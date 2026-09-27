@@ -8,54 +8,34 @@
 
 ## Báo cáo ngày 27/09/2026 (Tuần 1)
 
-**Trao đổi với thầy**
-- Thầy giao đề tài và gợi ý tham khảo báo cáo, repo của khóa trước.
-- Đồ án theo hướng **ứng dụng**: sản phẩm phải triển khai thật. **Lưu lượng người dùng là tiêu chí quan trọng** khi đánh giá ĐATN.
+Dạ em xin báo cáo tiến độ tuần 1 để thầy nắm ạ:
 
-**Công việc đã làm**
-- Đọc mô tả đề tài; đọc báo cáo và mã nguồn của khóa trước ([stock-report-agent-20251](https://github.com/buinguyenkhai/stock-report-agent-20251)).
-- Phân tích hệ thống của khóa trước:
-  - **Điểm mạnh:** Hybrid OCR (Tesseract + Surya) được đánh giá định lượng (Number F1 85,3%); kiến trúc agent LangGraph rõ ràng.
-  - **Hạn chế:**
-    - Chưa làm bước phân tích, so sánh và tạo báo cáo có biểu đồ.
-    - Mỗi chỉ tiêu chỉ lưu cột "kỳ này", nên chưa so sánh được với cùng kỳ.
-    - Chưa dùng CSDL.
-    - Mỗi truy vấn mất khoảng 5 phút, cần GPU, chạy local.
-- Khảo sát bối cảnh năm 2026:
-  - Quy định công bố BCTC: hạn 20 ngày sau quý, công ty mẹ 30 ngày. Vì vậy mùa BCTC Q3 rơi vào khoảng 10–30/10.
-  - Các sản phẩm "AI chứng khoán" đã có trên thị trường.
-  - Ranh giới pháp lý: không được khuyến nghị mua/bán khi không có giấy phép.
-- Khảo sát nhu cầu người dùng: diễn đàn (F319, Voz), đánh giá ứng dụng, cộng đồng quant.
+**Về hệ thống của khóa trước** (repo [stock-report-agent-20251](https://github.com/buinguyenkhai/stock-report-agent-20251)), em đã tìm hiểu:
+- Pipeline agent LangGraph:
+  - process_query: LLM few-shot → ReportRequest (mã, năm, kỳ, hợp nhất/riêng); lọc kỳ chưa công bố.
+  - extract_report_link: gọi API getdocument của Vietstock, không dùng LLM.
+  - ocr_report: Hybrid OCR.
+  - parse_report: 4 extractor BS/PL/CF/metadata chạy song song → AggregatedParser dùng Pydantic structured output.
+  - generate_final_response: hiện chỉ trả link.
+- Hybrid OCR: Tesseract (có confidence từng từ) → chọn ô có confidence thấp (ô số < 0,95, ô chữ < 0,35) hoặc số đáng ngờ → crop → Surya đọc lại theo batch → kiểm tra trước khi nhận (tỷ lệ độ dài, LCS, giữ tính chất số, số chữ số hợp lý) → merge. Kèm sửa ký tự dễ nhầm (O→0, l→1…) và suy luận vùng bảng. Kết quả trên 401 trang: Number F1 81,6% (Tesseract) → 85,3% (Hybrid) → 87,8% (Marker); tốc độ 7,8 → 11,1 → 58,3 s/trang.
+- Hạn chế:
+  - Schema chỉ có một `value` cho mỗi chỉ tiêu (cột kỳ này, `services/parser.py`) → mất cột cùng kỳ và lũy kế → không so sánh YoY được.
+  - Bước phân tích và tạo báo cáo chưa làm.
+  - Có `schema.sql` nhưng code chưa dùng.
+  - Khoảng 5 phút mỗi báo cáo (OCR 194 s + LLM 102 s), cần GPU.
 
-**Kết quả chính**
-- **Phát hiện kỹ thuật:** Thông tư 99/2025 thay Thông tư 200 từ BCTC Q1/2026 và đổi một số mã số (ví dụ tổng tài sản 270 → 280). Kiểm tra trên ~940 BCTC Q2/2026 (lấy từ một kho BCTC đã OCR công khai):
-  - khoảng 88% đã dùng mã mới, khoảng 11% vẫn ghi mã cũ;
-  - khoảng 1/4 dùng dấu phẩy để phân tách hàng nghìn.
-  - → Hệ thống phải chuẩn hóa mã số theo phiên bản mẫu biểu, không được hard-code.
-- **Nhu cầu nổi bật của người dùng:**
-  - phân biệt tin đồn với thông tin chính thức;
-  - hiểu nhanh kết quả kinh doanh;
-  - theo dõi danh mục ở nhiều CTCK với giá vốn đúng.
-- **Hoàn thành bộ tài liệu định hướng** (thư mục [`dinh-huong/`](dinh-huong/)): tầm nhìn và lộ trình, kiến trúc kỹ thuật, nghiên cứu người dùng, tác động của tin tức, kiến thức nền về thị trường.
+**Về BCTC Việt Nam**, em đã tìm hiểu:
+- Cấu trúc 3 báo cáo và các cột số liệu:
+  - KQKD quý: quý này, cùng kỳ, lũy kế.
+  - BCĐKT: cuối kỳ, đầu năm.
+  - LCTT: lũy kế, nên số riêng quý = lũy kế kỳ này − lũy kế kỳ trước.
+- Hệ thống mã số và các ràng buộc kế toán dùng để tự kiểm chứng: 270 = 100 + 200, 270 = 440, 60 = 50 − 51 − 52, tiền cuối kỳ trên LCTT = tiền trên BCĐKT.
+- Thông tư 99/2025 thay Thông tư 200 từ 1/1/2026: thêm dòng tài sản sinh học → dịch mã (tổng tài sản 270 → 280; mã 270 giờ là tài sản dài hạn khác). Ngân hàng, CTCK, bảo hiểm dùng mẫu riêng. Em kiểm tra trên khoảng 940 BCTC Q2/2026: khoảng 88% ghi mã 280, 11% vẫn ghi 270; khoảng 25% dùng dấu phẩy phân tách hàng nghìn → cần nhận diện phiên bản mẫu, chuẩn hóa mã số, và suy dấu phân cách theo từng tài liệu.
+- Quy định công bố thông tin: BCTC quý nộp trong 20 ngày (công ty mẹ 30 ngày) → mùa BCTC Q3 rơi vào khoảng 10–30/10.
 
-**Ý tưởng, đề xuất định hướng (xin ý kiến thầy)**
-- **Đổi cách làm:** trước đây người dùng hỏi thì agent mới đi tải và OCR. Nay hệ thống đọc mọi BCTC ngay khi công bố, tự kiểm chứng bằng ràng buộc kế toán (ví dụ tổng tài sản = tổng nguồn vốn) rồi lưu CSDL. Nhờ vậy báo cáo trả về trong vài giây.
-- **Project 3:**
-  - agent phân tích BCTC và radar mùa BCTC Q3/2026 cho nhóm VN30 và các ngân hàng;
-  - web có danh sách theo dõi;
-  - chạy thật trong hai mùa BCTC Q3 và Q4.
-- **ĐATN:** mở rộng thành "đội ngũ AI" quanh danh mục của nhà đầu tư: theo dõi công bố thông tin, giải thích biến động giá, tính lãi/lỗ thật.
+**Định hướng:** đọc và kiểm chứng BCTC ngay khi công bố rồi lưu CSDL, thay vì đợi người dùng hỏi mới OCR; chạy thật trong mùa BCTC Q3.
 
-**Câu hỏi cho thầy**
-1. Hội đồng Project 3 đánh giá nặng phần sản phẩm chạy thật (số liệu người dùng) hay chiều sâu kỹ thuật?
-2. Thầy có đồng ý hướng mở rộng sang quản lý danh mục ở ĐATN không?
-3. Lab có hỗ trợ API LLM hoặc máy chủ không? Sản phẩm có thể vận hành dưới danh nghĩa dự án của lab không?
-
-**Kế hoạch tuần tới (28/09 – 04/10)**
-- Dựng CSDL, module thu thập BCTC từ Vietstock, và pipeline trích xuất bằng VLM (đủ các cột so sánh).
-- Thử trích xuất 20 BCTC Q2/2026; đo tỷ lệ vượt kiểm tra cân đối để chọn mô hình.
-- Bật thu thập dữ liệu nền: tin tức (kèm giờ đăng), công bố thông tin, giá cuối ngày.
-- Hỏi thử ChatGPT/Gemini khoảng 20 câu về số liệu BCTC Q2/2026, rồi đối chiếu với BCTC gốc.
+**Kế hoạch tuần tới:** dựng CSDL, module thu thập và pipeline trích xuất (đủ các cột); chạy thử trên 20 BCTC Q2/2026.
 
 ---
 

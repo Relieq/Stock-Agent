@@ -6,6 +6,18 @@
 
 ---
 
+## Kế hoạch học kỳ
+
+| Thời gian | Nội dung |
+|---|---|
+| 28/09 – 11/10 | Dựng CSDL, module thu thập và trích xuất BCTC (bản đầu) |
+| 12/10 – 08/11 | Chạy thử trong mùa BCTC quý 3 (VN30 + các ngân hàng) |
+| 09/11 – 06/12 | Agent phân tích và tạo báo cáo so sánh; mở rộng lên VN100 |
+| 07/12 – 03/01 | Kiểm chứng số liệu, đánh giá độ chính xác |
+| 04/01 – 31/01 | Chạy trong mùa BCTC quý 4, viết báo cáo final |
+
+---
+
 ## Báo cáo ngày 27/09/2026 (Tuần 1)
 
 Dạ em xin báo cáo tiến độ tuần 1 để thầy nắm ạ:
@@ -32,6 +44,11 @@ Dạ em xin báo cáo tiến độ tuần 1 để thầy nắm ạ:
 - Hệ thống mã số và các ràng buộc kế toán dùng để tự kiểm chứng: 270 = 100 + 200, 270 = 440, 60 = 50 − 51 − 52, tiền cuối kỳ trên LCTT = tiền trên BCĐKT.
 - Thông tư 99/2025 thay Thông tư 200 từ 1/1/2026: thêm dòng tài sản sinh học → dịch mã (tổng tài sản 270 → 280; mã 270 giờ là tài sản dài hạn khác). Ngân hàng, CTCK, bảo hiểm dùng mẫu riêng. Em kiểm tra trên khoảng 940 BCTC Q2/2026: khoảng 88% ghi mã 280, 11% vẫn ghi 270; khoảng 25% dùng dấu phẩy phân tách hàng nghìn → cần nhận diện phiên bản mẫu, chuẩn hóa mã số, và suy dấu phân cách theo từng tài liệu.
 - Quy định công bố thông tin: BCTC quý nộp trong 20 ngày (công ty mẹ 30 ngày) → mùa BCTC Q3 rơi vào khoảng 10–30/10.
+
+**Rút ra:**
+- OCR mới đạt Number F1 ~85%, nên cần thêm bước kiểm chứng số bằng ràng buộc kế toán (VD: tổng tài sản = tổng nguồn vốn).
+- Hệ thống cũ chỉ lưu 1 cột số cho mỗi chỉ tiêu nên không so sánh được với cùng kỳ, cần lưu đủ các cột.
+- Từ 2026 mẫu BCTC đổi mã số (tổng tài sản 270 → 280; khoảng 11% BCTC Q2/2026 vẫn ghi mã cũ), cần chuẩn hóa mã theo phiên bản mẫu.
 
 **Định hướng:** đọc và kiểm chứng BCTC ngay khi công bố rồi lưu CSDL, thay vì đợi người dùng hỏi mới OCR; chạy thật trong mùa BCTC Q3.
 

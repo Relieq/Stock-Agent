@@ -35,13 +35,19 @@
   - **Canh thị trường ngay cả khi người dùng không hỏi.** ChatGPT chỉ trả lời khi được hỏi.
   - **Sở hữu dữ liệu đã chuẩn hóa cho toàn thị trường.** ChatGPT chỉ đi tìm lúc được hỏi.
   - **Chứng minh được từng con số.** Các mô hình tốt nhất vẫn sai khoảng 30–40% trên bài kiểm tra công việc của chuyên viên phân tích.
-  - **Là nơi làm việc**, có trạng thái và cộng đồng. ChatGPT chỉ là một ô trống.
-  - Nước đi quan trọng nhất: **không đối đầu với ChatGPT mà nằm bên trong ChatGPT và các trợ lý AI khác**, thông qua app hoặc MCP.
+  - **Là nơi làm việc, biết danh mục của bạn**, có trạng thái và cộng đồng. ChatGPT chỉ là một ô trống.
+  - **Ứng dụng riêng là "nhà" của sản phẩm.** MCP, tức cách để ChatGPT và các trợ lý AI khác gọi được dữ liệu của Soi, là kênh phụ và sẽ thêm sau. Backend được thiết kế API-first nên khi đó sẽ không phải viết lại.
 - **Đổi tư duy:** không đợi người dùng hỏi rồi mới đi tải và OCR PDF. Hãy **đọc mọi công bố thông tin một lần ngay khi nó xuất hiện, tự kiểm chứng rồi lưu vào CSDL**, để phục vụ hàng nghìn người, mỗi người chỉ chờ vài giây.
-- **Tầm nhìn vượt khỏi "Stock Report"** (tên tạm **"Soi"**):
-  - *Đây là lớp sự thật thời gian thực của thị trường vốn Việt Nam.* Mọi công bố thông tin (BCTC, giao dịch nội bộ, cổ tức, ĐHCĐ, trái phiếu…) được AI đọc, kiểm chứng và giải thích trong vài phút.
-  - Phục vụ cả người (qua web, Zalo) lẫn AI (qua ChatGPT và các trợ lý AI khác).
-  - Báo cáo chỉ là một trong nhiều đầu ra.
+- **Tầm nhìn vượt khỏi "Stock Report"** (tên tạm **"Soi"**): **đội ngũ đầu tư AI của riêng bạn, làm việc quanh danh mục của bạn** (xem [north-star.md](north-star.md)).
+  - Nền móng là *lớp sự thật thời gian thực của thị trường vốn Việt Nam*: mọi công bố thông tin (BCTC, giao dịch nội bộ, cổ tức, ĐHCĐ…) được AI đọc, kiểm chứng và giải thích trong vài phút.
+  - Trên nền đó là các "thành viên" của đội ngũ:
+    - chuyên viên phân tích BCTC (chính là đề tài gốc);
+    - chuyên viên tin tức và sự kiện;
+    - kế toán danh mục;
+    - quản trị rủi ro;
+    - người giải thích "vì sao giá biến động";
+    - thư ký soạn bản tin mỗi sáng.
+  - Đội ngũ **cung cấp thông tin và phân tích, không quyết định thay người dùng**.
   - BCTC là điểm bắt đầu, vì đó là phần khó nhất và giá trị nhất.
 - **Bối cảnh 09/2026:**
   - ~13,9 triệu tài khoản chứng khoán.
@@ -51,15 +57,29 @@
 - **5 cược lớn:**
   - ① Radar mọi công bố thông tin, bắt đầu từ BCTC.
   - ② Số liệu tự kiểm chứng, bấm vào là xem được nguồn.
-  - ③ Có mặt ở mọi nơi người dùng đang ở: Google, thẻ chia sẻ, Zalo, và **bên trong ChatGPT và các trợ lý AI khác**.
-  - ④ AI Analyst và các câu hỏi toàn thị trường, chạy trên dữ liệu đã kiểm chứng.
-  - ⑤ Cộng đồng và niềm tin: kiểm chứng tin đồn, dự đoán cộng đồng, công bố độ chính xác sau mỗi mùa BCTC.
+  - ③ **Danh mục là trung tâm:**
+    - giá vốn đúng sau các sự kiện quyền (cổ tức, cổ phiếu thưởng, quyền mua);
+    - lãi thật sau phí và thuế;
+    - cảnh báo rủi ro;
+    - trả lời "vì sao danh mục biến động hôm nay".
+  - ④ Có mặt ở nơi người dùng đang ở: **ứng dụng riêng** (web), Zalo, Facebook, Google. MCP thêm sau.
+  - ⑤ AI Analyst, cộng đồng và niềm tin: kiểm chứng tin đồn, công bố độ chính xác sau mỗi mùa BCTC.
 - **Thời điểm vàng:** mùa BCTC quý 3/2026 rơi đúng học kỳ Project 3.
   - Lác đác từ ~10/10, đỉnh quanh **20/10** và **30/10**.
   - Launch bản nhỏ (VN30 + ngân hàng) trước ~12/10.
   - Đến lúc bảo vệ ĐATN, sản phẩm đã qua 4 mùa BCTC và mùa ĐHCĐ, tích lũy được SEO và cộng đồng.
-- **Project 3** = MVP có người dùng thật: VN30 → VN100, web + Facebook + Zalo, AI Analyst v1.
-- **ĐATN** = toàn thị trường, phân tích sâu, đa kênh, vận hành như sản phẩm thật, có số liệu tăng trưởng người dùng để chứng minh.
+- **Project 3** = MVP có người dùng thật, gồm:
+  - chuyên viên phân tích BCTC (VN30 → VN100);
+  - radar mùa BCTC;
+  - web có watchlist, Facebook, Zalo;
+  - **bắt đầu lưu trữ tin tức, giá và giờ công bố ngay từ bây giờ**, vì dữ liệu này không thu lại được về sau.
+- **ĐATN** = đội ngũ AI quanh danh mục, gồm:
+  - kế toán danh mục và quản trị rủi ro;
+  - chuyên viên tin tức và sự kiện;
+  - người giải thích "vì sao giá biến động";
+  - bản tin mỗi sáng.
+
+  Chạy trên dữ liệu toàn thị trường và vận hành như một sản phẩm thật, có số liệu tăng trưởng và giữ chân người dùng để chứng minh.
 - **Ranh giới pháp lý:** sản phẩm là **dịch vụ thông tin**, không phải tư vấn đầu tư. Không khuyến nghị mua/bán, không đưa giá mục tiêu (xem [3.5](#35-pháp-lý-cần-biết-ngay-từ-đầu)).
 
 ---
@@ -101,17 +121,22 @@ Một sản phẩm của sinh viên không thể thắng ChatGPT ở chuyện "t
 
 **Chi phí thực tế của người dùng** (ước tính): để có kết quả tương đương bằng ChatGPT, bạn phải tự tìm PDF, tải lên (bản scan nặng 6–24 MB), hỏi đúng câu, tự kiểm tra lại số, rồi lặp lại cho từng mã, từng quý. Với một danh mục 10 mã trong mùa BCTC, việc đó tốn hàng giờ. Với Soi thì không tốn phút nào, vì thông báo tự đến.
 
-### 1.3 Nước đi quan trọng nhất: không đối đầu ChatGPT mà nằm bên trong nó
+### 1.3 Ứng dụng riêng là "nhà", ChatGPT là một kênh phụ về sau
 
-- **Cơ hội:** ChatGPT đã mở thư mục ứng dụng từ 12/2025 (Apps SDK, xây trên MCP). Nhiều trợ lý AI khác cũng hỗ trợ MCP.
-- **Cách làm:** xây app/connector **Soi**. Khi ai đó hỏi ChatGPT hoặc một trợ lý AI khác về BCTC hay công bố thông tin của doanh nghiệp Việt, trợ lý sẽ gọi dữ liệu đã kiểm chứng của Soi và trích nguồn.
-- **Câu trả lời cho hội đồng:** *"Bạn cứ dùng ChatGPT, chúng tôi ở bên trong nó."* Mỗi lượt gọi là một người dùng thật và đo được.
-- **Khác biệt so với MCP hiện có:** TCBS và Finhay đã có MCP server, nhưng gắn với tài khoản chứng khoán của họ. Soi trung lập, miễn phí, có kiểm chứng và dẫn nguồn.
-- **Hình mẫu:** *Daloopa*, công ty chuyên trích số liệu từ BCTC mà mỗi con số đều có link về nguồn, là một trong các nguồn dữ liệu của ChatGPT for Financial Services. **Soi là "Daloopa cho Việt Nam", mở cho cả người lẫn AI.**
+**Quyết định (27/09/2026): xây ứng dụng riêng trước, MCP để sau.** Lý do:
+- **Tính năng trung tâm cần ứng dụng riêng.** Danh mục, cảnh báo, bản tin, lịch sự kiện đều cần lưu trạng thái, có giao diện và gửi thông báo. MCP không làm được những việc này.
+- **ĐATN chấm theo người dùng của sản phẩm.** Người dùng vào thẳng ứng dụng thì dễ đo và dễ trình bày hơn.
+- **Giữ được quan hệ với người dùng:** thương hiệu, phản hồi, dữ liệu hành vi.
+- **Không phụ thuộc vào việc duyệt** app tài chính trên nền tảng của bên thứ ba.
+
+**Vẫn giữ cửa cho MCP.** Backend thiết kế **API-first**: web, Zalo Bot và sau này là MCP đều chỉ là "vỏ" gọi chung một API. Khi cần thì thêm MCP, mất khoảng 1–2 tuần.
+- **Cơ hội sau này:** ChatGPT đã mở thư mục ứng dụng từ 12/2025 (Apps SDK, xây trên MCP).
+- **Khác biệt so với MCP hiện có:** TCBS và Finhay đã có MCP, nhưng gắn với tài khoản của họ. Soi thì trung lập, có kiểm chứng và dẫn nguồn.
+- **Hình mẫu:** *Daloopa*, công ty chuyên trích số liệu từ BCTC mà mỗi con số đều có link về nguồn, là một nguồn dữ liệu của ChatGPT for Financial Services.
 
 ### 1.4 Câu trả lời một dòng
 
-> **"ChatGPT biết nói. Soi biết đúng, biết trước và chứng minh được, rồi đưa những điều đó vào chính ChatGPT."**
+> **"ChatGPT biết nói. Soi biết đúng, biết trước, biết danh mục của bạn, và chứng minh được từng con số."**
 
 ### 1.5 Đừng tin lời, hãy đo: "ChatGPT test"
 
@@ -680,10 +705,10 @@ Mỗi ý tưởng được mô tả theo ba ý: nó là gì, vì sao "lớn", v�
 - Nội dung kiểm chứng rất dễ lan truyền, và có giá trị xã hội rõ ràng.
 - ChatGPT làm việc này không đáng tin: nó thiếu lớp dữ liệu chính thức, và dễ lấy lại chính tin đồn trên web làm căn cứ.
 
-**D3. Soi bên trong ChatGPT và các trợ lý AI khác (app + MCP)** · P3 (bản thử MCP) → ĐATN (nộp app lên thư mục của ChatGPT)
+**D3. Soi bên trong ChatGPT và các trợ lý AI khác (app + MCP)** · cuối ĐATN nếu còn thời gian, nếu không thì để sau
 - **Các công cụ:** tra BCTC, tra chỉ số, tìm sự kiện, kiểm chứng một con số. Mỗi kết quả trả về số liệu kèm link nguồn.
-- Đây là bản nâng cấp của C2 thành **ưu tiên hàng đầu**, vì nó trả lời thẳng câu hỏi "tại sao không dùng ChatGPT?" (xem [mục 1.3](#13-nước-đi-quan-trọng-nhất-không-đối-đầu-chatgpt-mà-nằm-bên-trong-nó)).
-- Nó còn giúp **không cần tự xây một chatbot đa năng**: ChatGPT và các trợ lý AI khác đóng vai giao diện chat, còn Soi đóng vai nguồn sự thật.
+- **Chỉ là một kênh phụ.** Theo quyết định ở [mục 1.3](#13-ứng-dụng-riêng-là-nhà-chatgpt-là-một-kênh-phụ-về-sau), ứng dụng riêng là kênh chính. Nhờ backend API-first, việc thêm MCP chỉ mất khoảng 1–2 tuần.
+- **Không tự xây chatbot đa năng.** Ứng dụng riêng tập trung vào các tác vụ cụ thể: danh mục, radar, báo cáo. Hỏi đáp tự do thì để các trợ lý đa năng làm.
 
 **D4. Theo dõi trái phiếu doanh nghiệp** · sau ĐATN (tùy chọn)
 - **Nguồn:** cổng CBIS của HNX, gồm thông tin phát hành, thanh toán gốc/lãi, và các trường hợp chậm trả.
@@ -721,26 +746,28 @@ Chú thích cột **Qua ChatGPT test?** (xem [mục 1.5](#15-đừng-tin-lời-h
 | C5 Chat toàn thị trường | ~ (nên làm qua D3) | ★ | ★★ | ★ | Khó | P3 (cơ bản) → ĐATN |
 | **D1 Radar sự kiện công bố thông tin** | ✓ | ★★★ | ★★★ | ★★★ | Dễ–TB | P3 (1–2 loại) → ĐATN |
 | **D2 Kiểm chứng tin đồn** | ✓ | ★★★ | ★★ | ★★★ | TB | ĐATN |
-| **D3 Soi bên trong ChatGPT và trợ lý AI khác** | ✓ | ★★★ | ★★ | ★★★ | Dễ–TB | P3 (thử) → ĐATN |
+| D3 Soi bên trong ChatGPT và trợ lý AI khác (kênh phụ) | ✓ | ★★ | ★ | ★★ | Dễ (khi đã có API) | Cuối ĐATN / sau |
 | D4 Theo dõi trái phiếu | ✓ | ★★ | ★★ | ★★★ | TB | Sau ĐATN |
 
 ---
 
 ## 7. Chọn chiến lược: kết hợp theo thứ tự
 
-Có ba hướng:
+Có bốn hướng:
 1. **Earnings Wire (ưu tiên nội dung).** Có traffic nhanh nhất. Rủi ro: bị xem là "trang tin tự động", chiều sâu agent không nổi bật.
 2. **AI Analyst (ưu tiên công cụ).** Chiều sâu agent rõ ràng. Rủi ro: mảng này đông đối thủ nhất, và người dùng phải tự tìm đến, tự biết hỏi gì.
-3. **Data Infrastructure (ưu tiên API).** Uy tín kỹ thuật cao. Trước đây rủi ro là tệp người dùng nhỏ. Nhưng nếu dữ liệu chạy **bên trong ChatGPT và các trợ lý AI khác** thì tệp người dùng tiềm năng chính là người dùng của các trợ lý này.
+3. **Data Infrastructure (ưu tiên API).** Uy tín kỹ thuật cao. Rủi ro: tệp người dùng nhỏ. Có thể thêm sau dưới dạng MCP.
+4. **Danh mục + đội ngũ AI (ưu tiên giữ chân)** (bổ sung 27/09/2026). Người dùng có lý do mở ứng dụng mỗi ngày. Rủi ro: phải xử lý đúng các chi tiết kế toán của Việt Nam, và dữ liệu danh mục là dữ liệu tài chính cá nhân, cần bảo vệ.
 
-**Khuyến nghị: làm cả ba, nhưng theo thứ tự.**
+**Khuyến nghị: làm theo thứ tự.**
 
-> **Sự thật đã kiểm chứng là lõi → Radar là lý do quay lại → Có mặt ở mọi nơi (Google, Zalo, Facebook, và bên trong ChatGPT) → AI Analyst và cộng đồng là chiều sâu.**
+> **Sự thật đã kiểm chứng là lõi → Radar và BCTC là lý do người dùng *đến* (mùa BCTC) → Danh mục là lý do họ *ở lại* (hằng ngày) → Có mặt ở nơi người dùng đang ở (ứng dụng riêng, Zalo, Facebook, Google; MCP để sau).**
 
 - **Lõi:** dữ liệu và sự kiện đã kiểm chứng được mọi tính năng dùng chung, nên phải làm đúng ngay từ đầu. Mọi tính năng mới phải qua "ChatGPT test" ([mục 1.5](#15-đừng-tin-lời-hãy-đo-chatgpt-test)).
-- **Radar** (BCTC rồi đến mọi công bố thông tin) cho người dùng lý do quay lại mà không cần biết phải hỏi gì. Đây là chỗ cả đối thủ lẫn ChatGPT đang bỏ trống.
-- **Phân phối:** nội dung tự động (thẻ, trang SEO, BXH) và app/MCP bên trong ChatGPT và các trợ lý AI khác đưa sản phẩm đến nơi người dùng đã có mặt sẵn.
-- **Chiều sâu:** AI Analyst, kiểm chứng tin đồn và dự đoán cộng đồng giữ chân người dùng, đồng thời tạo khác biệt "agentic" cho đồ án.
+- **Radar** (BCTC trước, rồi đến mọi công bố thông tin) mang người dùng đến mà họ không cần biết phải hỏi gì. Đây là chỗ cả đối thủ lẫn ChatGPT đang bỏ trống.
+- **Danh mục** biến những người đến vì một mùa BCTC thành người dùng mỗi ngày. Cảnh báo và bản tin chỉ nói về *các mã họ đang giữ*.
+- **Phân phối:** nội dung tự động (thẻ, trang SEO, BXH), Zalo và Facebook đưa sản phẩm đến nơi người dùng đã có mặt sẵn. MCP là kênh phụ, thêm sau.
+- **Chiều sâu:** AI Analyst, người giải thích và kiểm chứng tin đồn tạo khác biệt "agentic" cho đồ án.
 
 ---
 
@@ -763,7 +790,7 @@ Có ba hướng:
 | Web + Facebook page + Zalo Bot; email/web push nếu kịp | Zalo OA/Mini App, video, Broker Copilot |
 | Kế hoạch năm 2026 nhập tay cho VN30 | Tự động đọc Nghị quyết ĐHCĐ |
 | Bộ canh thiết kế **chung cho mọi loại công bố thông tin**; thêm 1–2 loại sự kiện (giao dịch nội bộ, cổ tức) nếu kịp | Radar đầy đủ mọi sự kiện công bố thông tin |
-| **"ChatGPT test" v1**; **MCP server bản thử** (chỉ đọc) | App trong thư mục ChatGPT, connector MCP, API công khai |
+| **"ChatGPT test" v1**; backend **API-first**, có tài liệu OpenAPI; **bắt đầu lưu trữ tin tức, giá và giờ công bố** (chạy nền mỗi ngày) | Danh mục, tin tức & sự kiện, bản tin; MCP (kênh phụ) |
 
 ### 8.3 Lộ trình theo tuần (HK 2026.1)
 
@@ -774,7 +801,7 @@ Có ba hướng:
 | 1–2 | 28/9 – 11/10 | **MVP v0 (bản tối giản) kịp nhóm công bố sớm** | CSDL; watcher Vietstock; trích xuất VLM **đủ các cột so sánh**; kiểm tra cân đối (280 = 440 theo TT99, 270 = 440 theo TT200) và các dòng tổng chính của KQKD; backfill 4 quý cho VN30 + ngân hàng (giai đoạn này có cả hai mẫu TT200 và TT99); script sinh thẻ KQKD; web tĩnh tối giản; Facebook page; cài analytics |
 | 3–6 | 12/10 – 8/11 | **Chạy LIVE mùa BCTC Q3/2026** (đỉnh ~20/10 và ~30/10) | Đăng thẻ KQKD trong ≤ 30 phút (có duyệt tay); BXH mỗi tối; % kế hoạch năm (nhập tay cho VN30); Zalo Bot tra mã; thu phản hồi; đo Time-to-Insight. **"ChatGPT test" v1**: gồm các câu tra số, so sánh, toàn thị trường, và câu "độ mới" hỏi ngay sau khi doanh nghiệp công bố |
 | 7–10 | 9/11 – 6/12 | **AI Analyst v1 + VN100** | Báo cáo theo yêu cầu (soi 1 mã, so sánh nhiều mã, tổng quan nhóm ngân hàng); biểu đồ; xuất PDF/ảnh; link chia sẻ; bộ kiểm chứng số trong văn bản; nhãn "nội dung do AI tạo". Tính năng nào trượt "ChatGPT test" thì hạ ưu tiên |
-| 11–14 | 7/12 – 3/1 | **Tin cậy + phân phối + đánh giá** | Kiểm tra theo cây mã số và chéo kỳ; trang duyệt tay; trang SEO cho mọi mã đã phủ; watchlist và cảnh báo qua Zalo Bot/email; **MCP server bản thử** (tra BCTC, chỉ số, kiểm chứng một con số), thử với ChatGPT và các trợ lý AI khác; 1–2 loại sự kiện công bố thông tin nếu kịp; đánh giá trên vnpdf và golden set |
+| 11–14 | 7/12 – 3/1 | **Tin cậy + phân phối + đánh giá** | Kiểm tra theo cây mã số và chéo kỳ; trang duyệt tay; trang SEO cho mọi mã đã phủ; watchlist và cảnh báo qua Zalo Bot/email; chuẩn hóa API (OpenAPI) để sau này thêm MCP dễ dàng; 5–10 cuộc phỏng vấn người dùng về nhu cầu quản lý danh mục; 1–2 loại sự kiện công bố thông tin nếu kịp; đánh giá trên vnpdf và golden set |
 | 15–18 | 4/1 – 31/1 | **Mùa Q4/2026 + viết báo cáo** (đỉnh ~20/1 và ~30/1) | Đóng băng tính năng; vận hành mùa Q4 tự động hơn; tổng hợp số liệu người dùng; viết báo cáo; chuẩn bị demo |
 
 ```mermaid
@@ -833,7 +860,26 @@ gantt
 
 ## 9. ĐATN: lớn hơn theo 4 trục
 
-Project 3 chứng minh sản phẩm *"làm được và có người dùng"*. ĐATN phải chứng minh sản phẩm *"**chạy ở quy mô thật, phân tích sâu, và đang tăng trưởng**"*.
+Project 3 chứng minh sản phẩm *"làm được và có người dùng"*. ĐATN phải chứng minh sản phẩm *"**chạy ở quy mô thật, được dùng hằng ngày, và đang tăng trưởng**"*.
+
+### Trọng tâm (cập nhật 27/09/2026): đội ngũ AI quanh danh mục
+
+Mùa BCTC chỉ tạo đỉnh truy cập vài tuần mỗi quý. Danh mục mới là lý do để người dùng mở ứng dụng **mỗi ngày**. Vì vậy ĐATN xoay quanh ba trụ (chi tiết ở [north-star.md](north-star.md)):
+1. **Danh mục (kế toán danh mục + quản trị rủi ro):**
+   - nhập danh mục bằng tay, từ file, từ sao kê của CTCK hoặc từ ảnh chụp màn hình;
+   - **tự điều chỉnh giá vốn** theo cổ tức, cổ phiếu thưởng, quyền mua, lấy dữ liệu từ radar;
+   - tính lãi thật sau phí và thuế, so sánh với VN-Index;
+   - theo dõi tỷ trọng và cảnh báo theo quy tắc do người dùng tự đặt.
+2. **Tin tức & sự kiện + người giải thích:**
+   - radar mọi công bố thông tin cho các mã trong danh mục;
+   - gom tin trùng, gắn đúng mã;
+   - trả lời "vì sao hôm nay biến động";
+   - mức độ quan trọng của từng tin được học từ thống kê phản ứng giá trong quá khứ (xem [news-impact.md](news-impact.md)).
+3. **Thư ký:** bản tin sáng và nhìn lại tuần theo từng danh mục; hỏi đáp có ngữ cảnh danh mục.
+
+**Nền:** dữ liệu BCTC và công bố thông tin đã kiểm chứng từ P3, mở rộng ra toàn thị trường.
+
+**Hoãn sang sau ĐATN** (để dồn sức cho ba trụ): English edition, Broker Copilot, video ngắn, theo dõi trái phiếu, cuộc thi dự báo (chỉ làm bản nhỏ nếu còn sức), MCP (kênh phụ).
 
 ### Trục 1: Độ phủ
 - Toàn thị trường: HOSE + HNX + UPCoM.
@@ -848,25 +894,26 @@ Project 3 chứng minh sản phẩm *"làm được và có người dùng"*. Đ
 
 ### Trục 2: Độ sâu phân tích
 - A2 bản đầy đủ: tự sửa và click-to-source trên PDF.
-- A5 tự động, A6 soi rủi ro, A7 sau kiểm toán, C1 dự đoán cộng đồng, **D2 kiểm chứng tin đồn**.
+- A5 tự động, A6 soi rủi ro, A7 sau kiểm toán, D2 kiểm chứng tin đồn (bản nhỏ). C1 dự đoán cộng đồng để sau.
 - AI Analyst v2:
   - nhiều bước; tự lập kế hoạch cho cả câu hỏi mở;
   - tự chọn nhóm so sánh cùng ngành;
   - chỉ số định giá cơ bản như P/E, P/B (chỉ để tham khảo, không khuyến nghị);
-  - nhớ danh mục theo dõi của từng người dùng.
-- Câu hỏi toàn thị trường: text-to-SQL an toàn, có kiểm chứng. Cung cấp chủ yếu qua MCP để ChatGPT và các trợ lý AI khác gọi, không tự xây chatbot riêng.
+  - **hiểu danh mục của từng người dùng**: phân tích, so sánh và mô phỏng "nếu… thì…" đều theo đúng các mã họ đang giữ.
+- Câu hỏi toàn thị trường: text-to-SQL an toàn, có kiểm chứng, dùng ngay trong ứng dụng. Sau này mở thêm qua MCP.
 
 ### Trục 3: Kênh & tăng trưởng
-- **Bên trong ChatGPT và các trợ lý AI khác (D3):**
-  - Nộp app Soi lên thư mục ứng dụng của ChatGPT.
-  - Làm connector MCP cho các trợ lý AI khác.
-  - Đây là kênh có tệp người dùng tiềm năng lớn nhất.
+- **Ứng dụng riêng là kênh chính:** web (PWA, dùng tốt trên điện thoại, cài được lên màn hình chính) và bản tin sáng qua Zalo/email.
 - **Kênh khác:**
   - Zalo OA/Mini App, đăng ký dưới danh nghĩa tổ chức (ví dụ qua lab).
-  - Email, web push.
-  - English edition, Broker Copilot.
-  - API công khai, video ngắn (tùy chọn).
-- **Chiến dịch theo mùa:** mùa kiểm toán (3/2027), mùa ĐHCĐ (4/2027), cuộc thi dự báo Q1/2027 cùng CLB các trường.
+  - Web push.
+  - Facebook, SEO.
+- **Kênh phụ, làm nếu còn thời gian:** MCP để ChatGPT và các trợ lý AI khác gọi được dữ liệu của Soi (D3).
+- **Chiến dịch theo mùa:**
+  - mùa kiểm toán (3/2027);
+  - mùa ĐHCĐ (4/2027);
+  - mùa BCTC Q1/2027, kèm lời mời "nhập danh mục để nhận cảnh báo".
+- **Ngoài mùa:** các đợt FTSE tăng tỷ trọng cho Việt Nam (dự kiến 3/2027 và 6/2027) và các kỳ chia cổ tức là dịp để có nội dung "sự kiện ảnh hưởng tới danh mục của bạn".
 
 ### Trục 4: Kỹ thuật vận hành
 - **SLA:** Time-to-Insight trung vị ≤ 5 phút, tự động hoàn toàn cho phần lớn tài liệu.
@@ -881,10 +928,10 @@ Project 3 chứng minh sản phẩm *"làm được và có người dùng"*. Đ
 
 | Thời gian | Trọng tâm | Sự kiện thị trường |
 |---|---|---|
-| 2/2027 (sau Tết) | Mở rộng toàn thị trường; backfill 5 năm; mẫu BCTC cho CTCK và bảo hiểm; **D1 radar sự kiện công bố thông tin**; hoàn thiện MCP server | — |
-| 3/2027 | A7 sau kiểm toán; đọc tài liệu ĐHCĐ (A5 tự động); Zalo OA; **nộp app Soi lên ChatGPT** (tính trước thời gian xét duyệt) | BCTC năm đã kiểm toán (hạn 31/3); mùa ĐHCĐ bắt đầu |
-| 4/2027 | C1 cuộc thi dự báo Q1 cùng CLB các trường; **D2 kiểm chứng tin đồn**; English; thử nghiệm Broker Copilot | Cao điểm ĐHCĐ; BCTC Q1/2027 |
-| 5/2027 | API công khai + dataset mở; A6 soi rủi ro; **"ChatGPT test" lần cuối** với các mô hình mới nhất; tối ưu và kiểm thử tải | — |
+| 2/2027 (sau Tết) | **Danh mục v1:** nhập tay/CSV; tự điều chỉnh sự kiện quyền; lãi thật sau phí và thuế; so với VN-Index. Mở rộng dữ liệu ra toàn thị trường | — |
+| 3/2027 | **Tin tức & sự kiện v1** (D1): gom tin, gắn mã, chấm mức độ quan trọng; "vì sao biến động"; A7 sau kiểm toán; Zalo OA | BCTC năm đã kiểm toán (hạn 31/3); mùa ĐHCĐ; FTSE tăng tỷ trọng đợt 2 |
+| 4/2027 | **Bản tin sáng + cảnh báo theo danh mục**; nhập danh mục từ sao kê/ảnh chụp; quản trị rủi ro theo quy tắc người dùng; D2 kiểm chứng tin đồn (bản nhỏ) | Cao điểm ĐHCĐ; BCTC Q1/2027 |
+| 5/2027 | **Thống kê phản ứng giá theo loại sự kiện** để chấm mức độ quan trọng; "ChatGPT test" lần cuối; tối ưu và kiểm thử tải; MCP nếu còn thời gian | — |
 | 6–7/2027 | Đóng băng, đánh giá tổng thể, viết ĐATN, bảo vệ | BCTC bán niên (nếu bảo vệ muộn) |
 
 ### Mục tiêu người dùng cho ĐATN (3 mức)
@@ -896,8 +943,9 @@ Project 3 chứng minh sản phẩm *"làm được và có người dùng"*. Đ
 | Tỷ lệ quay lại sau 4 tuần (người đăng ký) | 15% | 25% | 35% |
 | Người theo dõi kênh (Zalo/Facebook) | 1.000 | 5.000 | 20.000 |
 | Báo cáo AI được tạo | 2.000 | 10.000 | 50.000 |
-| Developer dùng API/MCP | 10 | 50 | 200 |
-| Người dùng gọi Soi từ ChatGPT/trợ lý AI khác mỗi tháng | 500 | 5.000 | 20.000 |
+| **Danh mục đang hoạt động** (cập nhật trong 30 ngày) | 300 | 1.500 | 5.000 |
+| **DAU/MAU** (độ "dính" hằng ngày) | 10% | 20% | 30% |
+| Tỷ lệ mở bản tin sáng | 20% | 35% | 50% |
 
 > Đây là các mốc tự đặt để định hướng, không phải chuẩn của khoa; cần thống nhất với GVHD. Để dễ hình dung: CafeF có ~10 triệu lượt truy cập/tháng, Simplize ~0,3 triệu. 20.000 MAU đã là mức đáng kể với một sản phẩm của sinh viên.
 
@@ -906,8 +954,10 @@ Project 3 chứng minh sản phẩm *"làm được và có người dùng"*. Đ
 2. **Bảng mã chuẩn hóa xuyên chế độ kế toán.** Nhận dạng mẫu tự động (TT200 / TT99 / ngân hàng / CTCK / bảo hiểm) và ánh xạ về một bộ mã chung, để so sánh được giữa các năm và giữa các công ty.
 3. **Bộ kiểm chứng số cho văn bản do LLM viết** (numeric faithfulness guard). Đo tỷ lệ số liệu sai hoặc bịa trước và sau khi có bộ kiểm chứng.
 4. **Hệ thống thời gian thực ở quy mô toàn thị trường.** Có số liệu về độ trễ, thông lượng, chi phí trên mỗi tài liệu và mỗi người dùng.
-5. **"ChatGPT test" lặp lại qua nhiều mùa BCTC.** So sánh có hệ thống giữa Soi và các trợ lý AI đa năng về độ đúng, độ mới, khả năng kiểm chứng. Kết quả cho thấy khoảng cách với ChatGPT qua từng mùa đang giữ nguyên, nới rộng hay thu hẹp. Đây là câu trả lời có số liệu cho câu hỏi "tại sao không dùng ChatGPT?".
-6. **Bằng chứng về sản phẩm.** Số liệu tăng trưởng, retention theo cohort, A/B test (ví dụ thẻ có phần "vì sao" so với không có, xem tỷ lệ chia sẻ khác nhau thế nào).
+5. **Kế toán danh mục đúng quy định Việt Nam.** Tự điều chỉnh sự kiện quyền, phí và thuế từ dữ liệu công bố. Kiểm thử bằng sao kê thật của nhiều CTCK.
+6. **Mức độ quan trọng của sự kiện, học từ dữ liệu.** Dùng phương pháp nghiên cứu sự kiện (event study) trên dữ liệu Việt Nam để xếp hạng cảnh báo, thay cho quy tắc cảm tính.
+7. **"ChatGPT test" lặp lại qua nhiều mùa BCTC.** So sánh có hệ thống giữa Soi và các trợ lý AI đa năng về độ đúng, độ mới, khả năng kiểm chứng. Kết quả cho thấy khoảng cách với ChatGPT qua từng mùa đang giữ nguyên, nới rộng hay thu hẹp. Đây là câu trả lời có số liệu cho câu hỏi "tại sao không dùng ChatGPT?".
+8. **Bằng chứng về sản phẩm.** Số liệu tăng trưởng, retention theo cohort, A/B test (ví dụ thẻ có phần "vì sao" so với không có, xem tỷ lệ chia sẻ khác nhau thế nào).
 
 ---
 
@@ -940,6 +990,9 @@ Phải cài từ ngày đầu, vì số liệu đã bỏ lỡ thì không làm l
 | **Đối thủ lớn sao chép** | Tập trung vào thứ họ khó làm nhanh: kiểm chứng + nguồn từng con số, trung lập, đặc thù Việt Nam, tốc độ công bố. Đối với đồ án, cùng tồn tại là bình thường |
 | **Trợ lý AI đa năng làm phẳng khác biệt** (ChatGPT for Financial Services, MCP của CTCK, mô hình mới giỏi đọc PDF hơn) | Chạy "ChatGPT test" sau mỗi mùa BCTC. Bỏ những tính năng ChatGPT đã làm tốt ngang Soi. Dồn sức vào những thứ không nằm trong một cuộc chat: canh thời gian thực, dữ liệu Việt Nam đã kiểm chứng tích lũy qua nhiều năm, cộng đồng. **Nằm bên trong ChatGPT thay vì đối đầu** |
 | **Phụ thuộc nền tảng của bên thứ ba** (chính sách thư mục ứng dụng ChatGPT, Zalo) | Web + SEO vẫn là "nhà" của sản phẩm. MCP dùng giao thức mở, nên cùng lúc chạy được với nhiều trợ lý AI |
+| **Bản quyền dữ liệu giá** (danh mục cần giá để tính lãi/lỗ) | Dùng giá cuối ngày hoặc giá trễ; đọc kỹ điều khoản của nguồn (vnstock, API của CTCK) trước khi hiển thị cho người khác; tìm đối tác dữ liệu (qua lab hoặc CTCK) cho ĐATN; không phát lại dữ liệu giá thời gian thực |
+| **Dữ liệu danh mục là dữ liệu tài chính cá nhân** | Thu tối thiểu; có chế độ dùng ẩn danh (danh mục lưu trên thiết bị); mã hóa; xin đồng ý rõ ràng; cho xuất và xóa dữ liệu; không bán hay chia sẻ dữ liệu |
+| **Người dùng coi "đội ngũ AI" là lời khuyên đầu tư** | Mọi màn hình đều ghi rõ là thông tin, không phải khuyến nghị. Cảnh báo chỉ dựa trên quy tắc do người dùng tự đặt. Không có nút "nên mua/bán". Kiểm soát ngôn ngữ bằng prompt và bộ lọc |
 | **Chi phí LLM và hạ tầng vượt ngân sách** | Chỉ gửi trang cần thiết; mô hình rẻ trước; cache; theo dõi chi phí hằng ngày; xin credit giáo dục hoặc startup |
 | **Google phạt nội dung sinh hàng loạt** | Mỗi trang có dữ liệu và biểu đồ riêng; `noindex` trang mỏng; trang trung tâm cho từng mã; có trang phương pháp |
 | **Dữ liệu cá nhân** | Thu tối thiểu (email, Zalo ID); có chính sách quyền riêng tư; xin đồng ý; cho phép xóa (Luật BVDLCN 2025) |
@@ -956,13 +1009,17 @@ Phải cài từ ngày đầu, vì số liệu đã bỏ lỡ thì không làm l
 3. Dựng repo: CSDL, watcher (tái sử dụng logic Vietstock), pipeline trích xuất VLM với schema đủ các cột.
 4. Thử trích xuất 20 BCTC Q2/2026. Đo tỷ lệ vượt kiểm tra cân đối, rồi chọn mô hình.
 5. **Tự làm "ChatGPT test" thu nhỏ (khoảng 20 câu):** hỏi ChatGPT, Gemini, Perplexity về số liệu Q2/2026 của VN30, rồi đối chiếu với BCTC gốc. Ghi lại chỗ đúng, chỗ sai, chỗ không có nguồn. Kết quả giúp chọn đúng tính năng cần làm, và là slide mở đầu khi trình bày với GVHD.
-6. Nhập kế hoạch năm 2026 của VN30 (lấy từ Nghị quyết ĐHCĐ).
-7. Làm web tối giản và thẻ KQKD; cài analytics; viết trang miễn trừ, trang phương pháp, chính sách quyền riêng tư.
-8. Tham gia hoặc liên hệ 10–20 group chứng khoán lớn (đọc kỹ nội quy) và 3–5 CLB đầu tư sinh viên.
+6. **Bật thu thập nền ngay tuần này** (chạy mỗi ngày, rẻ, không làm lại được về sau):
+   - tin tức từ các báo tài chính, kèm **giờ đăng chính xác**;
+   - danh sách công bố thông tin, kèm giờ công bố;
+   - giá và khối lượng cuối ngày, dòng tiền khối ngoại.
+7. Nhập kế hoạch năm 2026 của VN30 (lấy từ Nghị quyết ĐHCĐ).
+8. Làm web tối giản và thẻ KQKD; cài analytics; viết trang miễn trừ, trang phương pháp, chính sách quyền riêng tư.
+9. Tham gia hoặc liên hệ 10–20 group chứng khoán lớn (đọc kỹ nội quy) và 3–5 CLB đầu tư sinh viên. Phỏng vấn 5–10 người về cách họ theo dõi danh mục hiện nay (xem [user-research.md](user-research.md)).
 
 ### Câu hỏi nên thảo luận với GVHD
 1. Hội đồng P3 đánh giá nặng phần nào hơn: sản phẩm chạy thật cùng số liệu người dùng, hay chiều sâu kỹ thuật? (Để biết cách phân bổ thời gian.)
-2. Thầy có đồng ý mở rộng phạm vi từ "Stock Report" thành "lớp sự thật của công bố thông tin" không? Hướng này vẫn bắt đầu từ BCTC như đề bài. Và lượt dùng qua ChatGPT và các trợ lý AI khác (MCP) có được tính là "người dùng" khi đánh giá ĐATN không?
+2. Thầy có đồng ý định hướng dài hạn là "đội ngũ đầu tư AI quanh danh mục" không? P3 vẫn bắt đầu từ BCTC như đề bài; ĐATN tập trung vào danh mục, tin tức và sự kiện. Phần nghiên cứu "tác động của tin tức tới giá" nên là một chương đánh giá trong ĐATN, hay chỉ là một tính năng?
 3. Lab có hỗ trợ ngân sách, API key, máy chủ không? Có thể đứng tên tổ chức cho Zalo OA không?
 4. Có thể vận hành sản phẩm dưới danh nghĩa dự án học thuật của lab/trường không? Có kênh nào để rà soát pháp lý (tư vấn đầu tư, AI, dữ liệu cá nhân)?
 5. Mức lưu lượng người dùng thế nào thì được coi là "tốt" cho ĐATN?

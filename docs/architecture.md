@@ -12,6 +12,12 @@
 6. **Không khóa vào một nhà cung cấp LLM.** Gọi LLM qua một lớp trung gian (API kiểu OpenAI, LiteLLM hoặc OpenRouter) để đổi mô hình theo chi phí và chất lượng.
 7. **Idempotent & có phiên bản.** Mỗi tài liệu được băm nội dung. Mỗi lần trích xuất ghi lại phiên bản pipeline. BCTC điều chỉnh hay công bố lại không ghi đè lên dữ liệu cũ.
 8. **Nhiều chế độ kế toán cùng tồn tại.** Từ năm 2026, Thông tư 99/2025 thay Thông tư 200 và đánh lại một số mã số. Ngân hàng, CTCK và bảo hiểm có mẫu riêng. Vì vậy mọi quy tắc (ánh xạ mã, ràng buộc kiểm chứng) đều phải khai báo **theo từng mẫu và phiên bản**, không được hard-code (xem 4.2).
+9. **API-first.** Mọi tính năng đều đi qua một API có tài liệu (OpenAPI). Web, Zalo Bot, email và sau này là MCP chỉ là các "vỏ" gọi chung API đó. Nhờ vậy, thêm kênh mới không phải viết lại lõi.
+10. **Lưu đúng thời điểm (point-in-time).**
+    - Mỗi tin tức, mỗi công bố thông tin, mỗi mức giá đều lưu **thời điểm xuất hiện** (`published_at`, `discovered_at`).
+    - Không ghi đè số liệu cũ khi có bản điều chỉnh.
+    - Đây là điều kiện bắt buộc để sau này làm nghiên cứu sự kiện (event study) mà không bị "nhìn trước tương lai" (look-ahead bias).
+    - **Dữ liệu này không thể thu lại về sau, nên phải bật thu thập từ P3.**
 
 ## 2. Tổng thể
 
@@ -373,7 +379,115 @@ flowchart LR
 | **So với trợ lý AI đa năng ("ChatGPT test")** | Tỷ lệ đúng số (sai số ≤ 0,5%), độ mới (hỏi ngay sau công bố), khả năng trả lời câu hỏi toàn thị trường, có nguồn kiểm chứng được hay không, thời gian, chi phí | 50–100 câu hỏi thật chia 5 loại. Chạy trên ChatGPT/Gemini/Perplexity (có tìm web) và trên Soi. Lặp lại sau mỗi mùa BCTC với phiên bản mô hình mới nhất |
 | Sản phẩm | UV, MAU, WAU, retention theo cohort, lượt chia sẻ, CSAT; người dùng và lượt gọi qua MCP | Analytics, log MCP |
 
-## 11. Cấu trúc repo đề xuất
+## 11. Danh mục (ĐATN): kế toán danh mục và quản trị rủi ro
+
+### 11.1 Mô hình dữ liệu
+
+```sql
+CREATE TABLE portfolios   (id UUID PRIMARY KEY, user_id UUID, name TEXT, base_ccy CHAR(3) DEFAULT 'VND',
+                           storage_mode VARCHAR(10) DEFAULT 'server');   -- server / local (chỉ lưu trên thiết bị)
+CREATE TABLE accounts     (id UUID PRIMARY KEY, portfolio_id UUID, broker VARCHAR(20), label TEXT);  -- nhiều CTCK
+CREATE TABLE transactions (id UUID PRIMARY KEY, account_id UUID, ticker VARCHAR(10), trade_date DATE,
+                           side VARCHAR(4),        -- BUY / SELL
+                           qty NUMERIC, price NUMERIC, fee NUMERIC, tax NUMERIC,
+                           source VARCHAR(20),     -- manual / csv / statement / screenshot
+                           source_ref TEXT);
+CREATE TABLE cash_flows   (id UUID PRIMARY KEY, account_id UUID, date DATE,
+                           kind VARCHAR(20),       -- deposit / withdraw / dividend / margin_interest / fee
+                           amount NUMERIC, ticker VARCHAR(10), event_id BIGINT);
+CREATE TABLE corporate_actions (id BIGSERIAL PRIMARY KEY, ticker VARCHAR(10), event_id BIGINT,  -- lấy từ radar
+                           kind VARCHAR(20),       -- cash_div / stock_div / bonus / rights / split / merger
+                           ex_date DATE, record_date DATE, pay_date DATE,
+                           ratio NUMERIC, cash_per_share NUMERIC, rights_price NUMERIC);
+CREATE TABLE prices_eod   (ticker VARCHAR(10), date DATE, open NUMERIC, high NUMERIC, low NUMERIC, close NUMERIC,
+                           volume NUMERIC, ref_price NUMERIC, ceiling NUMERIC, floor NUMERIC,
+                           foreign_net NUMERIC, source VARCHAR(20), PRIMARY KEY (ticker, date));
+-- Vị thế, giá vốn và lãi/lỗ là dữ liệu DẪN XUẤT: luôn tính lại từ transactions + cash_flows + corporate_actions.
+```
+
+### 11.2 Nhập danh mục (điểm ma sát lớn nhất của mọi app theo dõi danh mục)
+
+| Cách nhập | Cách làm | Giai đoạn |
+|---|---|---|
+| Nhập tay | Form nhanh: mã, số lượng, giá, ngày | ĐATN v1 |
+| File CSV/Excel | Mẫu chuẩn của Soi, và mẫu xuất sẵn của vài CTCK phổ biến | ĐATN v1 |
+| **Sao kê của CTCK (PDF/Excel)** | Dùng lại chính pipeline đọc tài liệu của BCTC. Kiểm chứng bằng cách so số dư cuối kỳ với tổng các giao dịch | ĐATN |
+| **Ảnh chụp màn hình danh mục** trên app của CTCK | Dùng VLM đọc mã, số lượng, giá vốn, sau đó **cho người dùng xác nhận** | ĐATN |
+| API của CTCK (chỉ đọc) | Chỉ làm khi có khung pháp lý rõ và được CTCK đồng ý | Sau ĐATN |
+
+### 11.3 Tính toán (toàn bộ bằng code, có unit test theo tình huống thật)
+
+- **"Giá vốn hai lớp"** (tính năng khác biệt):
+  - **Vốn thực bỏ ra:** bình quân gia quyền theo tiền thật đã trả. Sự kiện quyền chỉ thay đổi số lượng; nếu thực hiện quyền mua thì cộng thêm tiền trả cho quyền.
+  - **Giá vốn theo cách CTCK:** tính lại bằng công thức `P' = (P + Pa·a − C) / (1 + a + b)`, trong đó cổ tức tiền bị trừ vào giá vốn. Mục đích là để người dùng **đối chiếu được với số trên app CTCK**.
+  - **Hiển thị cả hai**, kèm "cổ tức đã nhận" và cách tính từng bước.
+- **Lãi/lỗ đã chốt và chưa chốt:**
+  - Trừ phí (phí Sở ~0,03% + phí môi giới của từng CTCK) và thuế bán 0,1%.
+  - Cộng cổ tức tiền mặt sau thuế 5%; trừ lãi margin (nếu có).
+- **Hiệu suất:** TWR (loại trừ ảnh hưởng của nạp/rút tiền), so sánh với VN-Index/VN30; hiệu suất theo từng mã và từng ngành.
+- **Rủi ro:**
+  - tỷ trọng từng mã và từng ngành; beta;
+  - mức sụt giảm từ đỉnh;
+  - thanh khoản: cần bao nhiêu phiên để thoát vị thế nếu mỗi phiên chỉ bán được x% khối lượng;
+  - quy tắc do người dùng tự đặt.
+- **Kiểm thử:** bộ "danh mục mẫu" gồm các tình huống khó (chia cổ tức bằng cổ phiếu rồi bán lô lẻ, thực hiện quyền mua, nhiều CTCK) có kết quả đúng tính tay.
+
+### 11.4 Quyền riêng tư
+
+- Có chế độ **chỉ lưu trên thiết bị**: danh mục nằm trong trình duyệt, server chỉ nhận danh sách mã để gửi cảnh báo.
+- Mã hóa khi lưu; tách danh tính người dùng khỏi dữ liệu giao dịch.
+- Có nút xuất và xóa dữ liệu; xin đồng ý rõ ràng.
+- Không bán dữ liệu, không dùng dữ liệu danh mục để huấn luyện mô hình khi người dùng chưa đồng ý.
+
+## 12. Tin tức & sự kiện (thu thập từ P3, dùng đầy đủ ở ĐATN)
+
+```mermaid
+flowchart LR
+    N1[RSS/scraper các báo<br/>tài chính] --> N2[(news_raw<br/>published_at, discovered_at)]
+    N3[Radar công bố<br/>thông tin] --> E[(events)]
+    N2 --> D[Gom tin trùng<br/>MinHash / embedding]
+    D --> T[Gắn mã<br/>từ điển tên công ty + LLM]
+    T --> C[Phân loại loại tin<br/>+ tóm tắt 1 câu]
+    C --> M{Chấm mức độ<br/>quan trọng}
+    E --> M
+    M --> A[Cảnh báo theo danh mục<br/>+ bản tin sáng]
+    P[(prices_eod)] --> X[Người giải thích<br/>vì sao biến động]
+    M --> X
+```
+
+- **Luôn lưu hai mốc thời gian:** `published_at` (theo nguồn) và `discovered_at` (lúc hệ thống thấy tin). Tin công bố sau 14:45 thì tính phản ứng giá từ phiên hôm sau.
+- **Gom tin trùng:** một sự kiện thường được 5–20 bài báo đưa lại. Chỉ gửi 1 cảnh báo, kèm danh sách nguồn.
+- **Gắn mã:** dùng từ điển tên công ty, tên viết tắt và tên lãnh đạo, rồi để LLM xác nhận. Tránh nhầm, ví dụ một mã trùng với một từ thông dụng.
+- **Người giải thích "vì sao biến động":**
+  - Tách biến động của cổ phiếu thành ba phần: do thị trường (beta × VN-Index), do ngành, và phần riêng của mã.
+  - Phần riêng được đối chiếu với các sự kiện và tin tức trong khoảng thời gian liên quan, cộng thêm dòng tiền khối ngoại và khối lượng bất thường.
+  - LLM chỉ viết lại các con số đã tính, kèm nguồn.
+  - Nếu không tìm thấy sự kiện nào thì trả lời thẳng: "không tìm thấy thông tin giải thích".
+- **Mức độ quan trọng:** ban đầu dùng quy tắc theo loại sự kiện. Về sau dùng thống kê phản ứng giá lịch sử (event study, xem [news-impact.md](news-impact.md)).
+
+## 13. Đội ngũ agent: vai trò → thành phần
+
+| Vai trò (xem [north-star.md](north-star.md)) | Thành phần kỹ thuật | Loại |
+|---|---|---|
+| Chuyên viên phân tích BCTC | Pipeline đọc và kiểm chứng (mục 4) + AI Analyst (mục 7) | Workflow + agent |
+| Chuyên viên tin tức & sự kiện | Radar (mục 3) + pipeline tin tức (mục 12) | Workflow (LLM ở bước phân loại) |
+| Kế toán danh mục | Dịch vụ tính toán (mục 11.3) | **Code thuần, không LLM** |
+| Quản trị rủi ro | Dịch vụ tính toán + quy tắc người dùng tự đặt | Code thuần |
+| Người giải thích | Phép tách biến động (code) + LLM viết lời | Agent có ràng buộc |
+| Thư ký | Bộ lập lịch + LLM soạn bản tin từ các sự kiện đã chấm điểm | Agent |
+| Nhà nghiên cứu định lượng | Event study; về sau có backtest theo đúng luật Việt Nam | Code + notebook |
+| Kiểm soát tuân thủ | Lớp kiểm tra đầu ra: lọc ngôn ngữ khuyến nghị, gắn nhãn AI, kiểm chứng số | Luôn bật, nằm trên mọi đầu ra |
+
+- **Điều phối:**
+  - Các vai trò chạy theo lịch hoặc theo sự kiện, qua hàng đợi. Không cần một "siêu agent" điều khiển tất cả.
+  - Chỉ phần hỏi đáp mới cần agent lập kế hoạch và gọi công cụ, dùng LangGraph.
+- **Dữ liệu cho người làm quant** (có thể mở sau ĐATN):
+  - Số liệu cơ bản ghi đúng thời điểm công bố (point-in-time).
+  - Chuỗi giá gốc và giá đã điều chỉnh, kèm bảng sự kiện quyền.
+  - Các bản chụp dữ liệu có phiên bản.
+  - Hiện chưa có nguồn miễn phí nào cung cấp những thứ này cho thị trường Việt Nam. Đây có thể là lợi thế riêng.
+
+## 14. Cấu trúc repo đề xuất
 
 ```
 stock-agent/
@@ -390,7 +504,11 @@ stock-agent/
 │   ├── content/            # thẻ KQKD, BXH, bản tin
 │   ├── bots/               # Zalo Bot (sau: Zalo OA), Facebook; Telegram tùy chọn
 │   ├── events/             # trích xuất sự kiện công bố thông tin ngắn (ĐATN)
-│   ├── mcp/                # MCP server cho ChatGPT và các trợ lý AI khác (thử ở cuối P3)
+│   ├── news/               # thu thập tin tức, gom trùng, gắn mã (chạy nền từ P3)
+│   ├── portfolio/          # kế toán danh mục, rủi ro, nhập sao kê/ảnh chụp (ĐATN)
+│   ├── research/           # event study, thống kê phản ứng giá (ĐATN)
+│   ├── briefing/           # bản tin sáng, nhìn lại tuần (ĐATN)
+│   ├── mcp/                # MCP server (kênh phụ, sau này)
 │   └── api/                # FastAPI: REST API công khai
 ├── db/migrations/
 ├── eval/                   # benchmark vnpdf, golden set, đánh giá nhận định

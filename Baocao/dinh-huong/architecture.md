@@ -490,29 +490,31 @@ flowchart LR
 ## 14. Cấu trúc repo đề xuất
 
 ```
-stock-agent/
-├── apps/
-│   ├── web/                # Next.js: trang công khai, SEO, giao diện chat
-│   └── admin/              # Duyệt tay (có thể dùng Streamlit)
-├── services/
-│   ├── ingestion/          # watcher, registry, downloader
-│   ├── extraction/         # pipeline LangGraph đọc & kiểm chứng
-│   │   ├── schemas/        # Pydantic schema theo từng mẫu BCTC
-│   │   └── rules/          # ràng buộc kế toán theo mẫu (DN thường, ngân hàng, …)
-│   ├── metrics/            # tính chỉ số
-│   ├── analyst/            # AI Analyst agent + tools + verifier
-│   ├── content/            # thẻ KQKD, BXH, bản tin
-│   ├── bots/               # Zalo Bot (sau: Zalo OA), Facebook; Telegram tùy chọn
-│   ├── events/             # trích xuất sự kiện công bố thông tin ngắn (ĐATN)
-│   ├── news/               # thu thập tin tức, gom trùng, gắn mã (chạy nền từ P3)
-│   ├── portfolio/          # kế toán danh mục, rủi ro, nhập sao kê/ảnh chụp (ĐATN)
-│   ├── research/           # event study, thống kê phản ứng giá (ĐATN)
-│   ├── briefing/           # bản tin sáng, nhìn lại tuần (ĐATN)
-│   ├── mcp/                # MCP server (kênh phụ, sau này)
-│   └── api/                # FastAPI: REST API công khai
-├── db/migrations/
-├── eval/                   # benchmark vnpdf, golden set, đánh giá nhận định
-│   └── chatgpt_test/       # bộ câu hỏi, câu trả lời, điểm chấm theo từng mùa
-├── infra/                  # docker-compose, CI/CD
-└── docs/
+Stock-Agent/
+├── Baocao/                 # báo cáo tuần, tài liệu định hướng, báo cáo P3/ĐATN
+├── Code/
+│   ├── apps/
+│   │   ├── web/            # Next.js: trang công khai, SEO, danh mục
+│   │   └── admin/          # Duyệt tay (có thể dùng Streamlit)
+│   ├── services/
+│   │   ├── ingestion/      # watcher, registry, downloader
+│   │   ├── extraction/     # pipeline LangGraph đọc & kiểm chứng
+│   │   │   ├── schemas/    # Pydantic schema theo từng mẫu BCTC
+│   │   │   └── rules/      # ràng buộc kế toán theo mẫu (DN thường, ngân hàng, …)
+│   │   ├── metrics/        # tính chỉ số
+│   │   ├── analyst/        # AI Analyst agent + tools + verifier
+│   │   ├── content/        # thẻ KQKD, BXH, bản tin
+│   │   ├── bots/           # Zalo Bot (sau: Zalo OA), Facebook; Telegram tùy chọn
+│   │   ├── events/         # trích xuất sự kiện công bố thông tin ngắn (ĐATN)
+│   │   ├── news/           # thu thập tin tức, gom trùng, gắn mã (chạy nền từ P3)
+│   │   ├── portfolio/      # kế toán danh mục, rủi ro, nhập sao kê/ảnh chụp (ĐATN)
+│   │   ├── research/       # event study, thống kê phản ứng giá (ĐATN)
+│   │   ├── briefing/       # bản tin sáng, nhìn lại tuần (ĐATN)
+│   │   ├── mcp/            # MCP server (kênh phụ, sau này)
+│   │   └── api/            # FastAPI: API dùng chung cho mọi kênh
+│   ├── db/migrations/
+│   ├── eval/               # benchmark vnpdf, golden set, "ChatGPT test"
+│   └── infra/              # docker-compose, CI/CD
+├── Data/                   # mẫu nhỏ + link Google Drive cho dữ liệu lớn
+└── Demo/                   # ảnh, video, link demo
 ```

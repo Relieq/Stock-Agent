@@ -8,25 +8,34 @@ Tầm nhìn (tên tạm **"Soi"**): **đội ngũ đầu tư AI của riêng b�
 - **Kênh:** ứng dụng riêng (web, Zalo). MCP để sau.
 - **Nguyên tắc:** miễn phí, trung lập; là dịch vụ thông tin, không phải tư vấn đầu tư; không quyết định thay người dùng.
 
-**Tại sao không hỏi thẳng ChatGPT?** ChatGPT chỉ trả lời khi được hỏi, không biết danh mục của bạn, không có dữ liệu Việt Nam đã chuẩn hóa, và không chứng minh được con số. Xem [mục 1 của tài liệu định hướng](docs/vision-and-roadmap.md#1-câu-hỏi-chốt-tại-sao-không-hỏi-thẳng-chatgpt).
+**Tại sao không hỏi thẳng ChatGPT?** ChatGPT chỉ trả lời khi được hỏi, không biết danh mục của bạn, không có dữ liệu Việt Nam đã chuẩn hóa, và không chứng minh được con số. Xem [mục 1 của tài liệu định hướng](Baocao/dinh-huong/vision-and-roadmap.md#1-câu-hỏi-chốt-tại-sao-không-hỏi-thẳng-chatgpt).
+
+## Cấu trúc thư mục
+
+| Thư mục | Nội dung |
+|---|---|
+| [`Baocao/`](Baocao/) | [Báo cáo tiến độ theo tuần](Baocao/bao-cao-tuan.md), tài liệu định hướng, báo cáo Project 3 / ĐATN |
+| [`Code/`](Code/) | Mã nguồn |
+| [`Data/`](Data/) | Dữ liệu mẫu và link tới dữ liệu lớn trên Google Drive |
+| [`Demo/`](Demo/) | Ảnh, video, link sản phẩm |
 
 ## Tài liệu định hướng
 
 Nên đọc theo thứ tự:
-1. [docs/north-star.md](docs/north-star.md): đích đến dài hạn, gồm đội ngũ đầu tư AI và danh mục ở trung tâm; ranh giới pháp lý; kỳ vọng thực tế.
-2. [docs/user-research.md](docs/user-research.md): người dùng thực sự cần gì, tổng hợp từ diễn đàn, đánh giá ứng dụng và cộng đồng quant.
-3. [docs/news-impact.md](docs/news-impact.md): tin tức tác động tới giá ra sao, cái gì làm được và cái gì không nên làm.
-4. [docs/market-primer.md](docs/market-primer.md): kiến thức nền về thị trường Việt Nam cho người làm sản phẩm.
+1. [Baocao/dinh-huong/north-star.md](Baocao/dinh-huong/north-star.md): đích đến dài hạn, gồm đội ngũ đầu tư AI và danh mục ở trung tâm; ranh giới pháp lý; kỳ vọng thực tế.
+2. [Baocao/dinh-huong/user-research.md](Baocao/dinh-huong/user-research.md): người dùng thực sự cần gì, tổng hợp từ diễn đàn, đánh giá ứng dụng và cộng đồng quant.
+3. [Baocao/dinh-huong/news-impact.md](Baocao/dinh-huong/news-impact.md): tin tức tác động tới giá ra sao, cái gì làm được và cái gì không nên làm.
+4. [Baocao/dinh-huong/market-primer.md](Baocao/dinh-huong/market-primer.md): kiến thức nền về thị trường Việt Nam cho người làm sản phẩm.
 
 Chi tiết:
-- [docs/vision-and-roadmap.md](docs/vision-and-roadmap.md): nội dung gồm
+- [Baocao/dinh-huong/vision-and-roadmap.md](Baocao/dinh-huong/vision-and-roadmap.md): nội dung gồm
   - phân tích đề tài và repo khóa trước;
   - bối cảnh thị trường, đối thủ, pháp lý năm 2026;
   - kho ý tưởng lớn;
   - lộ trình Project 3 → ĐATN;
   - chỉ tiêu người dùng;
   - rủi ro.
-- [docs/architecture.md](docs/architecture.md): nội dung gồm
+- [Baocao/dinh-huong/architecture.md](Baocao/dinh-huong/architecture.md): nội dung gồm
   - kiến trúc kỹ thuật;
   - pipeline đọc và kiểm chứng BCTC (TT200/TT99, ngân hàng, …);
   - mô hình dữ liệu;

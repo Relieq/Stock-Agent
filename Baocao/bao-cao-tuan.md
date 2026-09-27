@@ -1,6 +1,6 @@
 # Báo cáo tiến độ theo tuần
 
-> Sinh viên: Hoàng Văn Nhân. MSSV: _[điền]_
+> Sinh viên: Hoàng Văn Nhân. MSSV: 20235542
 > Đề tài: **Ứng dụng Agentic AI trong Chứng khoán: Stock Report Agent** (Project 3 → ĐATN)
 > Quy ước: tuần mới ở trên, tuần cũ ở dưới. Bản này trùng nội dung với Note trên nhóm Facebook, kèm link chi tiết.
 

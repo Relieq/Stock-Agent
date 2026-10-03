@@ -14,10 +14,12 @@ Tầm nhìn (tên tạm **"Soi"**): **đội ngũ đầu tư AI của riêng b�
 
 | Thư mục | Nội dung |
 |---|---|
-| [`Baocao/`](Baocao/) | [Báo cáo tiến độ theo tuần](Baocao/bao-cao-tuan.md), tài liệu định hướng, báo cáo Project 3 / ĐATN |
+| [`Baocao/`](Baocao/) | [Báo cáo tiến độ theo tuần](Baocao/bao-cao-tuan.md), tài liệu định hướng, [khảo sát sản phẩm hiện có](Baocao/khao-sat/), báo cáo Project 3 / ĐATN |
 | [`Code/`](Code/) | Mã nguồn |
-| [`Data/`](Data/) | Dữ liệu mẫu và link tới dữ liệu lớn trên Google Drive |
+| [`Data/`](Data/) | Dữ liệu mẫu; dữ liệu lớn để trên Google Drive |
 | [`Demo/`](Demo/) | Ảnh, video, link sản phẩm |
+
+Ảnh chụp màn hình và dữ liệu lớn lưu trên [Google Drive của dự án](https://drive.google.com/drive/folders/1EhRh39TGHEqmDqDVlqXjQnkIAy3GCSt2?usp=sharing), không đưa lên GitHub.
 
 ## Tài liệu định hướng
 

@@ -1,0 +1,21 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: soi-db
+    environment:
+      POSTGRES_USER: soi
+      POSTGRES_PASSWORD: soi
+      POSTGRES_DB: soi
+    ports:
+      # Cổng 5433 để không đụng PostgreSQL cài sẵn trên máy (nếu có)
+      - "5433:5432"
+    volumes:
+      - soi-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U soi -d soi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  soi-db-data:

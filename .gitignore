@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Cấu hình cục bộ
+.env
+
+# Dữ liệu lớn (lưu trên Google Drive, xem Data/README.md)
+Data/raw/

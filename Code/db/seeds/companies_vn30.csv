@@ -1,0 +1,31 @@
+ticker,name,exchange,template
+ACB,Ngân hàng Thương mại Cổ phần Á Châu,HOSE,bank
+BID,Ngân hàng Thương mại Cổ phần Đầu tư và Phát triển Việt Nam,HOSE,bank
+BSR,Công ty Cổ phần - Tổng Công ty Lọc Hóa dầu Việt Nam,HOSE,corporate
+CTG,Ngân hàng Thương mại Cổ phần Công Thương Việt Nam,HOSE,bank
+FPT,Công ty Cổ phần FPT,HOSE,corporate
+GAS,Tổng Công ty Khí Việt Nam - Công ty Cổ phần,HOSE,corporate
+GVR,Tập đoàn Công nghiệp Cao su Việt Nam - Công ty Cổ phần,HOSE,corporate
+HDB,Ngân hàng Thương mại Cổ phần Phát triển Thành phố Hồ Chí Minh,HOSE,bank
+HPG,Công ty Cổ phần Tập đoàn Hòa Phát,HOSE,corporate
+LPB,Ngân hàng Thương mại Cổ phần Lộc Phát Việt Nam,HOSE,bank
+MBB,Ngân hàng Thương mại Cổ phần Quân Đội,HOSE,bank
+MCH,Công ty Cổ phần Hàng tiêu dùng Masan,HOSE,corporate
+MSN,Công ty Cổ phần Tập đoàn Masan,HOSE,corporate
+MWG,Công ty Cổ phần Đầu tư Thế Giới Di Động,HOSE,corporate
+SAB,Tổng Công ty Cổ phần Bia - Rượu - Nước giải khát Sài Gòn,HOSE,corporate
+SHB,Ngân hàng Thương mại Cổ phần Sài Gòn - Hà Nội,HOSE,bank
+SSB,Ngân hàng Thương mại Cổ phần Đông Nam Á,HOSE,bank
+SSI,Công ty Cổ phần Chứng khoán SSI,HOSE,securities
+STB,Ngân hàng Thương mại Cổ phần Sài Gòn Tài Lộc,HOSE,bank
+TCB,Ngân hàng Thương mại Cổ phần Kỹ Thương Việt Nam,HOSE,bank
+TCX,Công ty Cổ phần Chứng khoán Kỹ Thương,HOSE,securities
+VCB,Ngân hàng Thương mại Cổ phần Ngoại Thương Việt Nam,HOSE,bank
+VHM,Công ty Cổ phần Vinhomes,HOSE,corporate
+VIB,Ngân hàng Thương mại Cổ phần Quốc tế Việt Nam,HOSE,bank
+VIC,Tập đoàn Vingroup - Công ty Cổ phần,HOSE,corporate
+VJC,Công ty Cổ phần Hàng không VietJet,HOSE,corporate
+VNM,Công ty Cổ phần Sữa Việt Nam,HOSE,corporate
+VPB,Ngân hàng Thương mại Cổ phần Việt Nam Thịnh Vượng,HOSE,bank
+VPL,Công ty Cổ phần Vinpearl,HOSE,corporate
+VRE,Công ty Cổ phần Vincom Retail,HOSE,corporate

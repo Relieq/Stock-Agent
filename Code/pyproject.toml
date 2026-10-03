@@ -1,0 +1,23 @@
+[project]
+name = "soi"
+version = "0.1.0"
+description = "Thu thập, kiểm chứng và phân tích BCTC doanh nghiệp niêm yết Việt Nam"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.31",
+    "psycopg[binary]>=3.2",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["services*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

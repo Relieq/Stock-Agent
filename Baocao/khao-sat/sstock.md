@@ -1,7 +1,7 @@
 # Khảo sát sstock.vn
 
 > Trải nghiệm ngày 28/09/2026 theo gợi ý của thầy hướng dẫn, bằng tài khoản miễn phí (vai trò "User"). Dữ liệu dùng để thử bộ lọc là của ngày 25/09/2026, phiên gần nhất có dữ liệu.
-> Ảnh chụp màn hình (31 ảnh) lưu trên [Google Drive của dự án](https://drive.google.com/drive/folders/1EhRh39TGHEqmDqDVlqXjQnkIAy3GCSt2?usp=sharing), thư mục `khao-sat/sstock`. Tên ảnh ghi ở cuối mỗi mục.
+> Ảnh chụp màn hình (31 ảnh) lưu trên [Google Drive](https://drive.google.com/drive/folders/1EhRh39TGHEqmDqDVlqXjQnkIAy3GCSt2?usp=sharing). Tên ảnh ghi ở cuối mỗi mục.
 > Ghi chú chỉ phản ánh những gì quan sát được tại thời điểm trải nghiệm.
 
 ## Rút ra cho đề tài

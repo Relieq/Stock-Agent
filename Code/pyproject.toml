@@ -7,6 +7,8 @@ dependencies = [
     "requests>=2.31",
     "psycopg[binary]>=3.2",
     "python-dotenv>=1.0",
+    "pymupdf>=1.24",
+    "openai>=1.60",
 ]
 
 [project.optional-dependencies]

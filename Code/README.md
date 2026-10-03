@@ -8,7 +8,9 @@ Mã nguồn của dự án. Cấu trúc theo [kiến trúc kỹ thuật](../Baoc
 | `db/migrations/` | Lược đồ CSDL (file `.sql`, áp dụng theo thứ tự tên) | Có |
 | `db/seeds/` | Danh sách công ty (VN30) | Có |
 | `services/ingestion/` | Thu thập BCTC: lấy danh sách từ Vietstock, nhận dạng tiêu đề, tải file | Có |
-| `services/extraction/` | Đọc và kiểm chứng BCTC | Tuần tới |
+| `services/extraction/` | Đọc và kiểm chứng BCTC: chọn PDF, định vị trang, chép bảng bằng mô hình đọc ảnh, chuẩn hóa số, kiểm tra ràng buộc kế toán | Bản đầu; đã chạy thật trên 4 BCTC |
+| `services/llm.py` | Gọi mô hình qua giao diện kiểu OpenAI (Gemini, OpenAI, OpenRouter, Ollama) | Có |
+| `eval/` | Chấm kết quả trích xuất với bộ duyệt tay (`Data/golden/`) | Có |
 | `services/analyst/`, `services/news/`, `apps/web/`, `eval/` | Phân tích, tin tức, giao diện, đánh giá | Sau |
 
 ## Cài đặt
@@ -38,6 +40,41 @@ python -m services.ingestion download --year 2026 --period Q2   # tải file v�
 - Các lệnh chạy lại nhiều lần không tạo dữ liệu trùng: tài liệu khóa theo mã tài liệu của nguồn, file khóa theo SHA-256.
 - File tải về nằm trong `Data/raw/` (không đưa lên GitHub).
 - `--tickers FPT,VCB` để chỉ chạy một số mã; `--delay` để chỉnh thời gian nghỉ giữa các request (mặc định 1 giây).
+
+## Đọc và kiểm chứng BCTC
+
+Cần API key của một nhà cung cấp mô hình trong `.env` (xem `.env.example`).
+
+```bash
+python -m services.llm                                            # kiểm tra key, liệt kê mô hình dùng được
+python -m services.extraction run --tickers FPT --year 2026 --period Q2 --scope consolidated
+python -m services.extraction show --doc-id 28                    # các ràng buộc bị lệch
+python -m services.extraction reread --doc-id 28                  # đọc lại các ô thuộc ràng buộc bị lệch
+python -m services.extraction recheck --doc-id 28                 # kiểm tra lại từ kết quả đã lưu (khi sửa rules.py), không gọi mô hình
+python eval/golden.py                                             # chấm với bộ duyệt tay
+```
+
+- Mô hình chỉ định vị trang và chép nguyên văn các ô; đổi chuỗi thành số, đổi đơn vị, kiểm tra cộng tổng đều bằng code.
+- Ràng buộc kế toán khai báo theo mẫu trong `services/extraction/rules.py`: TT200 đầy đủ; TT99 mới có các dòng tổng;
+  ngân hàng và công ty chứng khoán chưa có. Mẫu (TT200/TT99) nhận dạng bằng phép cộng kiểm tra, không suy từ năm.
+- Kết quả từng tài liệu lưu ở `Data/raw/extracted/<mã>/<id>_<sha>.json` và trong bảng `line_items`, `validations`.
+- Ràng buộc bắt buộc bị lệch thì đọc lại đúng các ô liên quan ở độ phân giải cao hơn, **không** cho mô hình biết
+  con số mong đợi (để mô hình không "sửa cho khớp"); mọi lần đọc lại được ghi lại cả giá trị trước và sau.
+- Trang in xoay ngang được nhận ra ở bước định vị trang và xoay thẳng trước khi chép bảng.
+- Quy ước dấu (chi phí in số dương hay số âm trong ngoặc) được nhận ra theo từng tài liệu.
+- Mã số in trùng trên chính BCTC được ghi lại (`duplicate_codes`) thay vì để dòng sau đè dòng trước.
+- Chưa làm: ràng buộc cho ngân hàng và công ty chứng khoán; đọc lại bằng mô hình mạnh hơn khi đọc lại lần đầu vẫn lệch.
+
+Kết quả thử với `gpt-5.4-mini` trên BCTC hợp nhất quý 2/2026 (03/10/2026):
+
+| Mã | Mẫu nhận dạng | Ràng buộc bắt buộc | Ghi chú |
+|---|---|---|---|
+| FPT | TT99 | 32/32 | Đọc sai 1 chữ số ở doanh thu thuần quý; ràng buộc khoanh đúng ô, đọc lại sửa đúng (đã đối chiếu ảnh gốc) |
+| HPG | TT99 (in mã tổng tài sản 270) | 32/32 | BCTC tự in trùng mã 230 cho tài sản sinh học dài hạn và BĐS đầu tư |
+| MWG | TT99 | 34/34 | Trang KQKD in xoay ngang; chi phí in số âm |
+| VNM | TT99 | 32/32 | |
+
+Trung bình khoảng 50 nghìn token vào và 12 nghìn token ra cho mỗi BCTC (khoảng 0,09 USD với giá ngày 03/10/2026).
 
 ## Kiểm thử
 

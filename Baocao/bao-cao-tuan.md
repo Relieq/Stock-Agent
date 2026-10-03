@@ -18,6 +18,67 @@
 
 ---
 
+## Báo cáo ngày 04/10/2026 (Tuần 2)
+
+> **Chưa hoàn thiện.** Tuần 2 kết thúc ngày 04/10; phần tiến độ (CSDL, thu thập, trích xuất) sẽ được bổ sung khi hết tuần.
+
+Dạ em xin báo cáo tiến độ tuần 2 để thầy nắm ạ:
+
+**Trao đổi với thầy:**
+- Thầy góp ý hướng quản lý danh mục chưa có gì đặc biệt cho ĐATN.
+- Thầy nêu hai ví dụ ĐATN trước đây: đánh giá báo cáo KQKD có gì bất thường; tìm doanh nghiệp có KQKD tốt theo phương pháp đầu tư tăng trưởng.
+- Thầy gợi ý em trải nghiệm sstock.vn.
+
+Em đã trải nghiệm sstock.vn và đề xuất lại hướng ĐATN như dưới đây.
+
+**Về sstock.vn** ([ghi chú chi tiết](khao-sat/sstock.md), [ảnh chụp](https://drive.google.com/drive/folders/1EhRh39TGHEqmDqDVlqXjQnkIAy3GCSt2?usp=sharing)), em đã tìm hiểu:
+- **Điểm mạnh** (các chức năng phân tích đều miễn phí):
+  - BCTC 17 quý, có mẫu riêng cho ngân hàng;
+  - công bố công thức biểu đồ theo mã chỉ tiêu VAS;
+  - 7 bộ lọc dựng sẵn, có bộ riêng cho BĐS và chứng khoán;
+  - chỉ số sức mạnh tương đối cho cổ phiếu và ngành;
+  - AI tóm tắt tin tức.
+- **Chưa phát hiện bất thường.** Ví dụ:
+  - tăng trưởng do nền thấp: KSF +11.944% (quý 2/2026);
+  - lỗ thu hẹp hiển thị như tăng trưởng: NTL quý 4/2025 lỗ 3 tỷ so với lỗ 35 tỷ, hiện +91,3%;
+  - FPT quý 1/2026: doanh thu giảm 22,3% so với cùng kỳ; so với quý trước, lãi từ công ty liên doanh, liên kết tăng từ 284 lên 667 tỷ, LNST của cổ đông không kiểm soát giảm từ 485 xuống −11 tỷ. Đây là dấu hiệu thường gặp khi thôi hợp nhất một công ty con, nhưng trang không có chú thích nào.
+- **Chưa có sàng lọc theo phương pháp tăng trưởng chuẩn** (CANSLIM, GARP…):
+  - chưa giải thích vì sao mã lọt lọc;
+  - chưa có backtest;
+  - DCL đang lỗ (LNST 4 quý gần nhất −2,26 tỷ) vẫn lọt bộ lọc tăng trưởng.
+- **Dữ liệu chỉ có số riêng từng quý:**
+  - không có cột cùng kỳ, cột lũy kế;
+  - không có thuyết minh dạng dữ liệu;
+  - ngày trong kho tài liệu là ngày tải lên, không phải ngày công bố.
+
+**Rút ra:**
+- Tỷ lệ tăng trưởng đơn thuần dễ gây hiểu nhầm. Cần tách tăng trưởng từ hoạt động chính khỏi tăng trưởng nhờ khoản bất thường hoặc nhờ nền thấp.
+- Nguyên nhân biến động thường nằm trong thuyết minh và công văn giải trình. Vì vậy hệ thống cần đọc được cả văn bản, không chỉ bảng số.
+- Muốn đánh giá một bộ lọc trung thực bằng backtest thì phải biết chính xác thông tin được công bố khi nào.
+
+**Đề xuất hướng ĐATN**, gộp hai hướng thầy gợi ý: *Agent phát hiện và giải thích bất thường trong kết quả kinh doanh, ứng dụng sàng lọc doanh nghiệp tăng trưởng.* Gồm ba phần:
+1. **Phát hiện bất thường** trong mỗi BCTC mới:
+   - nền thấp, lỗ thu hẹp;
+   - lợi nhuận ngoài hoạt động chính, lợi nhuận không đi kèm dòng tiền;
+   - thay đổi phạm vi hợp nhất, chênh lệch sau kiểm toán.
+2. **Agent tìm nguyên nhân** trong thuyết minh, công văn giải trình và tin tức. Agent đối chiếu lời giải trình của doanh nghiệp với số liệu, rồi tách ra lợi nhuận cốt lõi. Mọi kết luận có trích dẫn tới trang tài liệu gốc.
+3. **Sàng lọc theo phương pháp tăng trưởng** (CANSLIM, GARP…) trên lợi nhuận cốt lõi:
+   - mỗi mã có giải thích vì sao lọt lọc;
+   - đánh giá bằng backtest trên dữ liệu theo đúng ngày công bố.
+
+Kế hoạch Project 3 giữ nguyên, vì dữ liệu đủ cột, có thuyết minh và đúng thời điểm công bố chính là nền cho hướng này. Riêng giai đoạn 09/11–06/12, phần agent phân tích sẽ làm thử hai thứ:
+- cầu lợi nhuận: lợi nhuận tăng, giảm đến từ dòng nào;
+- một số cờ bất thường đơn giản.
+
+**Kế hoạch tuần tới:**
+- Hoàn thành bản đầu của CSDL, module thu thập và module trích xuất (đủ các cột, kiểm tra bằng ràng buộc kế toán).
+- Chạy thử trên 20 BCTC Q2/2026 để kịp mùa BCTC quý 3 (từ khoảng 12/10).
+- Rà thêm các sản phẩm khác (Vietstock, FireAnt, Simplize, Index AI) để khẳng định điểm mới của hướng ĐATN.
+
+**Câu hỏi cho thầy:** thầy thấy hướng ĐATN trên có phù hợp không ạ?
+
+---
+
 ## Báo cáo ngày 27/09/2026 (Tuần 1)
 
 Dạ em xin báo cáo tiến độ tuần 1 để thầy nắm ạ:

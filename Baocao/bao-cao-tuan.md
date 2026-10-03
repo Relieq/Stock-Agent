@@ -20,7 +20,7 @@
 
 ## Báo cáo ngày 03/10/2026 (Tuần 2)
 
-> Báo cáo này sẽ được cập nhật ngày 04/10 kèm kết quả phần CSDL và thu thập.
+> Đã cập nhật kết quả phần CSDL và thu thập (mục **Kết quả**).
 
 Dạ em xin báo cáo tiến độ tuần 2 để thầy nắm ạ:
 
@@ -85,9 +85,16 @@ Dữ liệu này chính là nền cho hướng ĐATN trên. Riêng giai đoạn 
 - cầu lợi nhuận: lợi nhuận tăng, giảm đến từ dòng nào;
 - một số cờ bất thường đơn giản.
 
-**Tiến độ:** tuần này em dành để xem lại hướng ĐATN theo góp ý của thầy nên phần CSDL, thu thập và trích xuất chưa xong. Phần này không phụ thuộc hướng ĐATN nên em làm ngay; riêng phần agent phân tích em sẽ làm theo ý kiến của thầy về hướng trên.
+**Tiến độ:** tuần này em dành phần lớn thời gian để xem lại hướng ĐATN theo góp ý của thầy. Phần CSDL và module thu thập không phụ thuộc hướng ĐATN nên em đã làm xong bản đầu; phần trích xuất chuyển sang tuần tới; riêng phần agent phân tích em sẽ làm theo ý kiến của thầy về hướng trên.
 
-**Ngày mai (04/10):** dựng CSDL và module thu thập, lấy danh sách BCTC quý 2/2026 của VN30; cập nhật lại báo cáo này kèm kết quả.
+**Kết quả** ([mã nguồn và cách chạy](../Code/README.md)):
+- **CSDL** PostgreSQL chạy bằng Docker, gồm các bảng công ty, tài liệu, file đã tải (mỗi phiên bản file một dòng, không ghi đè khi BCTC công bố lại), số liệu trích xuất và kết quả kiểm chứng.
+- **Module thu thập** lấy danh sách BCTC từ Vietstock, nhận dạng từ tiêu đề: loại báo cáo, kỳ, hợp nhất/công ty mẹ, soát xét/kiểm toán, bản điều chỉnh. Bộ nhận dạng được kiểm thử trên toàn bộ 46 dạng tiêu đề thực tế của VN30 năm 2025–2026.
+- **Chạy thật năm 2026 cho VN30:** 174 tài liệu, nhận dạng đúng 174/174. **30/30 mã đã có BCTC quý 2/2026** (58 file, 487 MB), danh sách ở [Data/bctc_q2_2026_vn30.csv](../Data/bctc_q2_2026_vn30.csv). Chạy lại không tạo dữ liệu trùng.
+- **Phát hiện:**
+  - Ngày giờ trên Vietstock là giờ Vietstock tải lên, không phải giờ công bố: BID, MBB, SSB, STB có cùng mốc 31/07/2026 11:35. Cần lấy giờ công bố từ HOSE/HNX hoặc cổng CBTT để tính đúng thời điểm.
+  - 5/58 file là `.zip` (SSI, TCX, VPB), bước trích xuất phải giải nén.
+  - VNM công bố BCTC quý đã soát xét; LPB và TCX chỉ có một báo cáo (không có công ty con).
 
 **Kế hoạch tuần tới:**
 - Pipeline trích xuất (đủ các cột, kiểm tra bằng ràng buộc kế toán).

@@ -18,9 +18,9 @@
 
 ---
 
-## Báo cáo ngày 04/10/2026 (Tuần 2)
+## Báo cáo ngày 03/10/2026 (Tuần 2)
 
-> **Chưa hoàn thiện.** Tuần 2 kết thúc ngày 04/10; phần tiến độ (CSDL, thu thập, trích xuất) sẽ được bổ sung khi hết tuần.
+> Báo cáo này sẽ được cập nhật ngày 04/10 kèm kết quả phần CSDL và thu thập.
 
 Dạ em xin báo cáo tiến độ tuần 2 để thầy nắm ạ:
 
@@ -51,12 +51,18 @@ Em đã trải nghiệm sstock.vn và đề xuất lại hướng ĐATN như dư
   - không có thuyết minh dạng dữ liệu;
   - ngày trong kho tài liệu là ngày tải lên, không phải ngày công bố.
 
+**Về các công cụ hiện có và quy trình đầu tư** ([ghi chú chi tiết](khao-sat/tu-dong-hoa-dau-tu.md)), em đã tìm hiểu:
+- các công cụ tài chính, chứng khoán trên thế giới và tại Việt Nam;
+- quy trình làm việc của một bộ phận đầu tư, bước nào đã được tự động hóa;
+- cách giữ con người duyệt trong các hệ thống đầu tư tự động.
+
 **Rút ra:**
 - Tỷ lệ tăng trưởng đơn thuần dễ gây hiểu nhầm. Cần tách tăng trưởng từ hoạt động chính khỏi tăng trưởng nhờ khoản bất thường hoặc nhờ nền thấp.
 - Nguyên nhân biến động thường nằm trong thuyết minh và công văn giải trình. Vì vậy hệ thống cần đọc được cả văn bản, không chỉ bảng số.
 - Muốn đánh giá một bộ lọc trung thực bằng backtest thì phải biết chính xác thông tin được công bố khi nào.
+- Các quỹ đầu tư mới dùng AI để nghiên cứu và soạn thảo, quyết định vẫn do con người. Các thử nghiệm để AI tự giao dịch chưa cho kết quả tốt hơn mua và nắm giữ. Vì vậy hệ thống nên đề xuất, còn con người duyệt.
 
-**Đề xuất hướng ĐATN**, gộp hai hướng thầy gợi ý: *Agent phát hiện và giải thích bất thường trong kết quả kinh doanh, ứng dụng sàng lọc doanh nghiệp tăng trưởng.* Gồm ba phần:
+**Đề xuất hướng ĐATN**, gộp hai hướng thầy gợi ý: *Agent phát hiện và giải thích bất thường trong kết quả kinh doanh, ứng dụng sàng lọc doanh nghiệp tăng trưởng.* Gồm ba phần chính và một phần mở rộng:
 1. **Phát hiện bất thường** trong mỗi BCTC mới:
    - nền thấp, lỗ thu hẹp;
    - lợi nhuận ngoài hoạt động chính, lợi nhuận không đi kèm dòng tiền;
@@ -65,13 +71,26 @@ Em đã trải nghiệm sstock.vn và đề xuất lại hướng ĐATN như dư
 3. **Sàng lọc theo phương pháp tăng trưởng** (CANSLIM, GARP…) trên lợi nhuận cốt lõi:
    - mỗi mã có giải thích vì sao lọt lọc;
    - đánh giá bằng backtest trên dữ liệu theo đúng ngày công bố.
+4. **Phần mở rộng: hỗ trợ ra quyết định có con người duyệt.** Hệ thống đề xuất theo quy tắc người dùng tự đặt, người dùng quyết định. Thử nghiệm bằng giao dịch giả lập.
 
-Kế hoạch Project 3 giữ nguyên, vì dữ liệu đủ cột, có thuyết minh và đúng thời điểm công bố chính là nền cho hướng này. Riêng giai đoạn 09/11–06/12, phần agent phân tích sẽ làm thử hai thứ:
+Hướng quản lý danh mục em xin bỏ khỏi phần chính.
+
+**Project 3** giữ kế hoạch cũ: đọc và kiểm chứng BCTC ngay khi công bố, lưu CSDL. Khác khóa trước ở chỗ:
+- lấy đủ các cột (cùng kỳ, lũy kế);
+- tự kiểm tra bằng ràng buộc kế toán;
+- xử lý cả mẫu ngân hàng và mẫu mới theo Thông tư 99;
+- ghi đúng ngày công bố.
+
+Dữ liệu này chính là nền cho hướng ĐATN trên. Riêng giai đoạn 09/11–06/12, phần agent phân tích sẽ làm thử hai thứ:
 - cầu lợi nhuận: lợi nhuận tăng, giảm đến từ dòng nào;
 - một số cờ bất thường đơn giản.
 
+**Tiến độ:** tuần này em dành để xem lại hướng ĐATN theo góp ý của thầy nên phần CSDL, thu thập và trích xuất chưa xong. Phần này không phụ thuộc hướng ĐATN nên em làm ngay; riêng phần agent phân tích em sẽ làm theo ý kiến của thầy về hướng trên.
+
+**Ngày mai (04/10):** dựng CSDL và module thu thập, lấy danh sách BCTC quý 2/2026 của VN30; cập nhật lại báo cáo này kèm kết quả.
+
 **Kế hoạch tuần tới:**
-- Hoàn thành bản đầu của CSDL, module thu thập và module trích xuất (đủ các cột, kiểm tra bằng ràng buộc kế toán).
+- Pipeline trích xuất (đủ các cột, kiểm tra bằng ràng buộc kế toán).
 - Chạy thử trên 20 BCTC Q2/2026 để kịp mùa BCTC quý 3 (từ khoảng 12/10).
 - Rà thêm các sản phẩm khác (Vietstock, FireAnt, Simplize, Index AI) để khẳng định điểm mới của hướng ĐATN.
 

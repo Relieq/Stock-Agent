@@ -27,6 +27,9 @@ class Rule:
     # Cộng thêm các dòng có hậu tố chữ của mã trong nhóm (ví dụ LCTT "26b": tiền của công ty con khi mất quyền
     # kiểm soát, doanh nghiệp tự thêm vào giữa nhóm đầu tư)
     include_suffixed: bool = False
+    # Mã lấy giá trị tuyệt đối và giữ nguyên dấu của công thức, không theo quy ước dấu của tài liệu
+    # (ví dụ lợi ích cổ đông không kiểm soát: ngân hàng in trong ngoặc như một khoản trừ dù chi phí in số dương)
+    abs_codes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,8 @@ class RuleSet:
     total_assets_code: str
     rules: tuple[Rule, ...]
     cross_rules: tuple[CrossRule, ...] = ()
+    # Các khoản chi phí dùng để nhận ra quy ước dấu của KQKD (chi phí in số dương hay số âm trong ngoặc)
+    expense_codes: tuple[str, ...] = ("11", "25", "26")
 
 
 def rule(statement: str, lhs: str, *codes: str, id: str | None = None, **kw) -> Rule:
@@ -154,7 +159,43 @@ TT99 = RuleSet(
     cross_rules=tuple(replace(c, gate=False) for c in _CASH_CROSS),
 )
 
-RULESETS = {rs.template: rs for rs in (TT200, TT99)}
+# Ngân hàng (TCTD): mã chuẩn b.* gán theo tên chỉ tiêu ở services/extraction/bank.py
+_BANK_INCOME_PARTS = ("b.nii", "b.nfee", "b.nfx", "b.ntrading", "b.ninv", "b.nother", "b.equity_inc")
+TCTD = RuleSet(
+    template="TCTD",
+    total_assets_code="b.ta",
+    expense_codes=("b.ie", "b.fe", "b.opex"),
+    rules=(
+        rule("BS", "b.ta", "b.cash", "b.sbv", "b.interbank", "b.trading_sec", "b.deriv_asset", "b.loans",
+             "b.debt_purchase", "b.inv_sec", "b.lt_invest", "b.fixed_assets", "b.inv_property", "b.other_assets",
+             id="BS_bank_assets"),
+        rule("BS", "b.tl", "b.gov", "b.interbank_liab", "b.cust_dep", "b.deriv_liab", "b.trust_funds", "b.papers",
+             "b.other_liab", id="BS_bank_liabilities"),
+        rule("BS", "b.tle", "b.tl", "b.te", id="BS_bank_tle", when_present="b.tl"),
+        # Ngân hàng không in dòng "Tổng nợ phải trả" (ví dụ BID): cộng thẳng các mục nợ phải trả
+        rule("BS", "b.tle", "b.gov", "b.interbank_liab", "b.cust_dep", "b.deriv_liab", "b.trust_funds", "b.papers",
+             "b.other_liab", "b.te", id="BS_bank_tle_items", when_absent="b.tl"),
+        rule("BS", "b.ta", "b.tle", id="BS_bank_ta_eq_tle"),
+        rule("IS", "b.nii", "b.ii", "-b.ie", id="IS_bank_nii"),
+        rule("IS", "b.nfee", "b.fi", "-b.fe", id="IS_bank_nfee"),
+        rule("IS", "b.nother", "b.oi", "-b.oe", id="IS_bank_nother"),
+        rule("IS", "b.toi", *_BANK_INCOME_PARTS, id="IS_bank_toi"),
+        rule("IS", "b.ppop", "b.toi", "-b.opex", id="IS_bank_ppop", when_present="b.toi"),
+        rule("IS", "b.ppop", *_BANK_INCOME_PARTS, "-b.opex", id="IS_bank_ppop_parts", when_absent="b.toi"),
+        rule("IS", "b.pbt", "b.ppop", "-b.prov", id="IS_bank_pbt"),
+        rule("IS", "b.cit", "b.cit_cur", "b.cit_def", id="IS_bank_cit"),
+        rule("IS", "b.npat", "b.pbt", "-b.cit", id="IS_bank_npat"),
+        # Dấu của lợi ích cổ đông không kiểm soát không theo quy ước dấu chung của KQKD; lấy giá trị tuyệt đối.
+        # Chưa bắt buộc vì lợi ích cổ đông không kiểm soát có thể âm thật (công ty con lỗ).
+        rule("IS", "b.npat_parent", "b.npat", "-b.mi", id="IS_bank_parent", gate=False, abs_codes=("b.mi",)),
+        rule("CF", "b.net", "b.cfo", "b.cfi", "b.cff", id="CF_bank_net"),
+        rule("CF", "b.cash_end", "b.cash_begin", "b.net", "b.fx", id="CF_bank_cash_end"),
+    ),
+)
+
+RULESETS = {rs.template: rs for rs in (TT200, TT99, TCTD)}
+# Bộ ràng buộc dành cho doanh nghiệp thường (dùng khi tự nhận dạng mẫu)
+CORPORATE_TEMPLATES = ("TT200", "TT99")
 
 # Mã chỉ có ở cấu trúc TT99: 160 (tài sản ngắn hạn khác) và 280 (tổng cộng tài sản); TT200 không có hai mã này
 TT99_ONLY_BS_CODES = ("160", "280")

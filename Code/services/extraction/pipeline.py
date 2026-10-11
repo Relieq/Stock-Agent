@@ -19,6 +19,7 @@ from pathlib import Path
 import psycopg
 
 from services.extraction import prompts
+from services.extraction.bank import canonicalize
 from services.extraction.numbers import normalize_code
 from services.extraction.sources import candidates, open_pdf, render_page
 from services.extraction.rules import RULESETS
@@ -65,7 +66,7 @@ def _to_extracted(statement: str, raw: dict) -> ExtractedStatement:
         unit_raw=raw.get("unit_text"),
         items=[
             ExtractedItem(code=r.get("code"), label=r.get("label", ""), values_raw=r.get("values", {}),
-                          note=r.get("note"), page=r.get("page"))
+                          note=r.get("note"), page=r.get("page"), stt=r.get("stt"))
             for r in raw.get("rows", [])
         ],
     )
@@ -126,16 +127,76 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
         record["raw"][st] = raw
     record["company_template"] = company_template
 
-    # 2b. Đọc lại các ô nằm trong ràng buộc bắt buộc bị lệch (architecture.md mục 4.3, bậc 1)
-    for _ in range(REREAD_ROUNDS):
-        if not _reread_failed(record, client, doc):
-            break
+    _escalate(record, client, doc)
     record["usage"] = {k: v - usage_before[k] for k, v in asdict(client.usage).items()}
     return _finalize(conn, record)
 
 
 REREAD_ROUNDS = 1
 REREAD_LONG_SIDE = 3000
+REEXTRACT_LONG_SIDE = 2600
+
+
+def _escalate(record: dict, client: VisionClient, doc) -> None:
+    """Thang leo thang khi ràng buộc bắt buộc bị lệch (architecture.md mục 4.3):
+    1. đọc lại đúng các ô liên quan ở độ phân giải cao hơn;
+    2. vẫn lệch thì chép lại cả báo cáo đó, mỗi trang một lần gọi (sửa lỗi bỏ sót dòng), giữ bản ít lệch hơn,
+       rồi đọc lại ô thêm một lần.
+    Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
+    for _ in range(REREAD_ROUNDS):
+        if not _reread_failed(record, client, doc):
+            break
+    if _reextract_failed_statements(record, client, doc):
+        _reread_failed(record, client, doc)
+
+
+def _gate_failures(record: dict) -> dict[str, int]:
+    """Số ràng buộc bắt buộc bị lệch theo từng báo cáo."""
+    _, _, _, template, checks = _check(record)
+    if not template:
+        return {}
+    statement_of = {r.id: r.statement for r in RULESETS[template].rules}
+    out: dict[str, int] = {}
+    for c in checks:
+        if c.gate and not c.passed and c.rule_id in statement_of:
+            out[statement_of[c.rule_id]] = out.get(statement_of[c.rule_id], 0) + 1
+    return out
+
+
+def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> bool:
+    failures = _gate_failures(record)
+    if not failures:
+        return False
+    chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
+    st_pages = {k: [int(x) for x in v] for k, v in chosen["statement_pages"].items()}
+    log = record.setdefault("reextracts", [])
+    improved = False
+    for st, n_failed in failures.items():
+        pages = st_pages.get(st, [])
+        if not pages:
+            continue
+        parts = []
+        for page in pages:
+            image = render_page(doc, page, REEXTRACT_LONG_SIDE, _rotation(record, page))
+            parts.append(client.json_from_images(prompts.extract_prompt(st), [(f"Trang {page}", image)],
+                                                 prompts.extract_schema(st), f"statement_{st}"))
+        merged = {
+            "unit_text": next((x["unit_text"] for x in parts if x.get("unit_text")), None),
+            "columns": parts[0].get("columns", []),
+            "rows": [r for x in parts for r in x.get("rows", [])],
+        }
+        before = record["raw"][st]
+        record["raw"][st] = merged
+        after_failed = _gate_failures(record).get(st, 0)
+        kept = after_failed < n_failed
+        if not kept:
+            record["raw"][st] = before
+        else:
+            improved = True
+        log.append({"statement": st, "pages": pages, "failed_before": n_failed, "failed_after": after_failed,
+                    "rows_before": len(before.get("rows", [])), "rows_after": len(merged["rows"]),
+                    "kept": kept, "model": client.cfg.model})
+    return improved
 
 
 def _rotation(record: dict, page: int) -> int:
@@ -147,8 +208,16 @@ def _rotation(record: dict, page: int) -> int:
 
 def _check(record: dict):
     extracted = [_to_extracted(st, raw) for st, raw in record["raw"].items()]
+    company_template = record["company_template"]
+    if company_template == "bank":
+        record["bank_unmapped"] = canonicalize(extracted)
     statements, sep = normalize(extracted)
-    template = detect_template(statements) if record["company_template"] == "corporate" else None
+    if company_template == "corporate":
+        template = detect_template(statements)
+    elif company_template == "bank":
+        template = "TCTD"
+    else:
+        template = None
     checks = validate(statements, template) if template else []
     return extracted, statements, sep, template, checks
 
@@ -206,9 +275,7 @@ def reread_document(conn: psycopg.Connection, document_id: int, client: VisionCl
     cand = next(c for c in candidates(path) if c.name == record["chosen"])
     doc = open_pdf(cand)
     usage_before = asdict(client.usage)
-    for _ in range(REREAD_ROUNDS):
-        if not _reread_failed(record, client, doc):
-            break
+    _escalate(record, client, doc)
     usage = record.get("usage") or {}
     for k, v in asdict(client.usage).items():
         usage[k] = usage.get(k, 0) + v - usage_before[k]
@@ -253,7 +320,7 @@ def _finalize(conn: psycopg.Connection, record: dict) -> dict:
         "checks": [asdict(c) | {"diff": c.diff} for c in checks],
     })
     record.pop("output_path", None)
-    if company_template != "corporate":
+    if template is None:
         record["note"] = f"Chưa có bộ ràng buộc cho mẫu {company_template}"
 
     out_path = raw_data_dir() / "extracted" / ticker / f"{document_id}_{sha256[:8]}.json"

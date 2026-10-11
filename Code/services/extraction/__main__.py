@@ -76,6 +76,9 @@ def cmd_reread(args) -> None:
             s = rec["summary"]
             print(f"[{doc_id}] {rec['ticker']}: ràng buộc bắt buộc {s['gate_checks'] - s['gate_failed']}/{s['gate_checks']} "
                   f"đạt -> {rec['status']}")
+            for r in rec.get("reextracts", []):
+                print(f"    chép lại {r['statement']} trang {r['pages']}: {r['rows_before']} -> {r['rows_after']} dòng, "
+                      f"lệch {r['failed_before']} -> {r['failed_after']} ({'giữ bản mới' if r['kept'] else 'giữ bản cũ'})")
             for r in rec.get("rereads", [])[-20:]:
                 mark = "đổi" if r["before"] != r["after"] else "giữ"
                 print(f"    {mark} {r['statement']} {r['code']} {r['column_kind']}: {r['before']} -> {r['after']}")
@@ -121,7 +124,7 @@ def main(argv: list[str] | None = None) -> None:
     rc.add_argument("--doc-id", type=int, nargs="+", required=True)
     rc.set_defaults(func=cmd_recheck)
 
-    rr = sub.add_parser("reread", help="Đọc lại các ô thuộc ràng buộc bị lệch")
+    rr = sub.add_parser("reread", help="Leo thang cho ràng buộc bị lệch: đọc lại ô, rồi chép lại báo cáo theo từng trang")
     rr.add_argument("--doc-id", type=int, nargs="+", required=True)
     rr.set_defaults(func=cmd_reread)
 

@@ -8,7 +8,7 @@ Mã nguồn của dự án. Cấu trúc theo [kiến trúc kỹ thuật](../Baoc
 | `db/migrations/` | Lược đồ CSDL (file `.sql`, áp dụng theo thứ tự tên) | Có |
 | `db/seeds/` | Danh sách công ty (VN30) | Có |
 | `services/ingestion/` | Thu thập BCTC: lấy danh sách từ Vietstock, nhận dạng tiêu đề, tải file | Có |
-| `services/extraction/` | Đọc và kiểm chứng BCTC: chọn PDF, định vị trang, chép bảng bằng mô hình đọc ảnh, chuẩn hóa số, kiểm tra ràng buộc kế toán | Bản đầu; đã chạy thật trên 4 BCTC |
+| `services/extraction/` | Đọc và kiểm chứng BCTC: chọn PDF, định vị trang, chép bảng bằng mô hình đọc ảnh, chuẩn hóa số, kiểm tra ràng buộc kế toán | Bản đầu; đã chạy thật trên 12 BCTC |
 | `services/llm.py` | Gọi mô hình qua giao diện kiểu OpenAI (Gemini, OpenAI, OpenRouter, Ollama) | Có |
 | `eval/` | Chấm kết quả trích xuất với bộ duyệt tay (`Data/golden/`) | Có |
 | `services/analyst/`, `services/news/`, `apps/web/`, `eval/` | Phân tích, tin tức, giao diện, đánh giá | Sau |
@@ -63,9 +63,13 @@ python eval/golden.py                                             # chấm với
 - Trang in xoay ngang được nhận ra ở bước định vị trang và xoay thẳng trước khi chép bảng.
 - Quy ước dấu (chi phí in số dương hay số âm trong ngoặc) được nhận ra theo từng tài liệu.
 - Mã số in trùng trên chính BCTC được ghi lại (`duplicate_codes`) thay vì để dòng sau đè dòng trước.
-- Chưa làm: ràng buộc cho ngân hàng và công ty chứng khoán; đọc lại bằng mô hình mạnh hơn khi đọc lại lần đầu vẫn lệch.
+- Ngân hàng (mẫu TCTD) không in mã số: `services/extraction/bank.py` gán mã chuẩn `b.*` theo tên chỉ tiêu (so khớp sau
+  khi bỏ dấu, để không phụ thuộc kiểu bỏ dấu cũ/mới như "khóan"/"khoán"), rồi kiểm tra theo bộ ràng buộc TCTD.
+  Tên chỉ tiêu viết theo cách gọi thực tế của 8 ngân hàng quý 2/2026; gặp ngân hàng mới có thể cần thêm biến thể.
+- Thang leo thang khi lệch: đọc lại ô ở độ phân giải cao hơn, rồi chép lại cả báo cáo theo từng trang.
+- Chưa làm: ràng buộc cho công ty chứng khoán (SSI, TCX); đọc lại bằng mô hình mạnh hơn.
 
-Kết quả thử với `gpt-5.4-mini` trên BCTC hợp nhất quý 2/2026 (03/10/2026):
+Kết quả thử với `gpt-5.4-mini` trên BCTC hợp nhất quý 2/2026 (03/10/2026), số ràng buộc bắt buộc đạt:
 
 | Mã | Mẫu nhận dạng | Ràng buộc bắt buộc | Ghi chú |
 |---|---|---|---|
@@ -73,6 +77,7 @@ Kết quả thử với `gpt-5.4-mini` trên BCTC hợp nhất quý 2/2026 (03/1
 | HPG | TT99 (in mã tổng tài sản 270) | 32/32 | BCTC tự in trùng mã 230 cho tài sản sinh học dài hạn và BĐS đầu tư |
 | MWG | TT99 | 34/34 | Trang KQKD in xoay ngang; chi phí in số âm |
 | VNM | TT99 | 32/32 | |
+| ACB, BID, CTG, LPB, MBB, TCB, VCB, VPB | TCTD | 38–44/38–44 mỗi ngân hàng | Lệch ban đầu chủ yếu do tên chỉ tiêu khác nhau giữa các ngân hàng; LPB có 1 ô đọc sai 10 tỷ ở LCTT, chép lại theo trang thì đúng |
 
 Trung bình khoảng 50 nghìn token vào và 12 nghìn token ra cho mỗi BCTC (khoảng 0,09 USD với giá ngày 03/10/2026).
 

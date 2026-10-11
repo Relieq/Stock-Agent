@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from services.extraction.numbers import infer_thousands_sep, normalize_code, parse_amount, unit_multiplier
-from services.extraction.rules import RULESETS, TT99_ONLY_BS_CODES, RuleSet
+from services.extraction.rules import CORPORATE_TEMPLATES, RULESETS, TT99_ONLY_BS_CODES, RuleSet
 
 
 @dataclass
@@ -17,6 +17,7 @@ class ExtractedItem:
     values_raw: dict[str, str | None]      # column_kind -> chuỗi in trên BCTC
     note: str | None = None
     page: int | None = None
+    stt: str | None = None                 # số thứ tự đầu dòng ("I", "1", "a"), dùng cho mẫu không in mã số (ngân hàng)
 
 
 @dataclass
@@ -56,9 +57,11 @@ class Check:
 def normalize(extracted: list[ExtractedStatement], default_unit: str | None = None) -> tuple[dict[str, Statement], str]:
     """Đổi chuỗi số về đồng. Dấu phân tách hàng nghìn suy ra chung cho cả tài liệu."""
     sep = infer_thousands_sep(v for st in extracted for it in st.items for v in it.values_raw.values())
+    # Báo cáo không ghi đơn vị (ví dụ KQKD của VCB quý 2/2026) thì dùng đơn vị ghi ở báo cáo khác trong tài liệu
+    doc_unit = next((m for st in extracted if (m := unit_multiplier(st.unit_raw)) is not None), None)
     out: dict[str, Statement] = {}
     for st in extracted:
-        mult = unit_multiplier(st.unit_raw) or unit_multiplier(default_unit) or Decimal(1)
+        mult = unit_multiplier(st.unit_raw) or unit_multiplier(default_unit) or doc_unit or Decimal(1)
         norm = out.setdefault(st.statement, Statement(st.statement, mult))
         seen: set[str] = set(norm.values)
         for it in st.items:
@@ -80,19 +83,19 @@ def normalize(extracted: list[ExtractedStatement], default_unit: str | None = No
     return out, sep
 
 
-def expenses_printed_negative(st: Statement) -> bool:
+def expenses_printed_negative(st: Statement, codes: tuple[str, ...] = ("11", "25", "26")) -> bool:
     """KQKD có in chi phí thành số âm không (ví dụ giá vốn "(37.942.073.479.846)").
 
     Đa số BCTC in chi phí là số dương rồi trừ theo công thức; một số công ty (ví dụ MWG) in chi phí trong ngoặc.
     Bỏ phiếu theo giá vốn (11), chi phí bán hàng (25), chi phí quản lý (26) ở mọi cột.
     """
-    votes = [v for code in ("11", "25", "26") for v in st.values.get(code, {}).values() if v != 0]
+    votes = [v for code in codes for v in st.values.get(code, {}).values() if v != 0]
     return bool(votes) and sum(v < 0 for v in votes) > len(votes) / 2
 
 
 def _evaluate_rules(ruleset: RuleSet, statements: dict[str, Statement]) -> list[Check]:
     checks: list[Check] = []
-    flip_is = "IS" in statements and expenses_printed_negative(statements["IS"])
+    flip_is = "IS" in statements and expenses_printed_negative(statements["IS"], ruleset.expense_codes)
     for r in ruleset.rules:
         st = statements.get(r.statement)
         if st is None or r.lhs not in st.values:
@@ -104,7 +107,7 @@ def _evaluate_rules(ruleset: RuleSet, statements: dict[str, Statement]) -> list[
         terms = list(r.rhs)
         if r.statement == "IS" and flip_is:
             # Chi phí đã mang dấu âm khi in: cộng thẳng thay vì trừ
-            terms = [(1, c) for _, c in terms]
+            terms = [(sign if c in r.abs_codes else 1, c) for sign, c in terms]
         if r.include_suffixed:
             signs = {c: sign for sign, c in r.rhs}
             for code in st.values:
@@ -117,7 +120,10 @@ def _evaluate_rules(ruleset: RuleSet, statements: dict[str, Statement]) -> list[
         missing = [c for _, c in terms if c not in st.values]
         tolerance = st.multiplier * (len(terms) + 1)   # ±1 đơn vị làm tròn cho mỗi số hạng
         for col, lhs in st.values[r.lhs].items():
-            rhs = sum((sign * st.values.get(c, {}).get(col, Decimal(0)) for sign, c in terms), Decimal(0))
+            rhs = Decimal(0)
+            for sign, c in terms:
+                v = st.values.get(c, {}).get(col, Decimal(0))
+                rhs += sign * (abs(v) if c in r.abs_codes else v)
             checks.append(Check(r.id, col, abs(lhs - rhs) <= tolerance, lhs, rhs, tolerance, r.gate, missing))
 
     for x in ruleset.cross_rules:
@@ -144,7 +150,8 @@ def detect_template(statements: dict[str, Statement]) -> str | None:
     if any(code in statements["BS"].values for code in TT99_ONLY_BS_CODES):
         return "TT99"
     total_ok, pass_rate = {}, {}
-    for name, rs in RULESETS.items():
+    for name in CORPORATE_TEMPLATES:
+        rs = RULESETS[name]
         checks = [c for c in _evaluate_rules(rs, statements) if c.gate]
         code = rs.total_assets_code
         totals = [c for c in checks if c.rule_id in (f"BS_{code}", f"BS_{code}_eq_440")]
@@ -154,7 +161,7 @@ def detect_template(statements: dict[str, Statement]) -> str | None:
     matched = [n for n, ok in total_ok.items() if ok]
     if len(matched) == 1:
         return matched[0]
-    pool = matched or list(RULESETS)
+    pool = matched or list(CORPORATE_TEMPLATES)
     best = max(pool, key=lambda n: pass_rate[n])
     return best if pass_rate[best] > 0 else None
 

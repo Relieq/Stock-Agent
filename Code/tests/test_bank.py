@@ -147,3 +147,14 @@ def test_wrapped_label_shift_is_repaired():
     assert codes["b.ppop"] == "8.261"
     assert codes["b.prov"] == "(3.825)"
     assert codes["b.cit_cur"] == "(879)"
+
+
+def test_label_variants_seen_in_q1_2026():
+    rows = [
+        (None, "Thu nhập/(lỗ) từ góp vốn, mua cổ phần", "(58)"),                       # TCB
+        (None, "Chi phí thuế thu nhập doanh nghiệp hiện hành", "(547)"),
+        (None, 'Chi phí thuế thu nhập doanh nghiệp ("TNDN")', "(547)"),               # LPB
+    ]
+    st = _st("IS", rows, "ytd_cur")
+    canonicalize([st])
+    assert [it.code for it in st.items] == ["b.equity_inc", "b.cit_cur", "b.cit"]

@@ -18,7 +18,7 @@ import json
 import os
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from openai import OpenAI
 
@@ -65,6 +65,32 @@ class Usage:
     seconds: float = 0.0
 
 
+# Giá công bố, USD cho 1 triệu token (vào, ra). Nguồn: bảng giá OpenAI qua các trang tổng hợp, xem ngày 11/10/2026.
+# Token ra gồm cả phần suy luận của mô hình. Mô hình không có trong bảng thì không ước tính chi phí.
+PRICES = {
+    "gpt-5.4-mini": (0.75, 4.50),
+    "gpt-5.4": (2.50, 15.00),
+}
+
+
+def cost_usd(model: str | None, input_tokens: int, output_tokens: int) -> float | None:
+    price = PRICES.get(model or "")
+    if price is None:
+        return None
+    return (input_tokens * price[0] + output_tokens * price[1]) / 1_000_000
+
+
+def usage_delta(after: dict, before: dict) -> dict:
+    """Phần chênh của usage theo bước (dict bước -> dict Usage) giữa hai thời điểm."""
+    out = {}
+    for step, u in after.items():
+        b = before.get(step, {})
+        d = {k: v - b.get(k, 0) for k, v in u.items()}
+        if d["calls"]:
+            out[step] = d
+    return out
+
+
 class VisionClient:
     def __init__(self, cfg: LLMConfig | None = None):
         self.cfg = cfg or config()
@@ -72,9 +98,15 @@ class VisionClient:
             raise RuntimeError("Chưa chọn mô hình: đặt LLM_MODEL trong Code/.env (xem danh sách: python -m services.llm)")
         self.client = OpenAI(api_key=self.cfg.api_key, base_url=self.cfg.base_url, max_retries=4, timeout=300)
         self.usage = Usage()
+        self.steps: dict[str, Usage] = {}     # theo bước, khóa là schema_name (page_classification, statement_BS...)
 
-    def json_from_images(self, prompt: str, images: list[tuple[str, bytes]], schema: dict, schema_name: str) -> dict:
-        """Gửi lời nhắc kèm các ảnh PNG (mỗi ảnh có nhãn), nhận về JSON theo schema."""
+    def steps_snapshot(self) -> dict:
+        return {k: asdict(v) for k, v in self.steps.items()}
+
+    def json_from_images(self, prompt: str, images: list[tuple[str, bytes]], schema: dict, schema_name: str,
+                         step: str | None = None) -> dict:
+        """Gửi lời nhắc kèm các ảnh PNG (mỗi ảnh có nhãn), nhận về JSON theo schema. `step` để tính chi phí theo
+        bước (mặc định là schema_name)."""
         content: list[dict] = [{"type": "text", "text": prompt}]
         for label, png in images:
             content.append({"type": "text", "text": label})
@@ -95,11 +127,13 @@ class VisionClient:
             response_format={"type": "json_schema", "json_schema": {"name": schema_name, "schema": schema, "strict": True}},
             **extra,
         )
-        self.usage.calls += 1
-        self.usage.seconds += time.monotonic() - started
-        if resp.usage:
-            self.usage.input_tokens += resp.usage.prompt_tokens or 0
-            self.usage.output_tokens += resp.usage.completion_tokens or 0
+        step_usage = self.steps.setdefault(step or schema_name, Usage())
+        for u in (self.usage, step_usage):
+            u.calls += 1
+            u.seconds += time.monotonic() - started
+            if resp.usage:
+                u.input_tokens += resp.usage.prompt_tokens or 0
+                u.output_tokens += resp.usage.completion_tokens or 0
         text = resp.choices[0].message.content or ""
         if resp.choices[0].finish_reason == "length":
             raise RuntimeError("Mô hình trả lời bị cắt do vượt giới hạn độ dài")

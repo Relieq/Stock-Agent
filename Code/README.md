@@ -73,6 +73,26 @@ python eval/golden.py                                             # chấm với
   khớp đúng phần còn thiếu của một ràng buộc. Mọi chỗ tự sửa được ghi lại và hiện trên web.
 - "Đã kiểm chứng" đòi hỏi: không ràng buộc bắt buộc nào lệch, có ràng buộc trên cả BCĐKT và KQKD, và kiểm được
   tổng tài sản = tổng nguồn vốn (thiếu trang nguồn vốn thì chép thêm trang kế tiếp).
+- Bằng chứng từng ô (`services/extraction/evidence.py`, không gọi mô hình): ô nằm trong ràng buộc cộng tổng đã đạt,
+  và/hoặc khớp với BCTC khác của cùng công ty: số đầu năm giữa các quý, quý = lũy kế kỳ này − lũy kế kỳ trước, quý 2
+  với BCTC bán niên (cùng ngày 30/06), quý 4 với BCTC năm. Hai lần đọc độc lập từ hai bộ ảnh khác nhau cùng ra một
+  con số là bằng chứng mạnh, và phủ được cả ô không thuộc phép cộng nào.
+- Hai BCTC in một con số khác nhau thì hoặc một bên đọc sai, hoặc công ty đã sửa số (bản bán niên được kiểm toán soát
+  xét nên hay khác bản quý 2 công ty tự lập). Khi cộng tổng ở cả hai bên đều khớp và chênh lệch không phải dạng sai 1-2
+  chữ số, coi là số thật khác nhau. Còn lại là "cần xem lại": `verify` đọc lại riêng từng ô đó ở ảnh nét hơn trên cả
+  hai BCTC (`services/extraction/verify.py`). Đọc lại vẫn ra như cũ thì là số thật khác nhau; ra số khác thì chỉ giữ
+  số mới khi nó làm hai BCTC khớp nhau và không làm hỏng ràng buộc nào (ô ngoài phép cộng có thể bị đọc nhầm dòng).
+  Quý 2/2026: 77 ô cần xem lại, đọc lại 140 ô trên 35 BCTC hết 0,19 USD, sửa 19 lỗi đọc, còn 7 ô.
+
+  ```bash
+  python -m services.extraction evidence --year 2026 --period Q2   # độ phủ và các ô cần xem lại của cả kỳ
+  python -m services.extraction verify --year 2026 --period Q2     # đọc lại các ô cần xem lại (gọi mô hình)
+  python -m services.extraction cost                               # chi phí gọi mô hình theo bước
+  ```
+- Chi phí: mỗi lần gọi mô hình được ghi theo bước (định vị trang, chép từng báo cáo, chép lại, đọc lại ô) vào
+  `usage_by_step` của bản ghi; giá mỗi mô hình ở `services/llm.py` (`PRICES`). Bước chép bảng tốn khoảng 0,05-0,12 USD
+  một BCTC, phần lớn là token ra (chính các con số được chép). Thử hạ mức suy luận từ `low` xuống `none` (11/10/2026,
+  VCB, SSI, VIC): rẻ hơn khoảng 8% nhưng VIC trượt 4/32 ràng buộc, nên giữ `low`.
 - Chưa làm: đọc lại bằng mô hình mạnh hơn.
 
 Kết quả thử với `gpt-5.4-mini` trên BCTC hợp nhất quý 2/2026 (03/10/2026), số ràng buộc bắt buộc đạt:

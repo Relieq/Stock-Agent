@@ -48,3 +48,11 @@ tr.soft td, tr.changed td { background:var(--warnbg); }
 }
 .infobox { background:var(--sel); padding:6px 10px; border-radius:6px; margin:6px 0; }
 .infobox ul { margin:4px 0 0; padding-left:20px; }
+td.ev-both, .legend .ev-both, .chip.ev-both { background:#cdeed6; }
+td.ev-period, .legend .ev-period, .chip.ev-period { background:#e3f4e8; }
+td.ev-sum, .legend .ev-sum, .chip.ev-sum { background:#eef7f0; }
+td.ev-none, .legend .ev-none, .chip.ev-none { background:#f1f2f4; color:#6b7480; }
+td.ev-restated, .legend .ev-restated, .chip.ev-restated { background:var(--warnbg); }
+td.ev-conflict, .legend .ev-conflict, .chip.ev-conflict { background:#f7b9b9; font-weight:600; }
+.legend span, .chip { padding:0 6px; border-radius:4px; margin-right:4px; white-space:nowrap; }
+td.ev-differs, .legend .ev-differs, .chip.ev-differs { background:#dfe9ff; }

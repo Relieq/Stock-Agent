@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 
 from services.api import data
 from services.db import connect
+from services.extraction.evidence import STATUS_LABELS
 from services.ingestion.registry import raw_data_dir
 
 HERE = Path(__file__).parent
@@ -88,11 +89,20 @@ def index(request: Request, year: int | None = None, period: str | None = None, 
             " count(*) FILTER (WHERE processed_at IS NOT NULL) FROM documents d").fetchone()
 
     docs = []
+    conn = connect()
     for r in rows:
         rec = data.load_record(r[0]) if r[5] in ("verified", "needs_review") else None
+        ev = data.evidence(conn, r[0]) if rec else None
+        cov = None
+        if ev:
+            n = ev.counts()
+            total = sum(n.values())
+            cov = {"checked": (total - n["none"] - n["restated"]) / total if total else 0, "conflict": n["conflict"],
+                   "peers": ", ".join(p for _, p, _ in ev.peers)}
         docs.append({"id": r[0], "ticker": r[1], "name": r[2], "kind": r[3], "scope": r[4], "status": r[5],
                      "template": r[6], "title": r[7], "listed_at": r[8], "processed_at": r[9], "gate": r[10],
-                     "head": data.headline(rec) if rec else {}, "has_record": rec is not None})
+                     "head": data.headline(rec) if rec else {}, "has_record": rec is not None, "cov": cov})
+    conn.close()
     return templates.TemplateResponse(request, "index.html", {
         "docs": docs, "year": year, "period": period, "periods": periods, "all": all,
         "totals": totals, "watcher": _watcher_status()})
@@ -122,8 +132,11 @@ def document(request: Request, doc_id: int):
     record = data.load_record(doc_id)
     if record is None:
         raise HTTPException(404, "Tài liệu này chưa được đọc")
+    with connect() as conn:
+        evidence = data.evidence(conn, doc_id)
     return templates.TemplateResponse(request, "document.html", {
-        "doc": doc, "record": record, "d": data.detail(record), "head": data.headline(record)})
+        "doc": doc, "record": record, "d": data.detail(record, evidence), "head": data.headline(record),
+        "EVIDENCE": STATUS_LABELS})
 
 
 @app.get("/tai-lieu/{doc_id}/trang/{page}.png")

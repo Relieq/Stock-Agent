@@ -3,6 +3,9 @@
     python -m services.extraction run --tickers FPT --year 2026 --period Q2
     python -m services.extraction run --doc-id 12
     python -m services.extraction show --doc-id 12
+    python -m services.extraction evidence --year 2026 --period Q2
+    python -m services.extraction verify --year 2026 --period Q2
+    python -m services.extraction cost
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ import sys
 
 from services.db import connect
 from services.extraction.pipeline import PIPELINE_VER, extract_document, recheck_document, reread_document
-from services.llm import VisionClient
+from services.llm import VisionClient, cost_usd
 
 
 def _select(conn, args) -> list[tuple[int, str, str]]:
@@ -105,6 +108,110 @@ def cmd_show(args) -> None:
                       f"lệch {lhs - rhs:>18,.0f}{'' if gate == 'true' else '  (chưa bắt buộc)'}")
 
 
+def cmd_evidence(args) -> None:
+    from services.extraction.evidence import STATUS_LABELS, document_evidence
+    with connect() as conn:
+        ids = args.doc_id or _period_ids(conn, args.year, args.period)
+        total = {k: 0 for k in STATUS_LABELS}
+        for doc_id in ids:
+            ev = document_evidence(conn, doc_id)
+            if ev is None:
+                continue
+            ticker = conn.execute("SELECT ticker FROM documents WHERE id = %s", (doc_id,)).fetchone()[0]
+            n = ev.counts()
+            for k, v in n.items():
+                total[k] += v
+            cells = sum(n.values())
+            checked = cells - n["none"] - n["restated"]
+            peers = ", ".join(f"{p}" for _, p, _ in ev.peers) or "không có kỳ liền kề"
+            print(f"[{doc_id}] {ticker}: {cells} ô, đã kiểm {checked} ({checked / cells:.0%}); khớp giữa các kỳ "
+                  f"{n['period'] + n['both']}; khác giữa hai BCTC {n['differs']}; cần xem lại {n['conflict']}; "
+                  f"trình bày lại {n['restated']} (đối chiếu: {peers})")
+            for pc in ev.period_checks:
+                if not pc.passed and (args.all or pc.suspect_misread):
+                    tag = "TRÌNH BÀY LẠI" if pc.restated else ("CẦN XEM" if pc.suspect_misread else "KHÁC")
+                    print(f"    {tag} {pc.kind} {pc.statement} "
+                          f"{ev.cells.labels.get((pc.statement, pc.key), pc.key)[:50]} [{pc.key}] {pc.column}: "
+                          f"{pc.later:,.0f} vs {pc.expected:,.0f} (lệch {pc.diff:,.0f})")
+        cells = sum(total.values())
+        if cells:
+            print("Tổng: " + "; ".join(f"{STATUS_LABELS[k]} {v} ({v / cells:.0%})" for k, v in total.items()))
+
+
+def _period_ids(conn, year: int, period: str) -> list[int]:
+    return [r[0] for r in conn.execute(
+        "SELECT id FROM documents WHERE fiscal_year = %s AND fiscal_period = %s"
+        " AND scope IN ('consolidated', 'standalone') AND processed_at IS NOT NULL ORDER BY ticker",
+        (year, period)).fetchall()]
+
+
+def cmd_verify(args) -> None:
+    from services.extraction.verify import cells_to_verify, decide, verify_document
+    from services.extraction.pipeline import _finalize, _load_record
+    if args.redecide:
+        with connect() as conn:
+            for doc_id in args.doc_id or _period_ids(conn, args.year, args.period):
+                rec = _load_record(conn, doc_id)
+                if not rec.get("cell_verifications"):
+                    continue
+                decide(conn, doc_id, rec)
+                _finalize(conn, rec)
+                conn.commit()
+                for e in rec["cell_verifications"]:
+                    if not e["same"]:
+                        print(f"[{doc_id}] {rec['ticker']} {'SỬA' if e['applied'] else 'khác, không giữ'} "
+                              f"{e['statement']} {e['label'][:40]} [{e['key']}] {e['column_kind']}: {e['before']} -> {e['after']}")
+        return
+    client = VisionClient()
+    with connect() as conn:
+        todo = cells_to_verify(conn, args.doc_id or _period_ids(conn, args.year, args.period))
+        print(f"{sum(len(v) for v in todo.values())} ô cần đọc lại trên {len(todo)} tài liệu")
+        for doc_id, cells in sorted(todo.items()):
+            ticker, period = conn.execute("SELECT ticker, fiscal_period FROM documents WHERE id = %s", (doc_id,)).fetchone()
+            added = verify_document(conn, doc_id, cells, client)
+            conn.commit()
+            print(f"[{doc_id}] {ticker} {period}: đọc lại {len(added)}/{len(cells)} ô")
+            for e in added:
+                mark = "giữ nguyên" if e["same"] else ("SỬA" if e["applied"] else "khác, không giữ")
+                print(f"    {mark} {e['statement']} {e['label'][:40]} [{e['key']}] {e['column_kind']}: "
+                      f"{e['before']} -> {e['after']}")
+    u = client.usage
+    cost = cost_usd(client.cfg.model, u.input_tokens, u.output_tokens)
+    print(f"Tổng: {u.calls} lần gọi, {u.input_tokens:,} token vào, {u.output_tokens:,} token ra"
+          + (f", khoảng {cost:.2f} USD" if cost is not None else ""))
+
+
+def cmd_cost(args) -> None:
+    """Chi phí gọi mô hình đã ghi trong các bản ghi trích xuất. Mỗi tài liệu chỉ giữ bản ghi mới nhất, nên các lần
+    chạy bị ghi đè không được tính; bản ghi cũ chưa có số liệu theo bước."""
+    import json
+    from services.ingestion.registry import raw_data_dir
+    steps: dict[str, list[float]] = {}
+    total = [0, 0, 0, 0.0]
+    docs = 0
+    for f in (raw_data_dir() / "extracted").glob("*/*.json"):
+        r = json.loads(f.read_text(encoding="utf-8"))
+        u = r.get("usage") or {}
+        docs += 1
+        total[0] += u.get("calls", 0); total[1] += u.get("input_tokens", 0); total[2] += u.get("output_tokens", 0)
+        total[3] += cost_usd(r.get("model"), u.get("input_tokens", 0), u.get("output_tokens", 0)) or 0
+        known = 0
+        for step, su in (r.get("usage_by_step") or {}).items():
+            a = steps.setdefault(step, [0, 0, 0, 0.0])
+            a[0] += su["calls"]; a[1] += su["input_tokens"]; a[2] += su["output_tokens"]
+            a[3] += cost_usd(r.get("model"), su["input_tokens"], su["output_tokens"]) or 0
+            known += su["calls"]
+        if u.get("calls", 0) > known:
+            a = steps.setdefault("(chưa ghi theo bước)", [0, 0, 0, 0.0])
+            k = {key: u.get(key, 0) - sum(s.get(key, 0) for s in (r.get("usage_by_step") or {}).values())
+                 for key in ("calls", "input_tokens", "output_tokens")}
+            a[0] += k["calls"]; a[1] += k["input_tokens"]; a[2] += k["output_tokens"]
+            a[3] += cost_usd(r.get("model"), k["input_tokens"], k["output_tokens"]) or 0
+    print(f"{docs} bản ghi; {total[0]} lần gọi, {total[1]:,} token vào, {total[2]:,} token ra, khoảng {total[3]:.2f} USD")
+    for step, (calls, ti, to, usd) in sorted(steps.items(), key=lambda x: -x[1][3]):
+        print(f"  {step:<24} {calls:>5} lần gọi {ti:>12,} vào {to:>11,} ra  {usd:>7.2f} USD")
+
+
 def main(argv: list[str] | None = None) -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
@@ -133,6 +240,23 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--doc-id", type=int, nargs="+", required=True)
     s.add_argument("--all", action="store_true", help="In cả các phép kiểm tra đạt")
     s.set_defaults(func=cmd_show)
+
+    e = sub.add_parser("evidence", help="Bằng chứng từng ô: cộng tổng và đối chiếu giữa các kỳ (không gọi mô hình)")
+    e.add_argument("--doc-id", type=int, nargs="+")
+    e.add_argument("--year", type=int)
+    e.add_argument("--period")
+    e.add_argument("--all", action="store_true", help="In cả các lệch do trình bày lại")
+    e.set_defaults(func=cmd_evidence)
+
+    v = sub.add_parser("verify", help="Đọc lại riêng các ô lệch cần xem lại giữa hai BCTC, trên cả hai bản")
+    v.add_argument("--doc-id", type=int, nargs="+")
+    v.add_argument("--year", type=int)
+    v.add_argument("--period")
+    v.add_argument("--redecide", action="store_true", help="Chỉ chọn lại số đọc lại nào được giữ, không gọi mô hình")
+    v.set_defaults(func=cmd_verify)
+
+    c = sub.add_parser("cost", help="Chi phí gọi mô hình theo bước, từ các bản ghi đã lưu")
+    c.set_defaults(func=cmd_cost)
 
     args = p.parse_args(argv)
     try:

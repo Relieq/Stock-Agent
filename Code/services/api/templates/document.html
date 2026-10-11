@@ -20,6 +20,11 @@
     {% if head %}<span>· Doanh thu quý: <b>{{ head.get('rev_q_cur') | ty }}</b> tỷ (cùng kỳ {{ head.get('rev_q_prev_year') | ty }})</span>
     <span>· LNST quý: <b>{{ head.get('npat_q_cur') | ty }}</b> tỷ (cùng kỳ {{ head.get('npat_q_prev_year') | ty }})</span>{% endif %}
   </div>
+  {% if d.evidence_counts %}{% set n = d.evidence_counts %}{% set total = n.values() | sum %}
+  <div class="small">Bằng chứng cho {{ total }} ô số
+    (đối chiếu với: {% for _, p, rel in d.peers %}{{ p }}{% if not loop.last %}, {% endif %}{% else %}chưa có BCTC kỳ liền kề đã đọc{% endfor %}):
+    {% for k, v in n.items() if v %}<span class="ev-{{ k }} chip">{{ EVIDENCE[k] }} {{ v }} ({{ (100 * v / total) | round | int }}%)</span>{% endfor %}
+  </div>{% endif %}
   {% if record.note %}<div class="warnbox">{{ record.note }}</div>{% endif %}
   {% if record.stt_code_swapped or record.codes_inferred or record.labels_repaired or record.extensions or d.rereads %}
   <div class="infobox"><b>Hệ thống đã tự sửa</b> (ràng buộc kế toán xác nhận phương án sửa; nên đối chiếu ảnh):
@@ -47,13 +52,19 @@
     <p class="small muted">Trang {{ t.pages | join(', ') }} · Đơn vị in trên BCTC: {{ t.unit or "không ghi" }} ·
       Số chép nguyên văn như in trên BCTC. Bấm một dòng để mở đúng trang bên phải.
       <span class="flagkey">Dòng tô đỏ</span> thuộc ràng buộc bắt buộc bị lệch.</p>
+    <p class="legend small">Màu từng ô (rê chuột để xem chi tiết):
+      <span class="ev-both">khớp cộng tổng và giữa các kỳ</span> <span class="ev-period">khớp giữa các kỳ</span>
+      <span class="ev-sum">khớp cộng tổng</span> <span class="ev-none">chưa kiểm được</span>
+      <span class="ev-restated">khác kỳ trước do trình bày lại</span> <span class="ev-differs">hai BCTC in khác nhau (công ty/kiểm toán sửa số)</span>
+      <span class="ev-conflict">cần xem lại</span></p>
     <table class="fs">
       <thead><tr><th>STT</th><th>Mã</th><th>Chỉ tiêu</th><th>TM</th>{% for k, name in t.columns %}<th class="num">{{ name }}</th>{% endfor %}<th>Tr.</th></tr></thead>
       <tbody>
       {% for r in t.rows %}
       <tr data-page="{{ r.page or (t.pages[0] if t.pages else 1) }}" {% if r.flagged %}class="flag"{% endif %}>
         <td>{{ r.stt or "" }}</td><td class="code">{{ r.code or "" }}</td><td>{{ r.label }}</td><td>{{ r.note or "" }}</td>
-        {% for k, name in t.columns %}<td class="num">{{ r.values.get(k) or "" }}</td>{% endfor %}
+        {% for k, name in t.columns %}{% set ev = r.evidence.get(k) %}<td class="num{% if ev %} ev-{{ ev.status }}{% endif %}"
+          {% if ev %}title="{{ EVIDENCE[ev.status] }}{% if ev.sum %}&#10;Cộng tổng: {{ ev.sum | join(', ') }}{% endif %}{% if ev.period %}&#10;Giữa các kỳ: {{ ev.period | join(', ') }}{% endif %}{% if ev.differs %}&#10;Khác: {{ ev.differs | join(', ') }}{% endif %}{% if ev.conflict %}&#10;Cần xem lại: {{ ev.conflict | join(', ') }}{% endif %}"{% endif %}>{{ r.values.get(k) or "" }}</td>{% endfor %}
         <td class="muted">{{ r.page or "" }}</td>
       </tr>
       {% endfor %}
@@ -79,6 +90,20 @@
       {% endfor %}
       </tbody>
     </table>
+
+    {% if d.period_conflicts %}
+    <h3>Số khác giữa các BCTC</h3>
+    <table class="fs">
+      <thead><tr><th>Loại</th><th>Chỉ tiêu</th><th>Cột</th><th class="num">BCTC này</th><th class="num">Theo BCTC khác</th><th class="num">Lệch</th><th>Đánh giá</th></tr></thead>
+      <tbody>
+      {% for c in d.period_conflicts %}
+      <tr class="{{ 'flag' if c.suspect else 'soft' }}"><td class="small">{{ c.kind }}</td>
+        <td>{{ c.statement }} <span class="code">{{ c.key }}</span> {{ c.label }}</td><td class="small">{{ c.column }}</td>
+        <td class="num">{{ c.value | dong }}</td><td class="num">{{ c.expected | dong }}</td><td class="num">{{ c.diff | dong }}</td><td class="small">{{ c.verdict }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
 
     {% if d.rereads or d.reextracts %}
     <h3>Các lần đọc lại khi lệch</h3>

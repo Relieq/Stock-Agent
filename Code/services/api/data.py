@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -12,12 +12,18 @@ from services.extraction.pipeline import _check, _rotation
 from services.extraction.rules import BANK_INCOME_PARTS, RULESETS
 from services.extraction.sources import candidates, open_pdf, render_page
 from services.ingestion.registry import raw_data_dir
+from services.extraction.evidence import cells_of, document_evidence
 from services.metrics.canonical import code_for
 
 COLUMNS = {
     "BS": [("end_period", "Cuối kỳ"), ("begin_year", "Đầu năm")],
     "IS": [("q_cur", "Quý này"), ("q_prev_year", "Cùng kỳ"), ("ytd_cur", "Lũy kế"), ("ytd_prev_year", "Lũy kế năm trước")],
     "CF": [("ytd_cur", "Lũy kế"), ("ytd_prev_year", "Lũy kế năm trước")],
+}
+PERIOD_KIND = {
+    "bs_begin": "Số đầu năm khác với BCTC quý liền kề",
+    "is_quarter": "Quý ≠ lũy kế kỳ này − lũy kế kỳ trước",
+    "same_date": "Khác BCTC cùng ngày kết thúc kỳ (bán niên/năm)",
 }
 STATEMENT_NAMES = {"BS": "Cân đối kế toán", "IS": "Kết quả kinh doanh", "CF": "Lưu chuyển tiền tệ"}
 
@@ -81,9 +87,11 @@ class Row:
     page: int | None
     values: dict[str, str | None]
     flagged: bool
+    evidence: dict[str, dict] = field(default_factory=dict)   # cột -> {"status", "sum", "period", "conflict"}
 
 
-def detail(record: dict) -> dict:
+def detail(record: dict, evidence=None) -> dict:
+    """`evidence`: kết quả services.extraction.evidence.document_evidence của chính tài liệu này (có thể None)."""
     extracted, statements, sep, template, checks = _check(record)
     flagged: dict[str, set[str]] = {}
     check_rows = []
@@ -98,13 +106,33 @@ def detail(record: dict) -> dict:
     chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
     tables = []
     for st in extracted:
-        rows = [Row(it.stt, it.code, it.label, it.note, it.page, it.values_raw,
-                    bool(it.code) and it.code in flagged.get(st.statement, set()))
-                for it in st.items]
+        keys = evidence.cells.item_keys.get(st.statement, []) if evidence else []
+        rows = []
+        for i, it in enumerate(st.items):
+            key = keys[i] if i < len(keys) else None
+            ev = {col: evidence.status[(st.statement, key, col)] for col in it.values_raw
+                  if key and (st.statement, key, col) in evidence.status} if evidence else {}
+            rows.append(Row(it.stt, it.code, it.label, it.note, it.page, it.values_raw,
+                            bool(it.code) and it.code in flagged.get(st.statement, set()), ev))
         tables.append({"statement": st.statement, "name": STATEMENT_NAMES[st.statement], "unit": st.unit_raw,
                        "columns": COLUMNS[st.statement], "rows": rows,
                        "pages": chosen["statement_pages"].get(st.statement, [])})
-    return {"template": template, "sep": sep, "tables": tables, "checks": check_rows,
+    period_rows = []
+    if evidence:
+        for pc in evidence.period_checks:
+            if not pc.passed:
+                period_rows.append({"kind": PERIOD_KIND[pc.kind], "statement": pc.statement, "column": pc.column,
+                                    "label": evidence.cells.labels.get((pc.statement, pc.key), pc.key),
+                                    "key": pc.key, "value": pc.later, "expected": pc.expected, "diff": pc.diff,
+                                    "restated": pc.restated, "suspect": pc.suspect_misread,
+                                    "verdict": ("BCTC ghi trình bày lại" if pc.restated else
+                                                "Cần xem lại" if pc.suspect_misread else
+                                                "Đọc lại vẫn vậy: hai BCTC in khác nhau" if pc.verified else
+                                                "Cộng tổng hai bên đều khớp: hai BCTC in khác nhau" if pc.consistent else
+                                                "Chênh lớn, không phải dạng đọc sai: nhiều khả năng soát xét sửa số")})
+    return {"template": template, "sep": sep, "tables": tables, "checks": check_rows, "period_conflicts": period_rows,
+            "evidence_counts": evidence.counts() if evidence else None,
+            "peers": evidence.peers if evidence else [],
             "duplicate_codes": record.get("duplicate_codes") or {},
             "rereads": record.get("rereads", []), "reextracts": record.get("reextracts", []),
             "page_count": chosen["page_count"], "chosen": record["chosen"]}
@@ -125,3 +153,17 @@ def page_png(storage_key: str, member: str, page: int, rotate: int, long_side: i
 
 def page_image(record: dict, storage_key: str, page: int) -> bytes:
     return page_png(storage_key, record["chosen"], page, _rotation(record, page))
+
+
+_cells_cache: dict[tuple, object] = {}
+
+
+def evidence(conn, document_id: int):
+    """Bằng chứng từng ô (services.extraction.evidence), cache theo file kết quả trích xuất."""
+    def cells_fn(doc_id, period, record):
+        p = record_path(doc_id)
+        key = (doc_id, period, str(p), p.stat().st_mtime if p else None)
+        if key not in _cells_cache:
+            _cells_cache[key] = cells_of(doc_id, period, record)
+        return _cells_cache[key]
+    return document_evidence(conn, document_id, load=load_record, cells_fn=cells_fn)

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -34,7 +35,7 @@ from services.extraction.validate import (
     validate,
 )
 from services.ingestion.registry import raw_data_dir
-from services.llm import VisionClient
+from services.llm import VisionClient, usage_delta
 
 PIPELINE_VER = "0.1.0"
 LOCATE_MAX_PAGES = 30
@@ -43,10 +44,20 @@ EXTRACT_LONG_SIDE = 2000
 
 
 def _locate(client: VisionClient, doc, max_pages: int) -> list[dict]:
-    n = min(doc.page_count, max_pages)
-    images = [(f"Trang {p}", render_page(doc, p, LOCATE_LONG_SIDE)) for p in range(1, n + 1)]
-    result = client.json_from_images(prompts.LOCATE_PROMPT, images, prompts.LOCATE_SCHEMA, "page_classification")
-    return sorted(result["pages"], key=lambda x: x["page"])
+    """Phân loại trang theo từng đoạn `max_pages` trang; dừng khi đã thấy đủ BCĐKT, KQKD, LCTT tiếng Việt.
+
+    Phần lớn BCTC có báo cáo trong 30 trang đầu; một số file ghép bản tiếng Anh lên trước (VHM quý 1/2026: 142 trang,
+    bản tiếng Việt nằm sau trang 70) nên phải quét tiếp.
+    """
+    pages: list[dict] = []
+    for start in range(1, doc.page_count + 1, max_pages):
+        end = min(doc.page_count, start + max_pages - 1)
+        images = [(f"Trang {p}", render_page(doc, p, LOCATE_LONG_SIDE)) for p in range(start, end + 1)]
+        result = client.json_from_images(prompts.LOCATE_PROMPT, images, prompts.LOCATE_SCHEMA, "page_classification")
+        pages += result["pages"]
+        if {"BS", "IS", "CF"} <= set(_statement_pages(sorted(pages, key=lambda x: x["page"]))):
+            break
+    return sorted(pages, key=lambda x: x["page"])
 
 
 def _statement_pages(pages: list[dict]) -> dict[str, list[int]]:
@@ -96,6 +107,7 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
     path = raw_data_dir() / storage_key
 
     usage_before = asdict(client.usage)   # client dùng chung cho nhiều tài liệu: chỉ tính phần của tài liệu này
+    steps_before = client.steps_snapshot()
     record: dict = {
         "document_id": document_id, "ticker": ticker, "title": title, "file_id": file_id, "sha256": sha256,
         "pipeline_ver": PIPELINE_VER, "model": client.cfg.model, "provider": client.cfg.provider,
@@ -131,6 +143,7 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
 
     _escalate(record, client, doc)
     record["usage"] = {k: v - usage_before[k] for k, v in asdict(client.usage).items()}
+    record["usage_by_step"] = usage_delta(client.steps_snapshot(), steps_before)
     return _finalize(conn, record)
 
 
@@ -170,7 +183,7 @@ def _extend_balance_sheet(record: dict, client: VisionClient, doc) -> bool:
         return False
     image = render_page(doc, page, EXTRACT_LONG_SIDE, _rotation(record, page))
     extra = client.json_from_images(prompts.extract_prompt("BS"), [(f"Trang {page}", image)],
-                                    prompts.extract_schema("BS"), "statement_BS")
+                                    prompts.extract_schema("BS"), "statement_BS", step="extend_BS")
     before = record["raw"]["BS"]
     record["raw"]["BS"] = before | {"rows": before.get("rows", []) + extra.get("rows", [])}
     _, _, _, _, checks = _check(record)
@@ -204,41 +217,64 @@ def _gate_tally(record: dict) -> dict[str, tuple[int, int]]:
 
 
 def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> bool:
-    failures = _gate_failures(record)
-    if not failures:
+    """Chép lại theo từng trang các báo cáo có ràng buộc bắt buộc lệch hoặc chưa có ràng buộc nào đạt.
+
+    Lần 1 giữ hướng trang như bước định vị; vẫn chưa ổn thì lần 2 xoay thêm 180 độ (VHM quý 1/2026 in ngược trang
+    mà bước định vị không nhận ra). Giữ bản mới khi ít lệch hơn và không làm giảm số ràng buộc đạt.
+    """
+    tally = _gate_tally(record)
+    if not tally and not record.get("template_ver"):
+        _, _, _, template, _ = _check(record)
+        if not template:
+            return False
+    targets = {st: tally.get(st, (0, 0)) for st in record["raw"]
+               if tally.get(st, (0, 0))[0] > 0 or (st in ("BS", "IS") and tally.get(st, (0, 0))[1] == 0)}
+    if not targets:
         return False
     chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
     st_pages = {k: [int(x) for x in v] for k, v in chosen["statement_pages"].items()}
     log = record.setdefault("reextracts", [])
     improved = False
-    for st, n_failed in failures.items():
+    for st in targets:
         pages = st_pages.get(st, [])
-        if not pages:
-            continue
-        parts = []
-        for page in pages:
-            image = render_page(doc, page, REEXTRACT_LONG_SIDE, _rotation(record, page))
-            parts.append(client.json_from_images(prompts.extract_prompt(st), [(f"Trang {page}", image)],
-                                                 prompts.extract_schema(st), f"statement_{st}"))
-        merged = {
-            "unit_text": next((x["unit_text"] for x in parts if x.get("unit_text")), None),
-            "columns": parts[0].get("columns", []),
-            "rows": [r for x in parts for r in x.get("rows", [])],
-        }
-        before = record["raw"][st]
-        passed_before = _gate_tally(record).get(st, (0, 0))[1]
-        record["raw"][st] = merged
-        after_failed, passed_after = _gate_tally(record).get(st, (0, 0))
-        # Ít lệch hơn chưa đủ: bản chép lại có thể mất mã số hoặc mất dòng nên ít ràng buộc chạy được hơn
-        # (TCX quý 2/2026: lệch 2 -> 0 nhưng số ràng buộc KQKD chạy được giảm từ 28 xuống 12)
-        kept = after_failed < n_failed and passed_after >= passed_before
-        if not kept:
-            record["raw"][st] = before
-        else:
-            improved = True
-        log.append({"statement": st, "pages": pages, "failed_before": n_failed, "failed_after": after_failed,
-                    "rows_before": len(before.get("rows", [])), "rows_after": len(merged["rows"]),
-                    "kept": kept, "model": client.cfg.model})
+        for extra_rotation in (0, 180):
+            n_failed, passed_before = _gate_tally(record).get(st, (0, 0))
+            if extra_rotation and n_failed == 0 and passed_before > 0:
+                break
+            rotations = {page: (_rotation(record, page) + extra_rotation) % 360 for page in pages}
+            parts = []
+            for page in pages:
+                image = render_page(doc, page, REEXTRACT_LONG_SIDE, rotations[page])
+                parts.append(client.json_from_images(prompts.extract_prompt(st), [(f"Trang {page}", image)],
+                                                     prompts.extract_schema(st), f"statement_{st}",
+                                                     step=f"reextract_{st}"))
+            if not parts:
+                break
+            merged = {
+                "unit_text": next((x["unit_text"] for x in parts if x.get("unit_text")), None),
+                "columns": parts[0].get("columns", []),
+                "rows": [r for x in parts for r in x.get("rows", [])],
+            }
+            before = record["raw"][st]
+            record["raw"][st] = merged
+            after_failed, passed_after = _gate_tally(record).get(st, (0, 0))
+            # Ít lệch hơn chưa đủ: bản chép lại có thể mất mã số hoặc mất dòng nên ít ràng buộc chạy được hơn
+            # (TCX quý 2/2026: lệch 2 -> 0 nhưng số ràng buộc KQKD chạy được giảm từ 28 xuống 12)
+            kept = (after_failed < n_failed and passed_after >= passed_before) or                    (after_failed <= n_failed and passed_after > passed_before)
+            if not kept:
+                record["raw"][st] = before
+            else:
+                improved = True
+                if extra_rotation:
+                    saved = chosen.setdefault("rotations", {})
+                    for p, r in rotations.items():   # khóa số (vừa định vị) hoặc chuỗi (đọc lại từ JSON)
+                        saved.pop(p, None)
+                        saved[str(p)] = r
+            log.append({"statement": st, "pages": pages, "rotation_added": extra_rotation,
+                        "failed_before": n_failed, "failed_after": after_failed,
+                        "passed_before": passed_before, "passed_after": passed_after,
+                        "rows_before": len(before.get("rows", [])), "rows_after": len(merged["rows"]),
+                        "kept": kept, "model": client.cfg.model})
     return improved
 
 
@@ -323,7 +359,8 @@ def _check_variants(record: dict):
     fixed_template = {"securities": "CTCK"}.get(company_template)
 
     def evaluate(swapped: frozenset):
-        raws = {st: _swap_stt_code(raw, {p for s_, p in swapped if s_ == st}) for st, raw in record["raw"].items()}
+        raws = {st: _swap_stt_code(raw, {p for s_, p in swapped if s_ == st and p != PROMOTE}, (st, PROMOTE) in swapped)
+                for st, raw in record["raw"].items()}
         extracted = [_to_extracted(st, raw) for st, raw in raws.items()]
         statements, sep = normalize(extracted)
         template = fixed_template or detect_template(statements)
@@ -337,12 +374,17 @@ def _check_variants(record: dict):
     swapped: frozenset = frozenset()
     best_score, best = evaluate(swapped)
     moves = [frozenset(u) for u in units.values() if u] + [frozenset([u]) for us in units.values() for u in us]
+    # Mô hình chép lẫn lộn trong cùng một bảng: dòng thì mã số ở cột stt (cột code là số thuyết minh), dòng thì đúng
+    # chỗ (MSN quý 1/2026). Phương án: dòng nào có stt dạng số thì lấy stt làm mã.
+    moves += [frozenset([(st, PROMOTE)]) for st, raw in record["raw"].items()
+              if any(re.fullmatch(r"\d{1,3}[a-z]?", str(r.get("stt") or "")) for r in raw.get("rows", []))]
     for move in moves:
         candidate = swapped ^ move
         score, result = evaluate(candidate)
         if score < best_score:
             swapped, best_score, best = candidate, score, result
-    record["stt_code_swapped"] = sorted(f"{st}@{p}" for st, p in swapped)
+    record["stt_code_swapped"] = sorted(f"{st}@{p}" for st, p in swapped if p != PROMOTE)
+    record["stt_promoted"] = sorted(st for st, p in swapped if p == PROMOTE)
     return best
 
 
@@ -363,11 +405,21 @@ def _pages_with_code_like_stt(raw: dict) -> list:
     return out
 
 
-def _swap_stt_code(raw: dict, pages: set) -> dict:
-    if not pages:
+PROMOTE = "stt"   # đơn vị phương án "lấy stt dạng số làm mã" (khác với đảo theo trang)
+
+
+def _swap_stt_code(raw: dict, pages: set, promote: bool = False) -> dict:
+    """Đảo stt <-> code cho các dòng ở `pages`; `promote`: dòng có stt dạng số thì lấy stt làm mã, code cũ làm thuyết minh."""
+    if not pages and not promote:
         return raw
-    return raw | {"rows": [r | {"stt": r.get("code"), "code": r.get("stt")} if r.get("page") in pages else r
-                           for r in raw.get("rows", [])]}
+    rows = []
+    for r in raw.get("rows", []):
+        if r.get("page") in pages:
+            r = r | {"stt": r.get("code"), "code": r.get("stt")}
+        elif promote and re.fullmatch(r"\d{1,3}[a-z]?", str(r.get("stt") or "")):
+            r = r | {"code": r["stt"], "stt": None, "note": r.get("note") or r.get("code")}
+        rows.append(r)
+    return raw | {"rows": rows}
 
 
 def _reread_failed(record: dict, client: VisionClient, doc) -> bool:
@@ -418,17 +470,33 @@ def _reread_failed(record: dict, client: VisionClient, doc) -> bool:
 def reread_document(conn: psycopg.Connection, document_id: int, client: VisionClient) -> dict:
     """Đọc lại các ô bị lệch cho một tài liệu đã trích xuất (không chép lại cả bảng)."""
     record = _load_record(conn, document_id)
+    doc = open_record_pdf(conn, record)
+    with track_usage(record, client):
+        _escalate(record, client, doc)
+    return _finalize(conn, record)
+
+
+def open_record_pdf(conn: psycopg.Connection, record: dict):
+    """Mở đúng file PDF mà bản ghi trích xuất đã đọc."""
     path = raw_data_dir() / conn.execute(
         "SELECT storage_key FROM document_files WHERE id = %s", (record["file_id"],)).fetchone()[0]
-    cand = next(c for c in candidates(path) if c.name == record["chosen"])
-    doc = open_pdf(cand)
-    usage_before = asdict(client.usage)
-    _escalate(record, client, doc)
+    return open_pdf(next(c for c in candidates(path) if c.name == record["chosen"]))
+
+
+@contextmanager
+def track_usage(record: dict, client: VisionClient):
+    """Cộng thêm chi phí các lần gọi mô hình trong khối lệnh vào usage và usage_by_step của bản ghi."""
+    usage_before, steps_before = asdict(client.usage), client.steps_snapshot()
+    yield
     usage = record.get("usage") or {}
     for k, v in asdict(client.usage).items():
         usage[k] = usage.get(k, 0) + v - usage_before[k]
     record["usage"] = usage
-    return _finalize(conn, record)
+    by_step = record.setdefault("usage_by_step", {})
+    for step, d in usage_delta(client.steps_snapshot(), steps_before).items():
+        cur = by_step.setdefault(step, {k: 0 for k in d})
+        for k, v in d.items():
+            cur[k] = cur.get(k, 0) + v
 
 
 def _load_record(conn: psycopg.Connection, document_id: int) -> dict:

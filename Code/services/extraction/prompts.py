@@ -91,6 +91,20 @@ Các ô cần đọc lại:
 {lines}"""
 
 
+def verify_prompt(statement: str, cells: list[tuple[str, str | None, str, str]]) -> str:
+    """cells: (mã ô để trả về, mã số in trên BCTC hoặc None, tên chỉ tiêu, column_kind). Dùng để đọc lại một ô có số khác
+    với BCTC khác của cùng công ty. Cố ý không đưa con số nào để mô hình không chép theo."""
+    lines = "\n".join(f"- ô {cid}: dòng \"{label}\"" + (f" (mã số {code})" if code else "") + f", cột {col}"
+                      for cid, code, label, col in cells)
+    return f"""Ảnh sau là {_STATEMENT_NAME[statement]} trong một BCTC Việt Nam, chụp ở độ phân giải cao.
+Hãy tìm đúng dòng và đúng cột của từng ô dưới đây, đọc THẬT CẨN THẬN từng chữ số và chép NGUYÊN VĂN như in (giữ dấu
+chấm, dấu phẩy, dấu ngoặc). Không tính toán, không suy đoán: chỉ chép đúng những gì nhìn thấy; ô trống thì trả null.
+Trường "code" của kết quả là mã ô đã cho (ví dụ o1), không phải mã số chỉ tiêu.
+{_COLUMN_HELP[statement]}
+Các ô cần đọc:
+{lines}"""
+
+
 def extract_schema(statement: str) -> dict:
     kinds = COLUMN_KINDS[statement]
     return {

@@ -1,0 +1,358 @@
+"""Bằng chứng cho từng ô số: ô đã được kiểm bằng cách nào, có mâu thuẫn ở đâu.
+
+Hai nguồn bằng chứng, đều không gọi mô hình:
+  * cộng tổng: ô nằm trong một ràng buộc kế toán đã đạt (lhs = tổng các mã ở rhs) của chính tài liệu;
+  * giữa các kỳ: cùng một con số in trên hai BCTC khác nhau, đọc độc lập từ hai bộ ảnh khác nhau, phải khớp:
+      - BCĐKT: cột "đầu năm" của mọi quý trong cùng năm tài chính là cùng một ngày (01/01), phải bằng nhau;
+      - KQKD: quý n = lũy kế quý n - lũy kế quý n-1, cho cả năm nay (q_cur) lẫn năm trước (q_prev_year);
+      - BCTC quý 2 với BCTC bán niên, quý 4 với BCTC năm (cùng ngày kết thúc kỳ): mọi cột của BCĐKT, lũy kế của KQKD
+        và LCTT phải bằng nhau. Đây là nguồn duy nhất phủ được LCTT và cột cuối kỳ của BCĐKT.
+    Hai lần đọc độc lập cùng sai thành một con số giống hệt nhau là rất khó, nên khớp giữa các kỳ là bằng chứng mạnh,
+    và bắt được cả ô không thuộc ràng buộc cộng tổng nào.
+
+Ô được nhận diện theo mã số (doanh nghiệp thường, CTCK) hoặc mã chuẩn b.* (ngân hàng); dòng không có mã thì theo tên
+chỉ tiêu đã bỏ dấu. Số liệu năm trước BCTC ghi "trình bày lại" thì lệch giữa các kỳ được ghi là trình bày lại, không
+coi là lỗi đọc.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from decimal import Decimal
+
+from services.extraction.bank import clean_label, fold
+from services.extraction.numbers import normalize_code, parse_amount
+from services.extraction.pipeline import _check
+from services.extraction.rules import RULESETS
+
+EPS = re.compile(r"(lai|lo).*tren (mot )?co phieu")
+RESTATED = re.compile(r"trình bày lại|điều chỉnh lại|restated", re.IGNORECASE)
+PERIOD_ORDER = ("Q1", "Q2", "Q3", "Q4")
+
+
+@dataclass
+class Cells:
+    """Số liệu một tài liệu theo ô: values[(báo cáo, khóa)][cột] = số (đồng)."""
+    document_id: int
+    period: str
+    values: dict[tuple[str, str], dict[str, Decimal]]
+    labels: dict[tuple[str, str], str]
+    multiplier: dict[str, Decimal]
+    restated: set[tuple[str, str]]                   # (báo cáo, cột) có tiêu đề "trình bày lại"
+    item_keys: dict[str, list[str | None]] = field(default_factory=dict)   # khóa của từng dòng theo thứ tự chép
+    sum_evidence: dict[tuple[str, str, str], list[str]] = field(default_factory=dict)
+    sum_conflicts: dict[tuple[str, str, str], list[str]] = field(default_factory=dict)
+    verified: set[tuple[str, str, str]] = field(default_factory=set)   # ô đọc lại ở ảnh nét hơn vẫn ra như cũ
+
+
+def label_key(label: str) -> str:
+    return "~" + fold(clean_label(label))
+
+
+def cells_of(document_id: int, period: str, record: dict) -> Cells:
+    extracted, statements, sep, template, checks = _check(record)
+    values: dict[tuple[str, str], dict[str, Decimal]] = {}
+    labels: dict[tuple[str, str], str] = {}
+    item_keys: dict[str, list[str | None]] = {}
+    mult = {st: s.multiplier for st, s in statements.items()}
+    for ex in extracted:
+        st = ex.statement
+        m = mult.get(st, Decimal(1))
+        seen_labels: dict[str, int] = {}
+        keys = item_keys.setdefault(st, [])
+        for it in ex.items:
+            keys.append(None)
+            if EPS.search(fold(clean_label(it.label))):
+                continue      # lãi trên cổ phiếu tính bằng đồng, không theo đơn vị của bảng
+            code = normalize_code(it.code)
+            if code:
+                key = code
+                if (st, key) in values:
+                    continue
+                vals = statements[st].values.get(code, {}) if st in statements else {}
+            else:
+                base = label_key(it.label)
+                seen_labels[base] = seen_labels.get(base, 0) + 1
+                key = base if seen_labels[base] == 1 else f"{base}#{seen_labels[base]}"
+                vals = {col: v * m for col, raw in it.values_raw.items() if (v := parse_amount(raw, sep)) is not None}
+            if vals:
+                values[(st, key)] = dict(vals)
+                labels[(st, key)] = it.label
+                keys[-1] = key
+    restated = {(st, c.get("kind")) for st, raw in record["raw"].items() for c in raw.get("columns", [])
+                if RESTATED.search(c.get("header") or "")}
+    cells = Cells(document_id, period, values, labels, mult, restated, item_keys)
+    cells.verified = {(v["statement"], v["key"], v["column_kind"]) for v in record.get("cell_verifications", [])
+                      if v.get("same")}
+
+    rules = {r.id: r for r in RULESETS[template].rules} if template else {}
+    crosses = {x.id: x for x in RULESETS[template].cross_rules} if template else {}
+    for c in checks:
+        if c.rule_id in rules:
+            r = rules[c.rule_id]
+            touched = [(r.statement, code, c.column_kind) for code in (r.lhs, *(t for _, t in r.rhs))
+                       if (r.statement, code) in values]
+        elif c.rule_id in crosses:
+            (ls, lc, lcol), (rs, rc, rcol) = crosses[c.rule_id].left, crosses[c.rule_id].right
+            touched = [(ls, lc, lcol), (rs, rc, rcol)]
+        else:
+            continue
+        target = cells.sum_evidence if c.passed else (cells.sum_conflicts if c.gate else None)
+        if target is None:
+            continue
+        for cell in touched:
+            target.setdefault(cell, []).append(c.rule_id)
+    return cells
+
+
+@dataclass
+class PeriodCheck:
+    kind: str                  # bs_begin / is_quarter / same_date
+    statement: str
+    key: str
+    column: str                # cột của tài liệu sau
+    later: Decimal
+    expected: Decimal          # tính từ tài liệu trước (và chính tài liệu sau với KQKD)
+    passed: bool
+    restated: bool
+    cells: list[tuple[int, str, str, str]]   # (document_id, báo cáo, khóa, cột) liên quan
+    # Mọi ô liên quan đều nằm trong ràng buộc cộng tổng đã đạt của chính tài liệu chứa nó: các số thực sự được in như
+    # vậy, nên lệch là do hai BCTC khác nhau thật (soát xét điều chỉnh, phân loại lại), không phải đọc sai
+    consistent: bool = False
+    # Mọi ô liên quan đã được đọc lại riêng ở ảnh nét hơn (verify.py) và vẫn ra như lần đầu: hai lần đọc trùng nhau
+    verified: bool = False
+
+    @property
+    def suspect_misread(self) -> bool:
+        """Lệch cần xem lại ảnh (có thể đọc sai), phân biệt với hai BCTC khác nhau thật.
+
+        Lệch 1-2 chữ số luôn cần xem: thường là đọc sai, nhưng bản soát xét cũng có thể sửa đúng vài chữ số
+        (FPT quý 2 so với bán niên 2026, mã 311: chênh 100.000 đồng, cả hai bản đều in đúng như đã đọc). Ngoài ra: giữa hai quý (số đầu năm, quý = lũy kế - lũy kế) mà không ghi
+        trình bày lại thì nghi đọc sai, vì BCTC quý hiếm khi tự đổi số kỳ trước; còn quý 2 khác bán niên/quý 4 khác
+        năm một khoản lớn là chuyện thường (soát xét, kiểm toán điều chỉnh) nên coi là khác thật.
+        """
+        if self.passed or self.restated or self.verified:
+            return False
+        if digit_slip(self.later, self.expected):
+            return True
+        return not self.consistent and self.kind != "same_date"
+
+    @property
+    def diff(self) -> Decimal:
+        return self.later - self.expected
+
+
+def _same(st: str, a: Decimal, b: Decimal, tol: Decimal) -> bool:
+    """KQKD: hai BCTC có thể dùng quy ước dấu chi phí khác nhau (VRE: bản quý in chi phí âm, bản bán niên in dương)."""
+    return abs(a - b) <= tol or (st == "IS" and abs(abs(a) - abs(b)) <= tol)
+
+
+def digit_slip(a: Decimal, b: Decimal) -> bool:
+    """Hai số cùng số chữ số và khác nhau ở tối đa 2 vị trí: dấu hiệu đọc sai chữ số, không phải điều chỉnh số liệu."""
+    x, y = str(abs(int(a))), str(abs(int(b)))
+    return len(x) == len(y) and sum(c != d for c, d in zip(x, y)) <= 2
+
+
+def _mark_consistency(checks: list[PeriodCheck], *docs: Cells) -> list[PeriodCheck]:
+    by_id = {d.document_id: d for d in docs}
+    for pc in checks:
+        pc.consistent = all((st, key, col) in by_id[doc_id].sum_evidence for doc_id, st, key, col in pc.cells)
+        pc.verified = all((st, key, col) in by_id[doc_id].verified for doc_id, st, key, col in pc.cells)
+    return checks
+
+
+def compare_periods(earlier: Cells, later: Cells) -> list[PeriodCheck]:
+    """Đối chiếu hai BCTC quý liên tiếp trong cùng năm tài chính (earlier là quý trước của later)."""
+    out: list[PeriodCheck] = []
+
+    def tol(st: str) -> Decimal:
+        return max(earlier.multiplier.get(st, Decimal(1)), later.multiplier.get(st, Decimal(1))) * 3
+
+    for (st, key), lv in later.values.items():
+        ev = earlier.values.get((st, key))
+        if ev is None:
+            continue
+        if st == "BS" and "begin_year" in lv and "begin_year" in ev:
+            a, b = lv["begin_year"], ev["begin_year"]
+            out.append(PeriodCheck("bs_begin", st, key, "begin_year", a, b, _same(st, a, b, tol(st)),
+                                   (st, "begin_year") in later.restated or (st, "begin_year") in earlier.restated,
+                                   [(later.document_id, st, key, "begin_year"), (earlier.document_id, st, key, "begin_year")]))
+        if st == "IS":
+            for q, ytd in (("q_cur", "ytd_cur"), ("q_prev_year", "ytd_prev_year")):
+                # Lũy kế của quý trước; BCTC quý 1 có thể không in cột lũy kế (lũy kế = quý)
+                e_ytd_col = ytd if ytd in ev else (q if earlier.period == "Q1" and q in ev else None)
+                if q not in lv or ytd not in lv or e_ytd_col is None:
+                    continue
+                expected = lv[ytd] - ev[e_ytd_col]
+                passed = abs(lv[q] - expected) <= tol(st) * 2 or                     abs(lv[q] - (lv[ytd] + ev[e_ytd_col])) <= tol(st) * 2 and lv[q] * lv[ytd] >= 0 > lv[ytd] * ev[e_ytd_col]
+                out.append(PeriodCheck("is_quarter", st, key, q, lv[q], expected, passed,
+                                       any((st, c) in s.restated for c in (q, ytd) for s in (earlier, later)),
+                                       [(later.document_id, st, key, q), (later.document_id, st, key, ytd),
+                                        (earlier.document_id, st, key, e_ytd_col)]))
+    return _mark_consistency(out, earlier, later)
+
+
+def compare_same_date(quarter: Cells, period_report: Cells) -> list[PeriodCheck]:
+    """Đối chiếu BCTC quý với BCTC cùng ngày kết thúc kỳ: quý 2 với bán niên (30/06), quý 4 với năm (31/12).
+
+    BCĐKT: cả hai cột phải bằng nhau. KQKD và LCTT: lũy kế của BCTC quý bằng số cả kỳ của BCTC bán niên/năm (bản này
+    có thể chỉ có một cặp cột, mô hình có thể gán là q_* hoặc ytd_*). Lệch có thể do đọc sai hoặc do soát xét/kiểm toán
+    điều chỉnh số liệu; cả hai đều cần người xem.
+    """
+    out: list[PeriodCheck] = []
+    pairs = {"BS": (("end_period", ("end_period",)), ("begin_year", ("begin_year",))),
+             "IS": (("ytd_cur", ("ytd_cur", "q_cur")), ("ytd_prev_year", ("ytd_prev_year", "q_prev_year"))),
+             "CF": (("ytd_cur", ("ytd_cur", "q_cur")), ("ytd_prev_year", ("ytd_prev_year", "q_prev_year")))}
+    for (st, key), qv in quarter.values.items():
+        pv = period_report.values.get((st, key))
+        if pv is None:
+            continue
+        tol = max(quarter.multiplier.get(st, Decimal(1)), period_report.multiplier.get(st, Decimal(1))) * 3
+        for col, other_cols in pairs.get(st, ()):
+            other = next((c for c in other_cols if c in pv), None)
+            if col not in qv or other is None:
+                continue
+            out.append(PeriodCheck("same_date", st, key, col, qv[col], pv[other], _same(st, qv[col], pv[other], tol),
+                                   (st, col) in quarter.restated or (st, other) in period_report.restated,
+                                   [(quarter.document_id, st, key, col), (period_report.document_id, st, key, other)]))
+    return _mark_consistency(out, quarter, period_report)
+
+
+# Trạng thái một ô, từ mạnh đến yếu
+STATUS_LABELS = {
+    "conflict": "Cần xem lại",
+    "differs": "Hai BCTC in khác nhau (công ty hoặc kiểm toán đã sửa số)",
+    "both": "Khớp cộng tổng và giữa các kỳ",
+    "period": "Khớp giữa các kỳ",
+    "sum": "Khớp cộng tổng",
+    "restated": "Khác kỳ trước do trình bày lại",
+    "none": "Chưa kiểm được",
+}
+
+
+def cell_status(cells: Cells, period_checks: list[PeriodCheck]) -> dict[tuple[str, str, str], dict]:
+    """Trạng thái từng ô (báo cáo, khóa, cột) của tài liệu `cells`."""
+    period_ok: dict[tuple, list[str]] = {}
+    period_bad: dict[tuple, list[str]] = {}
+    period_restated: set[tuple] = set()
+    period_differs: dict[tuple, list[str]] = {}
+    for pc in period_checks:
+        desc = f"{pc.kind}:{pc.key}:{pc.column}"
+        for doc_id, st, key, col in pc.cells:
+            if doc_id != cells.document_id:
+                continue
+            cell = (st, key, col)
+            if pc.passed:
+                period_ok.setdefault(cell, []).append(desc)
+            elif pc.restated:
+                period_restated.add(cell)
+            elif not pc.suspect_misread:
+                period_differs.setdefault(cell, []).append(desc)
+            else:
+                period_bad.setdefault(cell, []).append(desc)
+
+    out = {}
+    for (st, key), vals in cells.values.items():
+        for col in vals:
+            cell = (st, key, col)
+            sums, bad_sum = cells.sum_evidence.get(cell, []), cells.sum_conflicts.get(cell, [])
+            per, bad_per = period_ok.get(cell, []), period_bad.get(cell, [])
+            if bad_sum or bad_per:
+                status = "conflict"
+            elif cell in period_differs:
+                status = "differs"
+            elif sums and per:
+                status = "both"
+            elif per:
+                status = "period"
+            elif sums:
+                status = "sum"
+            elif cell in period_restated:
+                status = "restated"
+            else:
+                status = "none"
+            out[cell] = {"status": status, "sum": sums, "period": per, "conflict": bad_sum + bad_per,
+                         "differs": period_differs.get(cell, [])}
+    return out
+
+
+# BCTC quý và BCTC cùng ngày kết thúc kỳ: (kỳ quý, loại BCTC cả kỳ, kỳ của BCTC cả kỳ)
+SAME_DATE = {("Q2", "fs_semiannual", "H1"), ("Q4", "fs_annual", "FY")}
+
+
+def neighbours(conn, document_id: int) -> list[tuple[int, str, str]]:
+    """Các BCTC đã đọc dùng để đối chiếu, cùng mã, cùng phạm vi, cùng năm: [(id, kỳ, quan hệ)].
+
+    Quan hệ: "earlier"/"later" = quý liền trước/liền sau; "report" = BCTC cả kỳ cùng ngày kết thúc với quý này
+    (bán niên cho quý 2, năm cho quý 4); "quarter" = BCTC quý cùng ngày kết thúc với BCTC cả kỳ này.
+    """
+    row = conn.execute("SELECT ticker, scope, fiscal_year, fiscal_period, doc_type FROM documents WHERE id = %s",
+                       (document_id,)).fetchone()
+    if row is None:
+        return []
+    ticker, scope, year, period, doc_type = row
+    wanted: list[tuple[str, str, str]] = []          # (loại BCTC, kỳ, quan hệ)
+    if doc_type == "fs_quarter" and period in PERIOD_ORDER:
+        i = PERIOD_ORDER.index(period)
+        wanted += [("fs_quarter", p, "earlier" if p_i < i else "later")
+                   for p_i, p in enumerate(PERIOD_ORDER) if abs(p_i - i) == 1]
+        wanted += [(t, rp, "report") for q, t, rp in SAME_DATE if q == period]
+    wanted += [("fs_quarter", q, "quarter") for q, t, rp in SAME_DATE if t == doc_type and rp == period]
+    out = []
+    for t, p, relation in wanted:
+        hit = conn.execute(
+            """SELECT id FROM documents
+               WHERE ticker = %s AND scope = %s AND fiscal_year = %s AND doc_type = %s AND fiscal_period = %s
+                 AND content_kind = 'full' AND processed_at IS NOT NULL AND NOT is_amended
+               ORDER BY source_listed_at DESC LIMIT 1""",
+            (ticker, scope, year, t, p)).fetchone()
+        if hit:
+            out.append((hit[0], p, relation))
+    return out
+
+
+@dataclass
+class DocumentEvidence:
+    cells: Cells
+    period_checks: list[PeriodCheck]
+    status: dict[tuple[str, str, str], dict]
+    peers: list[tuple[int, str, str]]
+
+    def counts(self) -> dict[str, int]:
+        out = {k: 0 for k in STATUS_LABELS}
+        for s in self.status.values():
+            out[s["status"]] += 1
+        return out
+
+
+def document_evidence(conn, document_id: int, load=None, cells_fn=None) -> DocumentEvidence | None:
+    """Bằng chứng cho mọi ô của một tài liệu. `load(document_id)` trả về bản ghi trích xuất (mặc định đọc file JSON);
+    `cells_fn(document_id, kỳ, bản ghi)` thay cho cells_of khi cần cache."""
+    cells_fn = cells_fn or cells_of
+    from services.extraction.pipeline import _load_record
+
+    def _load(doc_id: int) -> dict | None:
+        if load:
+            return load(doc_id)
+        try:
+            return _load_record(conn, doc_id)
+        except RuntimeError:
+            return None
+
+    period = conn.execute("SELECT fiscal_period FROM documents WHERE id = %s", (document_id,)).fetchone()
+    record = _load(document_id)
+    if period is None or record is None:
+        return None
+    cells = cells_fn(document_id, period[0], record)
+    checks: list[PeriodCheck] = []
+    peers = neighbours(conn, document_id)
+    for peer_id, peer_period, relation in peers:
+        peer_record = _load(peer_id)
+        if peer_record is None:
+            continue
+        peer = cells_fn(peer_id, peer_period, peer_record)
+        checks += {"earlier": lambda: compare_periods(peer, cells), "later": lambda: compare_periods(cells, peer),
+                   "report": lambda: compare_same_date(cells, peer), "quarter": lambda: compare_same_date(peer, cells),
+                   }[relation]()
+    return DocumentEvidence(cells, checks, cell_status(cells, checks), peers)

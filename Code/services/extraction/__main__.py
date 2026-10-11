@@ -49,6 +49,7 @@ def cmd_run(args) -> None:
                 conn.commit()
                 print(f"    lỗi: {e}")
                 continue
+            conn.commit()   # ghi ngay từng tài liệu, không để cả đợt chạy trong một transaction
             s = rec["summary"]
             pages = {k: v for k, v in next(c for c in rec["candidates"] if c["name"] == rec["chosen"])["statement_pages"].items()}
             print(f"    trang: {pages}; mẫu: {rec['template_ver']}; ràng buộc bắt buộc: "

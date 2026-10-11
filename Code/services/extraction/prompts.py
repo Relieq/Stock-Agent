@@ -157,7 +157,11 @@ Hãy CHÉP LẠI NGUYÊN VĂN bảng số, theo đúng thứ tự từ trên xu�
 - stt: số thứ tự in ở đầu dòng, bỏ dấu chấm cuối (ví dụ "A", "I", "1", "a"); không có thì null. Số thứ tự có thể
   in ở cột riêng hoặc dính liền trước tên chỉ tiêu (ví dụ "II. Tiền gửi tại NHNN" thì stt là "II").
 - code: mã số in ở cột "Mã số" (ví dụ "110", "01", "411a"); không có thì null. Không lấy số thuyết minh làm mã số.
-- label: tên chỉ tiêu đúng như in, KHÔNG kèm số thứ tự đầu dòng.
+  Cột "Mã số" thường nằm sau tên chỉ tiêu nhưng cũng có thể là cột ngoài cùng bên trái, trước số thứ tự: xác định
+  theo tiêu đề cột, đừng nhầm với số thứ tự đầu dòng.
+- label: tên chỉ tiêu đúng như in, KHÔNG kèm số thứ tự đầu dòng. Tên dài có thể xuống 2-3 dòng chữ, số in ngang
+  dòng chữ CUỐI của tên; gộp cả các dòng chữ đó vào một label. Số thứ tự và số liệu trên cùng một hàng ngang thuộc về
+  cùng một chỉ tiêu: đừng ghép số của chỉ tiêu này với tên của chỉ tiêu ngay bên dưới.
 - note: nội dung cột "Thuyết minh" (ví dụ "5", "V.1"); không có thì null.
 - page: số trang N của ảnh chứa dòng đó.
 - values: chuỗi số đúng như in trên giấy cho từng cột, GIỮ NGUYÊN dấu chấm, dấu phẩy, dấu ngoặc, dấu trừ.

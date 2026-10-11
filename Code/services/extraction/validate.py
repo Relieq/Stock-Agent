@@ -70,7 +70,7 @@ def normalize(extracted: list[ExtractedStatement], default_unit: str | None = No
                 continue
             if code in seen:
                 # Dòng lặp lại ở đầu trang sau với cùng số liệu (ví dụ VNM in lại dòng 50) thì bỏ qua
-                same = all(parse_amount(raw, sep) is None or parse_amount(raw, sep) * mult == norm.values[code].get(col)
+                same = all(parse_amount(raw, sep) is None or parse_amount(raw, sep) * mult == norm.values.get(code, {}).get(col)
                            for col, raw in it.values_raw.items())
                 if not same and code not in norm.duplicate_codes:
                     norm.duplicate_codes.append(code)

@@ -1,0 +1,127 @@
+"""Đọc dữ liệu cho giao diện xem lại: danh sách BCTC, kết quả trích xuất, ảnh trang gốc."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
+
+from services.extraction.pipeline import _check, _rotation
+from services.extraction.rules import BANK_INCOME_PARTS, RULESETS
+from services.extraction.sources import candidates, open_pdf, render_page
+from services.ingestion.registry import raw_data_dir
+from services.metrics.canonical import code_for
+
+COLUMNS = {
+    "BS": [("end_period", "Cuối kỳ"), ("begin_year", "Đầu năm")],
+    "IS": [("q_cur", "Quý này"), ("q_prev_year", "Cùng kỳ"), ("ytd_cur", "Lũy kế"), ("ytd_prev_year", "Lũy kế năm trước")],
+    "CF": [("ytd_cur", "Lũy kế"), ("ytd_prev_year", "Lũy kế năm trước")],
+}
+STATEMENT_NAMES = {"BS": "Cân đối kế toán", "IS": "Kết quả kinh doanh", "CF": "Lưu chuyển tiền tệ"}
+
+
+def record_path(document_id: int) -> Path | None:
+    files = sorted((raw_data_dir() / "extracted").glob(f"*/{document_id}_*.json"), key=lambda p: p.stat().st_mtime)
+    return files[-1] if files else None
+
+
+@lru_cache(maxsize=64)
+def _load(path: str, mtime: float) -> dict:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def load_record(document_id: int) -> dict | None:
+    p = record_path(document_id)
+    return _load(str(p), p.stat().st_mtime) if p else None
+
+
+def headline(record: dict) -> dict[str, Decimal | None]:
+    """Doanh thu (ngân hàng: tổng thu nhập hoạt động) và LNST quý này, cùng kỳ. Đơn vị: đồng."""
+    _, statements, _, template, _ = _check(record)
+    out: dict[str, Decimal | None] = {}
+    if not template or "IS" not in statements:
+        return out
+    is_values = statements["IS"].values
+    rev_metric = "toi" if template == "TCTD" else "revenue"
+    for key, metric in (("rev", rev_metric), ("npat", "npat")):
+        code = code_for(template, "IS", metric)
+        for col in ("q_cur", "q_prev_year"):
+            out[f"{key}_{col}"] = is_values.get(code, {}).get(col) if code else None
+            if out[f"{key}_{col}"] is None and metric == "toi" and "b.nii" in is_values:
+                # Nhiều ngân hàng không in dòng tổng thu nhập hoạt động: cộng các khoản thu nhập thuần như ràng buộc IS_bank_ppop_parts
+                out[f"{key}_{col}"] = sum((is_values.get(c, {}).get(col, Decimal(0)) for c in BANK_INCOME_PARTS),
+                                          Decimal(0))
+    return out
+
+
+def _formula(template: str | None, rule_id: str) -> tuple[str, str | None, set[str]]:
+    """(công thức dễ đọc, báo cáo, các mã liên quan) của một ràng buộc."""
+    rs = RULESETS.get(template) if template else None
+    if rs is None:
+        return rule_id, None, set()
+    for r in rs.rules:
+        if r.id == rule_id:
+            terms = " ".join(("+ " if s > 0 else "− ") + c for s, c in r.rhs).removeprefix("+ ")
+            return f"[{r.lhs}] = {terms}", r.statement, {r.lhs, *(c for _, c in r.rhs)}
+    for x in rs.cross_rules:
+        if x.id == rule_id:
+            (ls, lc, lcol), (rs_, rc, rcol) = x.left, x.right
+            return f"{ls} [{lc}] {lcol} = {rs_} [{rc}] {rcol}", None, set()
+    return rule_id, None, set()
+
+
+@dataclass
+class Row:
+    stt: str | None
+    code: str | None
+    label: str
+    note: str | None
+    page: int | None
+    values: dict[str, str | None]
+    flagged: bool
+
+
+def detail(record: dict) -> dict:
+    extracted, statements, sep, template, checks = _check(record)
+    flagged: dict[str, set[str]] = {}
+    check_rows = []
+    for c in checks:
+        formula, st, codes = _formula(template, c.rule_id)
+        if c.gate and not c.passed and st:
+            flagged.setdefault(st, set()).update(codes)
+        check_rows.append({"rule_id": c.rule_id, "column": c.column_kind, "passed": c.passed, "gate": c.gate,
+                           "formula": formula, "lhs": c.lhs, "rhs": c.rhs, "diff": c.diff, "missing": c.missing})
+    check_rows.sort(key=lambda c: (c["passed"], not c["gate"], c["rule_id"]))
+
+    chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
+    tables = []
+    for st in extracted:
+        rows = [Row(it.stt, it.code, it.label, it.note, it.page, it.values_raw,
+                    bool(it.code) and it.code in flagged.get(st.statement, set()))
+                for it in st.items]
+        tables.append({"statement": st.statement, "name": STATEMENT_NAMES[st.statement], "unit": st.unit_raw,
+                       "columns": COLUMNS[st.statement], "rows": rows,
+                       "pages": chosen["statement_pages"].get(st.statement, [])})
+    return {"template": template, "sep": sep, "tables": tables, "checks": check_rows,
+            "duplicate_codes": record.get("duplicate_codes") or {},
+            "rereads": record.get("rereads", []), "reextracts": record.get("reextracts", []),
+            "page_count": chosen["page_count"], "chosen": record["chosen"]}
+
+
+@lru_cache(maxsize=8)
+def _open(storage_key: str, member: str):
+    for cand in candidates(raw_data_dir() / storage_key):
+        if cand.name == member:
+            return open_pdf(cand)
+    raise FileNotFoundError(member)
+
+
+@lru_cache(maxsize=256)
+def page_png(storage_key: str, member: str, page: int, rotate: int, long_side: int = 1700) -> bytes:
+    return render_page(_open(storage_key, member), page, long_side, rotate)
+
+
+def page_image(record: dict, storage_key: str, page: int) -> bytes:
+    return page_png(storage_key, record["chosen"], page, _rotation(record, page))

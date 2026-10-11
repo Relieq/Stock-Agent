@@ -129,3 +129,21 @@ def test_minority_interest_sign_does_not_follow_expense_convention():
     statements, _ = normalize(extracted)
     checks = {c.rule_id: c for c in validate(statements, "TCTD")}
     assert checks["IS_bank_parent"].passed
+
+
+def test_wrapped_label_shift_is_repaired():
+    # KQKD SHB quý 2/2026: tên dòng IX xuống ba dòng, mô hình gán số của IX cho tên dòng X
+    rows = [
+        (None, "Chi phí hoạt động", "(1.459)"),
+        (None, "Lợi nhuận thuần từ hoạt động kinh doanh trước chi phí dự phòng rủi ro tín dụng", None),
+        (None, "Hoàn nhập/(Chi phí) dự phòng rủi ro tín dụng", "8.261"),
+        (None, "Hoàn nhập/(Chi phí) dự phòng rủi ro tín dụng", "(3.825)"),
+        (None, "Tổng lợi nhuận trước thuế", "4.436"),
+        (None, "Chi phí thuế TNDN hiện hành tạm tính", "(879)"),
+    ]
+    st = _st("IS", rows, "q_cur")
+    canonicalize([st], repair_labels=True)
+    codes = {it.code: it.values_raw["q_cur"] for it in st.items if it.code}
+    assert codes["b.ppop"] == "8.261"
+    assert codes["b.prov"] == "(3.825)"
+    assert codes["b.cit_cur"] == "(879)"

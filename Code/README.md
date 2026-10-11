@@ -8,9 +8,10 @@ Mã nguồn của dự án. Cấu trúc theo [kiến trúc kỹ thuật](../Baoc
 | `db/migrations/` | Lược đồ CSDL (file `.sql`, áp dụng theo thứ tự tên) | Có |
 | `db/seeds/` | Danh sách công ty (VN30) | Có |
 | `services/ingestion/` | Thu thập BCTC: lấy danh sách từ Vietstock, nhận dạng tiêu đề, tải file | Có |
-| `services/extraction/` | Đọc và kiểm chứng BCTC: chọn PDF, định vị trang, chép bảng bằng mô hình đọc ảnh, chuẩn hóa số, kiểm tra ràng buộc kế toán | Bản đầu; đã chạy thật trên 12 BCTC |
+| `services/extraction/` | Đọc và kiểm chứng BCTC: chọn PDF, định vị trang, chép bảng bằng mô hình đọc ảnh, chuẩn hóa số, kiểm tra ràng buộc kế toán | Bản đầu; 30/30 BCTC hợp nhất quý 2/2026 của VN30 đạt |
 | `services/llm.py` | Gọi mô hình qua giao diện kiểu OpenAI (Gemini, OpenAI, OpenRouter, Ollama) | Có |
 | `eval/` | Chấm kết quả trích xuất với bộ duyệt tay (`Data/golden/`) | Có |
+| `services/api/` | Web xem lại kết quả đọc BCTC: số đã chép đặt cạnh ảnh trang gốc, các phép kiểm tra | Bản đầu, chạy trên máy |
 | `services/analyst/`, `services/news/`, `apps/web/`, `eval/` | Phân tích, tin tức, giao diện, đánh giá | Sau |
 
 ## Cài đặt
@@ -56,7 +57,7 @@ python eval/golden.py                                             # chấm với
 
 - Mô hình chỉ định vị trang và chép nguyên văn các ô; đổi chuỗi thành số, đổi đơn vị, kiểm tra cộng tổng đều bằng code.
 - Ràng buộc kế toán khai báo theo mẫu trong `services/extraction/rules.py`: TT200 đầy đủ; TT99 mới có các dòng tổng;
-  ngân hàng và công ty chứng khoán chưa có. Mẫu (TT200/TT99) nhận dạng bằng phép cộng kiểm tra, không suy từ năm.
+  ngân hàng (TCTD) và công ty chứng khoán (CTCK, mới có các dòng tổng). Mẫu (TT200/TT99) nhận dạng bằng phép cộng kiểm tra, không suy từ năm.
 - Kết quả từng tài liệu lưu ở `Data/raw/extracted/<mã>/<id>_<sha>.json` và trong bảng `line_items`, `validations`.
 - Ràng buộc bắt buộc bị lệch thì đọc lại đúng các ô liên quan ở độ phân giải cao hơn, **không** cho mô hình biết
   con số mong đợi (để mô hình không "sửa cho khớp"); mọi lần đọc lại được ghi lại cả giá trị trước và sau.
@@ -67,7 +68,12 @@ python eval/golden.py                                             # chấm với
   khi bỏ dấu, để không phụ thuộc kiểu bỏ dấu cũ/mới như "khóan"/"khoán"), rồi kiểm tra theo bộ ràng buộc TCTD.
   Tên chỉ tiêu viết theo cách gọi thực tế của 8 ngân hàng quý 2/2026; gặp ngân hàng mới có thể cần thêm biến thể.
 - Thang leo thang khi lệch: đọc lại ô ở độ phân giải cao hơn, rồi chép lại cả báo cáo theo từng trang.
-- Chưa làm: ràng buộc cho công ty chứng khoán (SSI, TCX); đọc lại bằng mô hình mạnh hơn.
+- Trước khi gọi lại mô hình, code thử các giả thuyết sửa lỗi miễn phí và để ràng buộc kế toán chọn: đảo cột mã số với
+  số thứ tự (theo từng trang), sửa tên chỉ tiêu bị lệch dòng (ngân hàng), gán mã cho dòng bị thiếu mã khi số của nó
+  khớp đúng phần còn thiếu của một ràng buộc. Mọi chỗ tự sửa được ghi lại và hiện trên web.
+- "Đã kiểm chứng" đòi hỏi: không ràng buộc bắt buộc nào lệch, có ràng buộc trên cả BCĐKT và KQKD, và kiểm được
+  tổng tài sản = tổng nguồn vốn (thiếu trang nguồn vốn thì chép thêm trang kế tiếp).
+- Chưa làm: đọc lại bằng mô hình mạnh hơn.
 
 Kết quả thử với `gpt-5.4-mini` trên BCTC hợp nhất quý 2/2026 (03/10/2026), số ràng buộc bắt buộc đạt:
 
@@ -80,6 +86,15 @@ Kết quả thử với `gpt-5.4-mini` trên BCTC hợp nhất quý 2/2026 (03/1
 | ACB, BID, CTG, LPB, MBB, TCB, VCB, VPB | TCTD | 38–44/38–44 mỗi ngân hàng | Lệch ban đầu chủ yếu do tên chỉ tiêu khác nhau giữa các ngân hàng; LPB có 1 ô đọc sai 10 tỷ ở LCTT, chép lại theo trang thì đúng |
 
 Trung bình khoảng 50 nghìn token vào và 12 nghìn token ra cho mỗi BCTC (khoảng 0,09 USD với giá ngày 03/10/2026).
+
+## Xem kết quả trên web
+
+```bash
+python -m services.api --port 8765     # rồi mở http://127.0.0.1:8765
+```
+
+- Trang đầu: các BCTC của kỳ, trạng thái kiểm chứng, doanh thu và LNST quý (tỷ đồng).
+- Bấm vào mã: bảng số chép nguyên văn từ BCTC đặt cạnh ảnh trang gốc; bấm một dòng để mở đúng trang. Tab "Kiểm tra" liệt kê từng ràng buộc kế toán và các lần đọc lại.
 
 ## Kiểm thử
 

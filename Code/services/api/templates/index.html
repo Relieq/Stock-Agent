@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}BCTC {{ period }}/{{ year }} · Soi{% endblock %}
+{% block body %}
+<section class="status">
+  <div><b>{{ totals[0] }}</b> tài liệu đã thấy trên Vietstock</div>
+  <div><b>{{ totals[1] }}</b> đã tải file</div>
+  <div><b>{{ totals[2] }}</b> đã đọc và kiểm tra</div>
+  <div class="watch">Bộ canh, lượt gần nhất: {{ watcher or "chưa chạy lần nào" }}</div>
+</section>
+
+<form class="filter" method="get">
+  <label>Kỳ
+    <select onchange="const [y,p]=this.value.split('-');location='/?year='+y+'&period='+p">
+    {% for y, p in periods %}<option value="{{ y }}-{{ p }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
+    </select>
+  </label>
+  <a href="/?year={{ year }}&period={{ period }}&all={{ 'false' if all else 'true' }}">{{ "Chỉ hiện BCTC hợp nhất" if all else "Hiện cả BCTC riêng" }}</a>
+</form>
+
+<table class="list">
+<thead><tr>
+  <th>Mã</th><th>Loại</th><th>Phạm vi</th><th>Trạng thái</th><th title="Số ràng buộc kế toán bắt buộc đạt / tổng">Ràng buộc</th>
+  <th class="num" title="Ngân hàng: tổng thu nhập hoạt động">Doanh thu quý</th><th class="num">Cùng kỳ</th>
+  <th class="num">LNST quý</th><th class="num">Cùng kỳ</th>
+</tr></thead>
+<tbody>
+{% for d in docs %}
+<tr>
+  <td><b>{% if d.has_record %}<a href="/tai-lieu/{{ d.id }}">{{ d.ticker }}</a>{% else %}{{ d.ticker }}{% endif %}</b>
+      <div class="muted small" title="{{ d.title }}">{{ d.name }}</div></td>
+  <td>{{ COMPANY_KIND[d.kind] }}{% if d.template %} <span class="muted small">{{ d.template }}</span>{% endif %}</td>
+  <td>{{ SCOPE.get(d.scope, d.scope) }}</td>
+  <td><span class="badge {{ STATUS[d.status][1] }}">{{ STATUS[d.status][0] }}</span></td>
+  <td>{{ d.gate if d.gate and d.gate != '0/0' else "–" }}</td>
+  <td class="num">{{ d.head.get('rev_q_cur') | ty }}</td><td class="num muted">{{ d.head.get('rev_q_prev_year') | ty }}</td>
+  <td class="num">{{ d.head.get('npat_q_cur') | ty }}</td><td class="num muted">{{ d.head.get('npat_q_prev_year') | ty }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+<p class="muted small">Đơn vị: tỷ đồng; số trong ngoặc là số âm. Ngân hàng: cột doanh thu là tổng thu nhập hoạt động.
+Bấm vào mã để xem số đã chép đặt cạnh ảnh trang BCTC gốc. Đây mới là số đọc ra từ BCTC, chưa phải thẻ KQKD cho người dùng.</p>
+{% endblock %}

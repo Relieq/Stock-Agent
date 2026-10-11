@@ -154,3 +154,48 @@ def test_duplicate_code_is_reported_not_overwritten():
     statements, _ = normalize([_bs(rows)])
     assert statements["BS"].duplicate_codes == ["221"]
     assert statements["BS"].values["221"]["end_period"] == Decimal(2_500_000)
+
+
+def _record(rows_by_statement, company_template="corporate"):
+    return {"company_template": company_template,
+            "raw": {st: {"unit_text": "Đơn vị tính: VND", "rows": rows} for st, rows in rows_by_statement.items()}}
+
+
+def _row(stt, code, label, value, page=1, col="end_period"):
+    return {"stt": stt, "code": code, "label": label, "note": None, "page": page, "values": {col: value}}
+
+
+def test_code_column_swapped_with_stt_is_recovered():
+    # VIC quý 2/2026 in cột mã số bên trái, mô hình chép đảo mã số và số thứ tự
+    from services.extraction.pipeline import _check
+    bs = [_row("100", None, "TÀI SẢN NGẮN HẠN", "60", page=1), _row("110", "1", "Tiền", "60", page=1),
+          _row("200", None, "TÀI SẢN DÀI HẠN", "40", page=1), _row("280", None, "TỔNG CỘNG TÀI SẢN", "100", page=1),
+          _row("300", None, "NỢ PHẢI TRẢ", "70", page=2), _row("400", None, "VỐN CHỦ SỞ HỮU", "30", page=2),
+          _row("440", None, "TỔNG CỘNG NGUỒN VỐN", "100", page=2)]
+    rec = _record({"BS": bs})
+    _, statements, _, template, checks = _check(rec)
+    assert template == "TT99"
+    assert {"100", "280", "440"} <= set(statements["BS"].values)
+    assert rec["stt_code_swapped"] == ["BS@1", "BS@2"]
+    assert all(c.passed for c in checks if c.gate)
+
+
+def test_missing_code_is_inferred_only_when_numbers_prove_it():
+    # SSI quý 2/2026: dòng "KẾT QUẢ HOẠT ĐỘNG" (mã 70) bị chép thiếu mã
+    from services.extraction.pipeline import _check
+    def r(code, label, cur, prev):
+        return {"stt": None, "code": code, "label": label, "note": None, "page": 1,
+                "values": {"q_cur": cur, "q_prev_year": prev}}
+    is_rows = [r(None, "KẾT QUẢ HOẠT ĐỘNG", "1.500", "1.200"), r("71", "Thu nhập khác", "30", "20"),
+               r("72", "Chi phí khác", "10", "5"), r("80", "Cộng kết quả hoạt động khác", "20", "15"),
+               r("90", "Tổng lợi nhuận trước thuế", "1.520", "1.215")]
+    rec = _record({"IS": is_rows}, "securities")
+    _, statements, _, template, checks = _check(rec)
+    assert template == "CTCK"
+    assert rec["codes_inferred"] == [{"statement": "IS", "code": "70", "label": "KẾT QUẢ HOẠT ĐỘNG", "rule": "IS_90"}]
+    assert all(c.passed for c in checks if c.gate)
+
+    is_rows[0]["values"]["q_prev_year"] = "1.100"      # số không khớp ở một cột thì không gán
+    rec = _record({"IS": is_rows}, "securities")
+    _check(rec)
+    assert rec["codes_inferred"] == []

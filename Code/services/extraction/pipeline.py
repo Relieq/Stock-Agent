@@ -11,6 +11,7 @@ validations để làm bước đó sau.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -20,13 +21,14 @@ import psycopg
 
 from services.extraction import prompts
 from services.extraction.bank import canonicalize
-from services.extraction.numbers import normalize_code
+from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.sources import candidates, open_pdf, render_page
 from services.extraction.rules import RULESETS
 from services.extraction.validate import (
     ExtractedItem,
     ExtractedStatement,
     detect_template,
+    expenses_printed_negative,
     normalize,
     summarize,
     validate,
@@ -142,7 +144,9 @@ def _escalate(record: dict, client: VisionClient, doc) -> None:
     1. đọc lại đúng các ô liên quan ở độ phân giải cao hơn;
     2. vẫn lệch thì chép lại cả báo cáo đó, mỗi trang một lần gọi (sửa lỗi bỏ sót dòng), giữ bản ít lệch hơn,
        rồi đọc lại ô thêm một lần.
-    Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
+    Trước đó: BCĐKT chưa kiểm được tổng tài sản = tổng nguồn vốn thì chép thêm trang kế tiếp (bước định vị trang có
+    thể bỏ sót trang nguồn vốn). Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
+    _extend_balance_sheet(record, client, doc)
     for _ in range(REREAD_ROUNDS):
         if not _reread_failed(record, client, doc):
             break
@@ -150,16 +154,52 @@ def _escalate(record: dict, client: VisionClient, doc) -> None:
         _reread_failed(record, client, doc)
 
 
+def _extend_balance_sheet(record: dict, client: VisionClient, doc) -> bool:
+    """Chép thêm trang ngay sau trang BCĐKT cuối cùng nếu chưa kiểm được tổng tài sản = tổng nguồn vốn.
+
+    Ví dụ BSR quý 2/2026: bước định vị trang chỉ nhận trang 4 (tài sản) là BCĐKT, bỏ sót trang 5 (nguồn vốn).
+    Giữ trang thêm khi nhờ nó kiểm được phương trình cân đối.
+    """
+    _, _, _, template, checks = _check(record)
+    if not template or "BS" not in record["raw"] or any(BALANCE_RULE.search(c.rule_id) for c in checks):
+        return False
+    chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
+    used = {int(p) for pages in chosen["statement_pages"].values() for p in pages}
+    page = max(int(p) for p in chosen["statement_pages"]["BS"]) + 1
+    if page > doc.page_count or page in used:
+        return False
+    image = render_page(doc, page, EXTRACT_LONG_SIDE, _rotation(record, page))
+    extra = client.json_from_images(prompts.extract_prompt("BS"), [(f"Trang {page}", image)],
+                                    prompts.extract_schema("BS"), "statement_BS")
+    before = record["raw"]["BS"]
+    record["raw"]["BS"] = before | {"rows": before.get("rows", []) + extra.get("rows", [])}
+    _, _, _, _, checks = _check(record)
+    kept = any(c.gate and BALANCE_RULE.search(c.rule_id) for c in checks)
+    if kept:
+        chosen["statement_pages"]["BS"] = [*chosen["statement_pages"]["BS"], page]
+    else:
+        record["raw"]["BS"] = before
+    record.setdefault("extensions", []).append({"statement": "BS", "page": page, "rows": len(extra.get("rows", [])),
+                                                "kept": kept, "model": client.cfg.model})
+    return kept
+
+
 def _gate_failures(record: dict) -> dict[str, int]:
     """Số ràng buộc bắt buộc bị lệch theo từng báo cáo."""
+    return {st: f for st, (f, _) in _gate_tally(record).items() if f}
+
+
+def _gate_tally(record: dict) -> dict[str, tuple[int, int]]:
+    """(số ràng buộc bắt buộc lệch, số đạt) theo từng báo cáo."""
     _, _, _, template, checks = _check(record)
     if not template:
         return {}
     statement_of = {r.id: r.statement for r in RULESETS[template].rules}
-    out: dict[str, int] = {}
+    out: dict[str, tuple[int, int]] = {}
     for c in checks:
-        if c.gate and not c.passed and c.rule_id in statement_of:
-            out[statement_of[c.rule_id]] = out.get(statement_of[c.rule_id], 0) + 1
+        if c.gate and c.rule_id in statement_of:
+            f, p = out.get(statement_of[c.rule_id], (0, 0))
+            out[statement_of[c.rule_id]] = (f + (not c.passed), p + c.passed)
     return out
 
 
@@ -186,9 +226,12 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
             "rows": [r for x in parts for r in x.get("rows", [])],
         }
         before = record["raw"][st]
+        passed_before = _gate_tally(record).get(st, (0, 0))[1]
         record["raw"][st] = merged
-        after_failed = _gate_failures(record).get(st, 0)
-        kept = after_failed < n_failed
+        after_failed, passed_after = _gate_tally(record).get(st, (0, 0))
+        # Ít lệch hơn chưa đủ: bản chép lại có thể mất mã số hoặc mất dòng nên ít ràng buộc chạy được hơn
+        # (TCX quý 2/2026: lệch 2 -> 0 nhưng số ràng buộc KQKD chạy được giảm từ 28 xuống 12)
+        kept = after_failed < n_failed and passed_after >= passed_before
         if not kept:
             record["raw"][st] = before
         else:
@@ -207,19 +250,124 @@ def _rotation(record: dict, page: int) -> int:
 
 
 def _check(record: dict):
-    extracted = [_to_extracted(st, raw) for st, raw in record["raw"].items()]
+    extracted, statements, sep, template, checks = _check_variants(record)
+    inferred = _infer_missing_codes(extracted, statements, sep, template, checks) if template else []
+    record["codes_inferred"] = inferred
+    if inferred:
+        statements, sep = normalize(extracted)
+        checks = validate(statements, template)
+    return extracted, statements, sep, template, checks
+
+
+def _infer_missing_codes(extracted, statements, sep, template, checks) -> list[dict]:
+    """Gán mã cho dòng mô hình chép thiếu mã số, chỉ khi số liệu chứng minh được.
+
+    Ràng buộc bắt buộc bị lệch và thiếu đúng một số hạng; một dòng chưa có mã trong cùng báo cáo có số bằng đúng phần
+    còn thiếu ở mọi cột (ít nhất 2 cột) thì dòng đó là số hạng thiếu. Ví dụ SSI quý 2/2026: dòng "KẾT QUẢ HOẠT ĐỘNG"
+    bị chép thiếu mã 70 nên ràng buộc 90 = 70 + 80 lệch; số của dòng đó khớp 90 - 80 ở cả 4 cột.
+    """
+    rs = RULESETS[template]
+    failed = {c.rule_id for c in checks if c.gate and not c.passed}
+    inferred: list[dict] = []
+    for r in rs.rules:
+        st = statements.get(r.statement)
+        if r.id not in failed or st is None or r.statement == "IS" and expenses_printed_negative(st, rs.expense_codes):
+            continue
+        missing = [c for _, c in r.rhs if c not in st.values]
+        if len(missing) != 1 or missing[0] in r.abs_codes:
+            continue
+        code = missing[0]
+        sign = next(sg for sg, c in r.rhs if c == code)
+        residual = {col: (lhs - sum(sg * st.values.get(c, {}).get(col, Decimal(0)) for sg, c in r.rhs if c != code)) * sign
+                    for col, lhs in st.values[r.lhs].items()}
+        tolerance = st.multiplier * (len(r.rhs) + 1)
+        ex = next(e for e in extracted if e.statement == r.statement)
+        for it in ex.items:
+            if normalize_code(it.code) is not None:
+                continue
+            vals = {col: v * st.multiplier for col, raw in it.values_raw.items() if (v := parse_amount(raw, sep)) is not None}
+            if len(vals) >= 2 and set(vals) == set(residual) and all(abs(vals[c] - residual[c]) <= tolerance for c in vals):
+                it.code = code
+                inferred.append({"statement": r.statement, "code": code, "label": it.label, "rule": r.id})
+                break
+    return inferred
+
+
+def _check_variants(record: dict):
     company_template = record["company_template"]
     if company_template == "bank":
-        record["bank_unmapped"] = canonicalize(extracted)
-    statements, sep = normalize(extracted)
-    if company_template == "corporate":
-        template = detect_template(statements)
-    elif company_template == "bank":
-        template = "TCTD"
-    else:
-        template = None
-    checks = validate(statements, template) if template else []
-    return extracted, statements, sep, template, checks
+        # Hai phương án gán tên chỉ tiêu: nguyên văn mô hình chép, và có sửa lỗi lệch tên khi tên xuống nhiều dòng
+        # (bank.repair_wrapped_labels). Ràng buộc kế toán chọn phương án ít lệch hơn; hòa thì giữ nguyên văn.
+        best = None
+        for repair in (False, True):
+            extracted = [_to_extracted(st, raw) for st, raw in record["raw"].items()]
+            unmapped = canonicalize(extracted, repair_labels=repair)
+            statements, sep = normalize(extracted)
+            checks = validate(statements, "TCTD")
+            failed = sum(c.gate and not c.passed for c in checks)
+            if best is None or failed < best[0]:
+                best = (failed, repair, unmapped, extracted, statements, sep, checks)
+        _, repair, record["bank_unmapped"], extracted, statements, sep, checks = best
+        record["labels_repaired"] = repair
+        return extracted, statements, sep, "TCTD", checks
+
+    if company_template not in ("corporate", "securities"):
+        extracted = [_to_extracted(st, raw) for st, raw in record["raw"].items()]
+        statements, sep = normalize(extracted)
+        return extracted, statements, sep, None, []
+
+    # Cột mã số thường nằm sau tên chỉ tiêu, nhưng có BCTC in ở ngoài cùng bên trái, trước số thứ tự (ví dụ VIC quý
+    # 2/2026), và mô hình có thể chép đảo hai cột, có khi chỉ ở một trang (TCX quý 2/2026 khi chép lại theo trang).
+    # Thử đảo stt <-> code theo từng (báo cáo, trang) có cột stt trông giống mã số, lần lượt từng đơn vị, giữ khi
+    # ràng buộc kế toán tốt hơn (nhận ra mẫu, ít lệch, nhiều ràng buộc đạt); hòa thì giữ nguyên văn.
+    fixed_template = {"securities": "CTCK"}.get(company_template)
+
+    def evaluate(swapped: frozenset):
+        raws = {st: _swap_stt_code(raw, {p for s_, p in swapped if s_ == st}) for st, raw in record["raw"].items()}
+        extracted = [_to_extracted(st, raw) for st, raw in raws.items()]
+        statements, sep = normalize(extracted)
+        template = fixed_template or detect_template(statements)
+        checks = validate(statements, template) if template else []
+        failed = sum(c.gate and not c.passed for c in checks)
+        passed = sum(c.gate and c.passed for c in checks)
+        return (template is None, failed, -passed, len(swapped)), (extracted, statements, sep, template, checks)
+
+    # Thử đảo cả báo cáo trước (tổng tài sản cần cả trang 100 lẫn trang 200 cùng đúng), rồi bật/tắt từng trang
+    units = {st: [(st, page) for page in _pages_with_code_like_stt(raw)] for st, raw in record["raw"].items()}
+    swapped: frozenset = frozenset()
+    best_score, best = evaluate(swapped)
+    moves = [frozenset(u) for u in units.values() if u] + [frozenset([u]) for us in units.values() for u in us]
+    for move in moves:
+        candidate = swapped ^ move
+        score, result = evaluate(candidate)
+        if score < best_score:
+            swapped, best_score, best = candidate, score, result
+    record["stt_code_swapped"] = sorted(f"{st}@{p}" for st, p in swapped)
+    return best
+
+
+_CODE_LIKE = re.compile(r"\d{2,3}[a-z]?")
+
+
+def _pages_with_code_like_stt(raw: dict) -> list:
+    """Các trang mà cột stt giống mã số hơn cột code (đa số là số 2-3 chữ số như "10", "110", "411a")."""
+    def share(rows, key: str) -> float:
+        vals = [str(r[key]).strip() for r in rows if r.get(key)]
+        return sum(bool(_CODE_LIKE.fullmatch(v)) for v in vals) / len(vals) if vals else 0.0
+    pages = sorted({r.get("page") for r in raw.get("rows", [])}, key=lambda p: (p is None, p))
+    out = []
+    for page in pages:
+        rows = [r for r in raw.get("rows", []) if r.get("page") == page]
+        if share(rows, "stt") >= 0.5 and share(rows, "stt") > share(rows, "code"):
+            out.append(page)
+    return out
+
+
+def _swap_stt_code(raw: dict, pages: set) -> dict:
+    if not pages:
+        return raw
+    return raw | {"rows": [r | {"stt": r.get("code"), "code": r.get("stt")} if r.get("page") in pages else r
+                           for r in raw.get("rows", [])]}
 
 
 def _reread_failed(record: dict, client: VisionClient, doc) -> bool:
@@ -301,6 +449,15 @@ def recheck_document(conn: psycopg.Connection, document_id: int) -> dict:
     return _finalize(conn, _load_record(conn, document_id))
 
 
+BALANCE_RULE = re.compile(r"_eq_440$|_ta_eq_tle$")   # tổng tài sản = tổng nguồn vốn, theo từng mẫu
+
+
+def statements_of_rule(rule_id: str) -> str:
+    """Báo cáo của một ràng buộc theo tiền tố id ("BS_270" -> "BS"); ràng buộc chéo trả về "X"."""
+    prefix = rule_id.split("_", 1)[0]
+    return prefix if prefix in ("BS", "IS", "CF") else "X"
+
+
 def _finalize(conn: psycopg.Connection, record: dict) -> dict:
     """Bước 3-4: chuẩn hóa, kiểm tra ràng buộc, lưu file kết quả và ghi CSDL."""
     document_id, ticker, file_id, sha256 = record["document_id"], record["ticker"], record["file_id"], record["sha256"]
@@ -309,7 +466,16 @@ def _finalize(conn: psycopg.Connection, record: dict) -> dict:
     # 3. Chuẩn hóa và kiểm tra
     extracted, statements, sep, template, checks = _check(record)
     summary = summarize(checks)
-    if template and summary["gate_checks"] and summary["gate_failed"] == 0:
+    # Phải có ràng buộc bắt buộc trên cả BCĐKT và KQKD: trước đây BCĐKT bị chép sai cột mã số thì không ràng buộc
+    # nào chạy được trên BCĐKT mà tài liệu vẫn "đạt" nhờ KQKD (GVR, VHM, VRE quý 2/2026)
+    # và phải kiểm được tổng tài sản = tổng nguồn vốn: thiếu trang nguồn vốn (BSR quý 2/2026, bước định vị trang
+    # bỏ sót trang 5) thì vẫn có ràng buộc BCĐKT đạt nhưng nửa bảng chưa được đọc
+    covered = {statements_of_rule(c.rule_id) for c in checks if c.gate}
+    balanced = any(c.gate and BALANCE_RULE.search(c.rule_id) for c in checks)
+    summary["gate_statements"] = sorted(covered)
+    summary["balance_checked"] = balanced
+    if (template and summary["gate_checks"] and summary["gate_failed"] == 0 and {"BS", "IS"} <= covered
+            and balanced):
         status = "verified"
     else:
         status = "needs_review"
@@ -353,5 +519,6 @@ def _finalize(conn: psycopg.Connection, record: dict) -> dict:
                 (file_id, c.rule_id, c.column_kind, c.passed, c.lhs, c.rhs,
                  json.dumps({"gate": c.gate, "tolerance": str(c.tolerance), "missing": c.missing}), PIPELINE_VER),
             )
-        conn.execute("UPDATE documents SET template_ver = %s, status = %s WHERE id = %s", (template, status, document_id))
+        conn.execute("UPDATE documents SET template_ver = %s, status = %s, processed_at = COALESCE(processed_at, now())"
+                     " WHERE id = %s", (template, status, document_id))
     return record

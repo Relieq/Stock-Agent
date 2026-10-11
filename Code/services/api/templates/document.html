@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.ticker }} {{ doc.period }}/{{ doc.year }} · Soi{% endblock %}
+{% block body %}
+<section class="dochead">
+  <h1>{{ doc.ticker }} <span class="muted">· {{ doc.name }}</span></h1>
+  <div>{{ doc.title }}</div>
+  <div class="small muted">
+    Mẫu: <b>{{ d.template or "chưa có bộ ràng buộc" }}</b> ·
+    File đọc: {{ d.chosen }} ({{ d.page_count }} trang) ·
+    Mô hình: {{ record.model }}{% if record.usage %} · {{ "{:,}".format(record.usage.input_tokens) }} token vào,
+    {{ "{:,}".format(record.usage.output_tokens) }} token ra{% endif %} ·
+    <a href="/tai-lieu/{{ doc.id }}/file" target="_blank">File gốc</a> ·
+    <a href="{{ doc.source_url }}" target="_blank" rel="noopener">Nguồn Vietstock</a>
+  </div>
+  {% set gated = d.checks | selectattr('gate') | list %}
+  {% set failed = gated | rejectattr('passed') | list %}
+  <div class="summary">
+    <span class="badge {{ STATUS[doc.status][1] }}">{{ STATUS[doc.status][0] }}</span>
+    <span>Ràng buộc bắt buộc: <b>{{ gated | length - failed | length }}/{{ gated | length }}</b> đạt</span>
+    {% if head %}<span>· Doanh thu quý: <b>{{ head.get('rev_q_cur') | ty }}</b> tỷ (cùng kỳ {{ head.get('rev_q_prev_year') | ty }})</span>
+    <span>· LNST quý: <b>{{ head.get('npat_q_cur') | ty }}</b> tỷ (cùng kỳ {{ head.get('npat_q_prev_year') | ty }})</span>{% endif %}
+  </div>
+  {% if record.note %}<div class="warnbox">{{ record.note }}</div>{% endif %}
+  {% if record.stt_code_swapped or record.codes_inferred or record.labels_repaired or record.extensions or d.rereads %}
+  <div class="infobox"><b>Hệ thống đã tự sửa</b> (ràng buộc kế toán xác nhận phương án sửa; nên đối chiếu ảnh):
+    <ul>
+    {% if record.stt_code_swapped %}<li>Mô hình chép đảo cột mã số và số thứ tự ở {{ record.stt_code_swapped | join(', ') }} (báo cáo@trang): đã đảo lại.</li>{% endif %}
+    {% for c in record.codes_inferred or [] %}<li>Dòng "{{ c.label }}" bị chép thiếu mã số: gán mã {{ c.code }} vì số của dòng khớp đúng phần còn thiếu của ràng buộc {{ c.rule }} ở mọi cột.</li>{% endfor %}
+    {% if record.labels_repaired %}<li>Tên chỉ tiêu dài xuống nhiều dòng làm tên bị lệch sang dòng dưới: đã gán lại tên theo đúng hàng số.</li>{% endif %}
+    {% for e in record.extensions or [] %}{% if e.kept %}<li>Bước định vị trang bỏ sót trang {{ e.page }} của {{ e.statement }}: đã chép thêm.</li>{% endif %}{% endfor %}
+    {% if d.rereads %}<li>Đọc lại {{ d.rereads | length }} ô ở độ phân giải cao hơn (xem tab Kiểm tra).</li>{% endif %}
+    </ul>
+  </div>
+  {% endif %}
+  {% if d.duplicate_codes %}<div class="warnbox">Mã số in trùng trên chính BCTC: {{ d.duplicate_codes }}</div>{% endif %}
+</section>
+
+<div class="split">
+<div class="left">
+  <nav class="tabs">
+  {% for t in d.tables %}<button data-tab="{{ t.statement }}" {% if loop.first %}class="on"{% endif %}>{{ t.name }}</button>{% endfor %}
+  <button data-tab="checks">Kiểm tra ({{ failed | length }} lệch)</button>
+  </nav>
+
+  {% for t in d.tables %}
+  <div class="tab" id="tab-{{ t.statement }}" {% if not loop.first %}hidden{% endif %} data-pages="{{ t.pages | join(',') }}">
+    <p class="small muted">Trang {{ t.pages | join(', ') }} · Đơn vị in trên BCTC: {{ t.unit or "không ghi" }} ·
+      Số chép nguyên văn như in trên BCTC. Bấm một dòng để mở đúng trang bên phải.
+      <span class="flagkey">Dòng tô đỏ</span> thuộc ràng buộc bắt buộc bị lệch.</p>
+    <table class="fs">
+      <thead><tr><th>STT</th><th>Mã</th><th>Chỉ tiêu</th><th>TM</th>{% for k, name in t.columns %}<th class="num">{{ name }}</th>{% endfor %}<th>Tr.</th></tr></thead>
+      <tbody>
+      {% for r in t.rows %}
+      <tr data-page="{{ r.page or (t.pages[0] if t.pages else 1) }}" {% if r.flagged %}class="flag"{% endif %}>
+        <td>{{ r.stt or "" }}</td><td class="code">{{ r.code or "" }}</td><td>{{ r.label }}</td><td>{{ r.note or "" }}</td>
+        {% for k, name in t.columns %}<td class="num">{{ r.values.get(k) or "" }}</td>{% endfor %}
+        <td class="muted">{{ r.page or "" }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+  <div class="tab" id="tab-checks" hidden>
+    <p class="small muted">Mỗi phép kiểm tra: dòng tổng in trên BCTC phải bằng phép cộng các dòng thành phần (mã trong ngoặc vuông),
+      cho lệch tối đa ±1 đơn vị làm tròn mỗi số hạng. "Bắt buộc": trượt thì BCTC không được coi là đã kiểm chứng. Số: đồng.</p>
+    <table class="fs">
+      <thead><tr><th></th><th>Ràng buộc</th><th>Cột</th><th class="num">Dòng tổng in trên BCTC</th><th class="num">Cộng các dòng con</th><th class="num">Lệch</th></tr></thead>
+      <tbody>
+      {% for c in d.checks %}
+      <tr class="{{ '' if c.passed else ('flag' if c.gate else 'soft') }}">
+        <td>{{ "✓" if c.passed else "✗" }}</td>
+        <td><span class="code">{{ c.formula }}</span>{% if not c.gate %} <span class="muted small">(chưa bắt buộc)</span>{% endif %}
+            {% if c.missing %}<div class="muted small">BCTC không có dòng: {{ c.missing | join(', ') }}</div>{% endif %}</td>
+        <td class="small">{{ c.column }}</td>
+        <td class="num">{{ c.lhs | dong }}</td><td class="num">{{ c.rhs | dong }}</td><td class="num">{{ c.diff | dong }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    {% if d.rereads or d.reextracts %}
+    <h3>Các lần đọc lại khi lệch</h3>
+    <table class="fs">
+      <thead><tr><th>Báo cáo</th><th>Mã</th><th>Cột</th><th class="num">Lần đầu</th><th class="num">Đọc lại</th></tr></thead>
+      <tbody>
+      {% for r in d.rereads %}<tr {% if r.before != r.after %}class="changed"{% endif %}><td>{{ r.statement }}</td><td class="code">{{ r.code }}</td><td class="small">{{ r.column_kind }}</td><td class="num">{{ r.before }}</td><td class="num">{{ r.after }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% for r in d.reextracts %}<p class="small">Chép lại {{ r.statement }} theo từng trang {{ r.pages }}: lệch {{ r.failed_before }} → {{ r.failed_after }} ({{ "giữ bản mới" if r.kept else "giữ bản cũ" }})</p>{% endfor %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="right">
+  <div class="pager">
+    <button id="prev">‹</button> Trang <input id="pageno" type="number" min="1" max="{{ d.page_count }}"> / {{ d.page_count }} <button id="next">›</button>
+    <a id="openimg" target="_blank">mở ảnh lớn</a>
+  </div>
+  <div class="imgwrap"><img id="pageimg" alt="Ảnh trang BCTC gốc"></div>
+</div>
+</div>
+
+<script>
+const docId = {{ doc.id }}, maxPage = {{ d.page_count }};
+const img = document.getElementById('pageimg'), no = document.getElementById('pageno'), openLink = document.getElementById('openimg');
+function show(p) {
+  p = Math.max(1, Math.min(maxPage, +p || 1));
+  no.value = p;
+  const url = '/tai-lieu/' + docId + '/trang/' + p + '.png';
+  img.src = url; openLink.href = url;
+}
+document.getElementById('prev').onclick = () => show(+no.value - 1);
+document.getElementById('next').onclick = () => show(+no.value + 1);
+no.onchange = () => show(no.value);
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.tab').forEach(t => t.hidden = t.id !== 'tab-' + b.dataset.tab);
+  const pages = document.getElementById('tab-' + b.dataset.tab).dataset.pages;
+  if (pages) show(pages.split(',')[0]);
+});
+document.querySelectorAll('tr[data-page]').forEach(tr => tr.onclick = () => {
+  document.querySelectorAll('tr.sel').forEach(x => x.classList.remove('sel'));
+  tr.classList.add('sel');
+  if (+tr.dataset.page !== +no.value) show(tr.dataset.page);
+});
+const first = document.querySelector('.tab:not([hidden])');
+show(first && first.dataset.pages ? first.dataset.pages.split(',')[0] : 1);
+</script>
+{% endblock %}

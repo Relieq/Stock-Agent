@@ -7,7 +7,8 @@ Mỗi ràng buộc: lhs = tổng có dấu của các mã ở rhs, áp cho từn
 Mẫu TT200 (Thông tư 200/2014, B01/B02/B03-DN và bản hợp nhất theo TT202) viết theo mẫu biểu.
 Mẫu TT99 (Thông tư 99/2025) mới khai báo các dòng tổng đã đối chiếu trên BCTC thực tế; các dòng con bị
 đổi mã chưa đối chiếu với phụ lục của thông tư nên chưa đưa vào (xem architecture.md mục 4.2).
-Mẫu ngân hàng (TCTD) không in mã số kiểu DN thường, cần ánh xạ theo tên chỉ tiêu: chưa làm.
+Mẫu ngân hàng (TCTD) không in mã số kiểu DN thường: ánh xạ theo tên chỉ tiêu ở bank.py.
+Mẫu công ty chứng khoán (CTCK) in mã số; mới khai báo các dòng tổng.
 """
 
 from __future__ import annotations
@@ -160,7 +161,7 @@ TT99 = RuleSet(
 )
 
 # Ngân hàng (TCTD): mã chuẩn b.* gán theo tên chỉ tiêu ở services/extraction/bank.py
-_BANK_INCOME_PARTS = ("b.nii", "b.nfee", "b.nfx", "b.ntrading", "b.ninv", "b.nother", "b.equity_inc")
+BANK_INCOME_PARTS = ("b.nii", "b.nfee", "b.nfx", "b.ntrading", "b.ninv", "b.nother", "b.equity_inc")
 TCTD = RuleSet(
     template="TCTD",
     total_assets_code="b.ta",
@@ -179,9 +180,9 @@ TCTD = RuleSet(
         rule("IS", "b.nii", "b.ii", "-b.ie", id="IS_bank_nii"),
         rule("IS", "b.nfee", "b.fi", "-b.fe", id="IS_bank_nfee"),
         rule("IS", "b.nother", "b.oi", "-b.oe", id="IS_bank_nother"),
-        rule("IS", "b.toi", *_BANK_INCOME_PARTS, id="IS_bank_toi"),
+        rule("IS", "b.toi", *BANK_INCOME_PARTS, id="IS_bank_toi"),
         rule("IS", "b.ppop", "b.toi", "-b.opex", id="IS_bank_ppop", when_present="b.toi"),
-        rule("IS", "b.ppop", *_BANK_INCOME_PARTS, "-b.opex", id="IS_bank_ppop_parts", when_absent="b.toi"),
+        rule("IS", "b.ppop", *BANK_INCOME_PARTS, "-b.opex", id="IS_bank_ppop_parts", when_absent="b.toi"),
         rule("IS", "b.pbt", "b.ppop", "-b.prov", id="IS_bank_pbt"),
         rule("IS", "b.cit", "b.cit_cur", "b.cit_def", id="IS_bank_cit"),
         rule("IS", "b.npat", "b.pbt", "-b.cit", id="IS_bank_npat"),
@@ -193,7 +194,41 @@ TCTD = RuleSet(
     ),
 )
 
-RULESETS = {rs.template: rs for rs in (TT200, TT99, TCTD)}
+# Công ty chứng khoán (CTCK): mẫu B01/B02/B03-CTCK theo TT334/2016/TT-BTC. Các dòng tổng đã khớp trên BCTC SSI và TCX
+# quý 2/2026 (riêng TCX lệch đúng ở 2 ô đọc sai, đã đối chiếu ảnh). LCTT của CTCK có thêm phần lưu chuyển tiền của
+# khách hàng đánh mã lại từ 01, nên chỉ lần xuất hiện đầu của mỗi mã (phần của công ty) được dùng.
+CTCK = RuleSet(
+    template="CTCK",
+    total_assets_code="270",
+    expense_codes=("21", "40", "60"),
+    rules=(
+        rule("BS", "100", "110", "130"),
+        rule("BS", "200", "210", "220", "230", "240", "250"),
+        rule("BS", "270", "100", "200"),
+        rule("BS", "300", "310", "340"),
+        rule("BS", "440", "300", "400"),
+        rule("BS", "270", "440", id="BS_270_eq_440"),
+        rule("BS", "400", "410", "420", gate=False),
+        rule("IS", "01", "01.1", "01.2", "01.3", "01.4"),
+        rule("IS", "20", *codes(1, 11, 2)),
+        rule("IS", "21", "21.1", "21.2", "21.3", "21.4"),
+        rule("IS", "40", *codes(21, 32, 2)),
+        rule("IS", "50", *codes(41, 44, 2)),
+        rule("IS", "60", *codes(51, 55, 2)),
+        rule("IS", "70", "20", "-40", "50", "-60", "-61", "-62"),
+        rule("IS", "80", "71", "-72"),
+        rule("IS", "90", "70", "80"),
+        rule("IS", "90", "91", "92", id="IS_90_parts", gate=False),
+        rule("IS", "100", "100.1", "100.2"),
+        rule("IS", "200", "90", "-100"),
+        rule("IS", "200", "201", "202", "203", id="IS_200_parts", gate=False),
+        rule("CF", "70", *codes(61, 65, 2)),
+        rule("CF", "80", *codes(71, 76, 2)),
+        rule("CF", "90", "60", "70", "80"),
+    ),
+)
+
+RULESETS = {rs.template: rs for rs in (TT200, TT99, TCTD, CTCK)}
 # Bộ ràng buộc dành cho doanh nghiệp thường (dùng khi tự nhận dạng mẫu)
 CORPORATE_TEMPLATES = ("TT200", "TT99")
 

@@ -169,6 +169,17 @@ Mỗi dòng lưu: `ma_so`, `ten_chi_tieu` (nguyên văn), `thuyet_minh`, giá tr
 
 ### 4.3 Thang leo thang khi số liệu lệch
 
+0. **Tự định vị ô sai bằng ràng buộc (công nghệ lõi, cập nhật 12/10/2026).** Thử thay từng ô thuộc các ràng buộc bị lệch
+   bằng số làm ràng buộc đó khớp; giữ phương án làm khớp nhiều ràng buộc nhất mà không làm lệch ràng buộc nào đang đúng,
+   số mới phải nguyên theo đơn vị in và khác số cũ ít chữ số. Hai ô cùng lệch một lượng (lỗi lan qua phép cộng giữa chúng)
+   được xét theo cặp. Đây là bước định vị lỗi của phương pháp Fellegi–Holt (Fellegi & Holt, 1976) mà cơ quan thống kê dùng
+   để làm sạch số liệu điều tra, áp dụng cho BCTC dạng scan. Sau đó **đọc lại riêng các ô được đề xuất** (không đưa con số
+   mong đợi cho mô hình) và chỉ nhận số mới khi lần đọc lại ra đúng số mà ràng buộc đòi hỏi: hai nguồn độc lập cùng chỉ
+   một số. Một ràng buộc lệch mà nhiều số hạng đều sửa được thì đọc lại cả nhóm và nhận ô duy nhất khớp. Đọc lại vẫn ra
+   số cũ ở mọi ô của nhóm thì ghi nhận nghi chính BCTC in lệch. Lệch ở mọi cột cùng lúc là dấu hiệu lỗi cấu trúc (thiếu
+   dòng, nhãn lạ, quy tắc thiếu mã), không phải đọc nhầm. Code: `services/extraction/repair.py`, đo bằng `eval/repair.py`
+   (không gọi mô hình) trên các lỗi đã biết (sửa tay và đọc lại thành công). Hướng tiếp theo: đưa ràng buộc giữa các BCTC
+   (quý với lũy kế, quý 4 với cả năm, đầu năm với cuối năm trước) vào cùng bước định vị.
 1. Đọc lại đúng trang đó ở DPI cao hơn, chỉ cho các dòng lệch. Prompt nói rõ *"dòng X đang lệch Y"*.
 2. Dùng mô hình mạnh hơn cho trang đó.
 3. Dùng engine khác (OCR truyền thống hoặc Hybrid OCR của khóa trước), sau đó để LLM ghép kết quả.

@@ -190,6 +190,29 @@ def cmd_fix(args) -> None:
               f"{e['before']} -> {e['after']}")
 
 
+def cmd_repair(args) -> None:
+    """In đề xuất sửa ô của bộ định vị lỗi (không gọi mô hình, không ghi gì)."""
+    from services.extraction.pipeline import _check, _load_record
+    from services.extraction.repair import localize
+    with connect() as conn:
+        for doc_id in args.doc_id:
+            rec = _load_record(conn, doc_id)
+            extracted, statements, sep, template, _ = _check(rec)
+            loc = localize(extracted, statements, sep, template)
+            print(f"[{doc_id}] {rec['ticker']}: {len(loc.proposals)} đề xuất, {len(loc.ambiguous)} nhóm cần đọc lại, "
+                  f"còn lệch {len(loc.unresolved)}")
+            for p in loc.proposals:
+                print(f"  {p.confidence:4s} {p.statement} dòng {p.row} [{p.code}] {p.label[:40]} {p.column_kind}: "
+                      f"{p.before} -> {p.after} (khớp {', '.join(p.fixes)})")
+            for i, group in enumerate(loc.ambiguous, 1):
+                print(f"  nhóm {i} ({', '.join(group[0].fixes)}):")
+                for p in group:
+                    print(f"      {p.statement} dòng {p.row} [{p.code}] {p.label[:40]} {p.column_kind}: {p.before} -> {p.after}"
+                          f" ({p.digits_changed} chữ số)" + (f" + dòng {p.partner.row} -> {p.partner.after}" if p.partner else ""))
+            for k in loc.unresolved:
+                print(f"  chưa giải thích được: {k}")
+
+
 def cmd_approve(args) -> None:
     from services.extraction.verify import approve_document
     with connect() as conn:
@@ -281,6 +304,10 @@ def main(argv: list[str] | None = None) -> None:
     f.add_argument("--by", required=True, help="Người sửa")
     f.add_argument("--note", default="")
     f.set_defaults(func=cmd_fix)
+
+    rp = sub.add_parser("repair", help="Đề xuất ô đọc sai và số đúng từ ràng buộc kế toán (không gọi mô hình)")
+    rp.add_argument("--doc-id", type=int, nargs="+", required=True)
+    rp.set_defaults(func=cmd_repair)
 
     a = sub.add_parser("approve", help="Duyệt xuất bản BCTC còn lệch sau khi đối chiếu ảnh gốc (có ghi lại)")
     a.add_argument("--doc-id", type=int, required=True)

@@ -901,6 +901,32 @@ Tiền gọi mô hình tăng theo số BCTC phải đọc. Toàn thị trường
 
 Các trục dưới đây giữ làm tầm nhìn dài hạn; phần nào bị hoãn thì theo điều chỉnh này.
 
+### Công nghệ lõi (chốt 12/10/2026): bộ máy tự kiểm chứng và tự sửa số liệu BCTC
+
+Agent hay mô hình ngôn ngữ thì ai cũng dùng được như nhau; thứ khó chép là số liệu đúng, có nguồn, tích lũy theo thời
+gian. Soi định vị là **lớp kiểm chứng**: mọi chức năng phía trên (thẻ, cờ, báo cáo so sánh, danh mục) chỉ dùng số đã kiểm
+chứng, mỗi số mở được trang BCTC gốc, chưa kiểm chứng thì nói "chưa có số đã kiểm chứng" thay vì đoán.
+
+Lõi gồm ba phần:
+
+1. **Lưới ràng buộc:** mỗi ô số nằm trong những phép cộng nào, trong một BCTC (khai báo theo mẫu TT200, TT99, TCTD, CTCK)
+   và giữa các BCTC của cùng công ty (quý với lũy kế, quý 4 với cả năm, đầu năm với cuối năm trước).
+2. **Tự định vị và sửa lỗi:** khi phép cộng lệch, tìm ít ô nhất cần sửa để mọi phép cộng cùng khớp, rồi đọc lại riêng
+   các ô đó và chỉ nhận khi ảnh xác nhận đúng số đề xuất (chi tiết ở [architecture.md mục 4.3](architecture.md)). Ý tưởng
+   định vị lỗi là của phương pháp Fellegi–Holt trong thống kê chính thức; đóng góp của Soi là áp dụng cho BCTC Việt Nam
+   dạng scan, kết hợp mô hình đọc ảnh để xác nhận từng ô, và đo được.
+3. **Kiểm tra khi viết:** mọi số và từ chỉ hướng trong văn bản sinh ra phải khớp bảng số đã kiểm chứng.
+
+Lợi thế tích lũy, không nằm ở thuật toán: kho số liệu đã kiểm chứng theo thời điểm, lịch sử từng lần sửa (cũng là bộ dữ
+liệu vàng), bộ quy tắc và danh sách ngoại lệ học từ BCTC thật mỗi mùa (mã 269 lợi thế thương mại, nhiều dòng LCTT cùng mã,
+nhãn riêng từng ngân hàng...). Số đo cho báo cáo: % BCTC lệch được tự sửa đúng, độ chính xác theo ô, số ô phải duyệt tay,
+tiền đọc mỗi BCTC; so với ChatGPT trên cùng bộ câu hỏi. Phần "agent" (báo cáo so sánh) là lớp mỏng phía trên, không phải
+trung tâm.
+
+Lỗi BCTC tự cộng lệch (BSR, SSB, VPL, VHM quý 4/2025) giữ làm dữ liệu nội bộ cho báo cáo, không làm thành chức năng cho
+người dùng: không có giá trị đầu tư. Số bị sửa giữa các bản (tự lập so với soát xét/kiểm toán) thì có giá trị và đã có ở
+cờ "số bị sửa" trên thẻ; bảng xếp hạng mùa BCTC có thêm bộ lọc theo cờ này.
+
 ### Trục 1: Độ phủ
 - Toàn thị trường: HOSE + HNX + UPCoM (hoãn, xem điều chỉnh 12/10/2026).
 - Lịch sử từ 5 năm trở lên (hoãn; hiện dùng 8 quý từ cột "cùng kỳ"), để phân tích xu hướng dài hạn, TTM, CAGR.

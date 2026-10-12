@@ -24,6 +24,7 @@ from services.extraction import prompts
 from services.extraction.bank import canonicalize
 from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.sources import candidates, open_pdf, render_page
+from services.extraction.repair import agrees, localize, proposal_dict
 from services.extraction.rules import RULESETS
 from services.extraction.validate import (
     ExtractedItem,
@@ -160,11 +161,80 @@ def _escalate(record: dict, client: VisionClient, doc) -> None:
     Trước đó: BCĐKT chưa kiểm được tổng tài sản = tổng nguồn vốn thì chép thêm trang kế tiếp (bước định vị trang có
     thể bỏ sót trang nguồn vốn). Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
     _extend_balance_sheet(record, client, doc)
+    _repair_by_constraints(record, client, doc)
     for _ in range(REREAD_ROUNDS):
         if not _reread_failed(record, client, doc):
             break
     if _reextract_failed_statements(record, client, doc):
         _reread_failed(record, client, doc)
+
+
+def _repair_by_constraints(record: dict, client: VisionClient, doc) -> bool:
+    """Định vị ô đọc sai bằng ràng buộc kế toán (repair.localize), đọc lại riêng các ô đó và chỉ nhận số mới khi lần
+    đọc lại ra đúng số mà ràng buộc đòi hỏi: hai nguồn độc lập (phép cộng và ảnh) cùng chỉ một số.
+
+    Nhóm phương án ngang nhau (một ràng buộc lệch, nhiều số hạng đều sửa được) thì đọc lại cả nhóm và nhận ô duy nhất
+    khớp. Đọc lại vẫn ra số cũ ở mọi ô của nhóm thì ghi nhận nghi chính BCTC in lệch (record["filing_mismatch"])."""
+    extracted, statements, sep, template, _ = _check(record)
+    loc = localize(extracted, statements, sep, template)
+    groups = [[p] for p in loc.proposals if not any(p is q.partner for q in loc.proposals)] + loc.ambiguous
+    if not groups:
+        return False
+    cells = {}
+    for group in groups:
+        for p in group:
+            for q in (p, p.partner):
+                if q is not None:
+                    cells[(q.statement, q.row, q.column_kind)] = q
+    by_page: dict[tuple[str, int], list] = {}
+    for (st, row, col), q in cells.items():
+        page = record["raw"][st]["rows"][row].get("page")
+        if page:
+            by_page.setdefault((st, int(page)), []).append(q)
+    reread: dict[tuple[str, int, str], str | None] = {}
+    for (st, page), qs in by_page.items():
+        image = render_page(doc, page, REREAD_LONG_SIDE, _rotation(record, page))
+        ids = {f"o{n}": q for n, q in enumerate(qs, 1)}
+        asked = [(cid, None if q.code.startswith(("~", "b.")) else q.code, q.label, q.column_kind) for cid, q in ids.items()]
+        result = client.json_from_images(prompts.verify_prompt(st, asked), [(f"Trang {page}", image)],
+                                         prompts.REREAD_SCHEMA, "reread_cells", step="repair_cells")
+        for ans in result.get("cells", []):
+            q = ids.get((ans.get("code") or "").strip())
+            if q is not None:
+                reread[(q.statement, q.row, q.column_kind)] = ans.get("value")
+
+    mult = {name: st.multiplier for name, st in statements.items()}
+
+    def confirmed(q) -> bool:
+        key = (q.statement, q.row, q.column_kind)
+        return key in reread and agrees(q, reread[key], sep, mult[q.statement])
+
+    log = record.setdefault("repairs", [])
+    changed = False
+    for group in groups:
+        ok = [p for p in group if confirmed(p) and (p.partner is None or confirmed(p.partner))]
+        accepted = ok[0] if len(ok) == 1 else None
+        for p in group:
+            for q in (p, p.partner):
+                if q is None:
+                    continue
+                log.append(proposal_dict(q) | {"reread": reread.get((q.statement, q.row, q.column_kind)),
+                                               "accepted": accepted is not None and q in (accepted, accepted.partner),
+                                               "group_size": len(group), "model": client.cfg.model})
+        if accepted is not None:
+            for q in (accepted, accepted.partner):
+                if q is not None:
+                    record["raw"][q.statement]["rows"][q.row]["values"][q.column_kind] = q.after
+            changed = True
+        elif all(_same_raw(reread.get((p.statement, p.row, p.column_kind)), p.before, sep) for p in group):
+            record.setdefault("filing_mismatch", []).append(sorted({f for p in group for f in p.fixes}))
+    return changed
+
+
+def _same_raw(a: str | None, b: str | None, sep: str) -> bool:
+    """Cùng dãy chữ số (lần đọc lại có thể viết dấu phân tách hay dấu ngoặc khác)."""
+    da, db = re.sub(r"\D", "", a or ""), re.sub(r"\D", "", b or "")
+    return bool(da) and da.lstrip("0") == db.lstrip("0")
 
 
 def _extend_balance_sheet(record: dict, client: VisionClient, doc) -> bool:
@@ -358,6 +428,8 @@ def _check_variants(record: dict):
     # ràng buộc kế toán tốt hơn (nhận ra mẫu, ít lệch, nhiều ràng buộc đạt); hòa thì giữ nguyên văn.
     fixed_template = {"securities": "CTCK"}.get(company_template)
 
+    baseline_checks = 0     # số ràng buộc bắt buộc được kiểm khi giữ nguyên văn
+
     def evaluate(swapped: frozenset):
         raws = {st: _swap_stt_code(raw, {p for s_, p in swapped if s_ == st and p != PROMOTE}, (st, PROMOTE) in swapped)
                 for st, raw in record["raw"].items()}
@@ -367,12 +439,17 @@ def _check_variants(record: dict):
         checks = validate(statements, template) if template else []
         failed = sum(c.gate and not c.passed for c in checks)
         passed = sum(c.gate and c.passed for c in checks)
-        return (template is None, failed, -passed, len(swapped)), (extracted, statements, sep, template, checks)
+        # Phương án làm mất dòng tổng (mã bị thay bằng số thứ tự) thì ít ràng buộc được kiểm hơn nên cũng ít lệch hơn,
+        # dù sai (VHM quý 4/2025: lấy stt làm mã còn 36 phép kiểm, giữ nguyên văn 80). Mỗi phép kiểm bị mất so với
+        # bản nguyên văn tính như một lần lệch.
+        lost = max(0, baseline_checks - failed - passed)
+        return (template is None, failed + lost, -passed, len(swapped)), (extracted, statements, sep, template, checks)
 
     # Thử đảo cả báo cáo trước (tổng tài sản cần cả trang 100 lẫn trang 200 cùng đúng), rồi bật/tắt từng trang
     units = {st: [(st, page) for page in _pages_with_code_like_stt(raw)] for st, raw in record["raw"].items()}
     swapped: frozenset = frozenset()
     best_score, best = evaluate(swapped)
+    baseline_checks = sum(c.gate for c in best[4])
     moves = [frozenset(u) for u in units.values() if u] + [frozenset([u]) for us in units.values() for u in us]
     # Mô hình chép lẫn lộn trong cùng một bảng: dòng thì mã số ở cột stt (cột code là số thuyết minh), dòng thì đúng
     # chỗ (MSN quý 1/2026). Phương án: dòng nào có stt dạng số thì lấy stt làm mã.

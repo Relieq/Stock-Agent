@@ -1,0 +1,145 @@
+"""Đo bộ máy tự định vị ô đọc sai (services/extraction/repair.py) trên các lỗi đã biết, không gọi mô hình.
+
+    python eval/repair.py [--verbose]
+
+Đề kiểm tra lấy từ các bản ghi trích xuất đã lưu:
+  * sửa tay (record["manual_fixes"]): người duyệt đối chiếu ảnh gốc, có số cũ và số mới;
+  * đọc lại (record["rereads"]) của tài liệu nay đã đạt kiểm chứng/được duyệt: lần đọc lại ra số khác và số đó còn
+    nằm trong bản ghi cuối.
+Với mỗi tài liệu, trả các ô đó về số sai ban đầu, chạy định vị lỗi rồi so với số đúng. Kết quả theo ô:
+  * đúng: đề xuất duy nhất (độ tin cao/vừa) đúng ô, đúng số;
+  * cần đọc lại: ô nằm trong một nhóm phương án ngang nhau, có phương án đúng số (đọc lại riêng từng ô sẽ chọn được);
+  * sót: không có đề xuất nào cho ô này (ví dụ lỗi không làm lệch phép cộng nào trong chính BCTC đó);
+và đề xuất sai: đề xuất cho ô không có trong đề hoặc sai số.
+"""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import sys
+from collections import Counter
+
+from services.db import connect
+from services.extraction.numbers import normalize_code, parse_amount
+from services.extraction.pipeline import _check, _load_record
+from services.extraction.repair import localize
+
+
+def truth_cells(record: dict) -> dict[tuple[str, int, str], tuple[str | None, str, str]]:
+    """(báo cáo, dòng, cột) -> (số sai ban đầu, số đúng, nguồn). Lấy lần sửa đầu tiên làm số sai, lần cuối làm số đúng."""
+    out: dict = {}
+    if record.get("status") in ("verified", "approved"):
+        for r in record.get("rereads", []):
+            if r.get("before") == r.get("after"):
+                continue
+            rows = record["raw"].get(r["statement"], {}).get("rows", [])
+            idx = next((i for i, row in enumerate(rows) if normalize_code(row.get("code")) == r["code"]), None)
+            if idx is None or rows[idx]["values"].get(r["column_kind"]) != r["after"]:
+                continue
+            key = (r["statement"], idx, r["column_kind"])
+            out[key] = (out.get(key, (r["before"],))[0], r["after"], "đọc lại")
+    for f in record.get("manual_fixes", []):
+        key = (f["statement"], f["row"], f["column_kind"])
+        out[key] = (out.get(key, (f["before"],))[0], f["after"], "sửa tay")
+    return out
+
+
+def extracted_code(extracted, key):
+    st, row, _ = key
+    ex = next((e for e in extracted if e.statement == st), None)
+    return ex.items[row].code if ex and row < len(ex.items) else None
+
+
+def _cells_in_failures(extracted, statements, template) -> set:
+    """Các ô thuộc ít nhất một ràng buộc bắt buộc bị lệch trong chính BCTC (lỗi khác chỉ lộ khi đối chiếu BCTC khác)."""
+    from services.extraction.repair import _cells_of
+    from services.extraction.validate import validate
+    if template is None:
+        return set()
+    return {cell for c in validate(statements, template) if c.gate and not c.passed
+            for cell in _cells_of(c, template, statements)}
+
+
+def evaluate(record: dict, verbose: bool = False) -> Counter:
+    truth = truth_cells(record)
+    tally: Counter = Counter()
+    if not truth:
+        return tally
+    broken = copy.deepcopy(record)
+    for (st, row, col), (before, _, _) in truth.items():
+        broken["raw"][st]["rows"][row]["values"][col] = before
+    extracted, statements, sep, template, _ = _check(broken)
+    loc = localize(extracted, statements, sep, template)
+
+    def same(raw_a, raw_b):
+        a, b = parse_amount(raw_a, sep), parse_amount(raw_b, sep)
+        return a is not None and a == b
+
+    sure = {(p.statement, p.row, p.column_kind): p for p in loc.proposals}
+    grouped_list = [q for g in loc.ambiguous for p in g for q in (p, p.partner) if q]
+    grouped = {(p.statement, p.row, p.column_kind): p for p in grouped_list}
+    involved = _cells_in_failures(extracted, statements, template)
+    for key, (before, after, source) in truth.items():
+        if parse_amount(before, sep) is None and parse_amount(after, sep) is None:
+            continue
+        code = normalize_code(extracted_code(extracted, key))
+        if (key[0], code, key[2]) not in involved:
+            result = "ngoài tầm"
+        elif key in sure and same(sure[key].after, after):
+            result = "đúng"
+        elif key in grouped and same(grouped[key].after, after):
+            result = "cần đọc lại"
+        else:
+            result = "sót"
+        tally[result] += 1
+        tally[f"{source}: {result}"] += 1
+        if verbose:
+            p = sure.get(key) or grouped.get(key)
+            print(f"  [{record['document_id']} {record['ticker']}] {key} {before} -> {after} ({source}): {result}"
+                  + (f"; đề xuất {p.after} ({p.confidence}, {len(p.fixes)} ràng buộc)" if p else ""))
+    for p in loc.proposals:
+        key = (p.statement, p.row, p.column_kind)
+        if key not in truth or not same(p.after, truth[key][1]):
+            tally["đề xuất sai"] += 1
+            if verbose:
+                print(f"  [{record['document_id']} {record['ticker']}] ĐỀ XUẤT SAI {key} {p.before} -> {p.after} "
+                      f"({p.confidence}, {p.fixes})")
+    tally["nhóm cần đọc lại"] += len(loc.ambiguous)
+    tally["ô phải đọc lại"] += sum(len(g) for g in loc.ambiguous)
+    return tally
+
+
+def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--verbose", action="store_true")
+    args = ap.parse_args()
+    total: Counter = Counter()
+    docs = 0
+    with connect() as conn:
+        ids = [r[0] for r in conn.execute(
+            "SELECT id FROM documents WHERE status IN ('verified', 'approved', 'needs_review') ORDER BY id")]
+        for doc_id in ids:
+            try:
+                record = _load_record(conn, doc_id)
+            except RuntimeError:
+                continue
+            t = evaluate(record, args.verbose)
+            if t:
+                docs += 1
+                total += t
+    cells = total["đúng"] + total["cần đọc lại"] + total["sót"]
+    print(f"{docs} tài liệu, {cells + total['ngoài tầm']} ô đã biết là đọc sai")
+    print(f"  ngoài tầm (không làm lệch phép cộng nào trong chính BCTC): {total['ngoài tầm']}")
+    print(f"  trong tầm: {cells}")
+    for k in ("đúng", "cần đọc lại", "sót"):
+        print(f"  {k:12s} {total[k]:4d}  ({total[k] / cells:.0%})" if cells else "")
+    print(f"  đề xuất sai  {total['đề xuất sai']:4d}")
+    print(f"  nhóm phương án ngang nhau: {total['nhóm cần đọc lại']}, tổng {total['ô phải đọc lại']} ô phải đọc lại")
+    for k in sorted(k for k in total if ":" in k):
+        print(f"    {k}: {total[k]}")
+
+
+if __name__ == "__main__":
+    main()

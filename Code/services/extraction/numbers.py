@@ -62,6 +62,10 @@ def parse_amount(raw: str | None, thousands_sep: str) -> Decimal | None:
         negative, s = not negative, s[1:]
 
     decimal_mark = "," if thousands_sep == "." else "."
+    # Số có từ hai nhóm phân tách trở lên thì không thể là số thập phân: mô hình có khi chép một vài dòng bằng dấu
+    # kia (VHM quý 4/2025 chép "103,009,532" trong tài liệu dùng dấu chấm)
+    if _MULTI_GROUP[decimal_mark].match(s):
+        thousands_sep, decimal_mark = decimal_mark, thousands_sep
     s = s.replace(thousands_sep, "")
     s = s.replace(decimal_mark, ".")
     if not re.fullmatch(r"\d+(\.\d+)?", s):

@@ -23,7 +23,8 @@ from collections import Counter
 from services.db import connect
 from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.pipeline import _check, _load_record
-from services.extraction.repair import localize
+from services.extraction.evidence import document_evidence
+from services.extraction.repair import cross_proposals, localize
 
 
 def truth_cells(record: dict) -> dict[tuple[str, int, str], tuple[str | None, str, str]]:
@@ -31,7 +32,7 @@ def truth_cells(record: dict) -> dict[tuple[str, int, str], tuple[str | None, st
     out: dict = {}
     if record.get("status") in ("verified", "approved"):
         for r in record.get("rereads", []):
-            if r.get("before") == r.get("after"):
+            if r.get("before") == r.get("after") or r.get("kept") is False:
                 continue
             rows = record["raw"].get(r["statement"], {}).get("rows", [])
             idx = next((i for i, row in enumerate(rows) if normalize_code(row.get("code")) == r["code"]), None)
@@ -61,7 +62,7 @@ def _cells_in_failures(extracted, statements, template) -> set:
             for cell in _cells_of(c, template, statements)}
 
 
-def evaluate(record: dict, verbose: bool = False) -> Counter:
+def evaluate(record: dict, verbose: bool = False, conn=None) -> Counter:
     truth = truth_cells(record)
     tally: Counter = Counter()
     if not truth:
@@ -71,6 +72,19 @@ def evaluate(record: dict, verbose: bool = False) -> Counter:
         broken["raw"][st]["rows"][row]["values"][col] = before
     extracted, statements, sep, template, _ = _check(broken)
     loc = localize(extracted, statements, sep, template)
+    if conn is not None:
+        doc_id = record["document_id"]
+
+        def load(d):
+            if d == doc_id:
+                return broken
+            try:
+                return _load_record(conn, d)
+            except RuntimeError:
+                return None
+        taken = {(p.statement, p.row, p.column_kind) for p in loc.proposals} |                 {(p.statement, p.row, p.column_kind) for g in loc.ambiguous for p in g}
+        loc.ambiguous += cross_proposals(document_evidence(conn, doc_id, load=load), extracted, statements, sep,
+                                         template, taken)
 
     def same(raw_a, raw_b):
         a, b = parse_amount(raw_a, sep), parse_amount(raw_b, sep)
@@ -81,18 +95,20 @@ def evaluate(record: dict, verbose: bool = False) -> Counter:
     grouped = {(p.statement, p.row, p.column_kind): p for p in grouped_list}
     involved = _cells_in_failures(extracted, statements, template)
     for key, (before, after, source) in truth.items():
-        if parse_amount(before, sep) is None and parse_amount(after, sep) is None:
-            continue
+        if parse_amount(before, sep) == parse_amount(after, sep):
+            continue        # chỉ khác cách viết (dấu phân tách), bước chuẩn hóa số đã đọc đúng
         code = normalize_code(extracted_code(extracted, key))
-        if (key[0], code, key[2]) not in involved:
-            result = "ngoài tầm"
-        elif key in sure and same(sure[key].after, after):
+        in_scope = (key[0], code, key[2]) in involved
+        if key in sure and same(sure[key].after, after):
             result = "đúng"
         elif key in grouped and same(grouped[key].after, after):
             result = "cần đọc lại"
         else:
-            result = "sót"
-        tally[result] += 1
+            result = "sót" if in_scope else "ngoài tầm"
+        if not in_scope and result != "ngoài tầm":
+            result += " (nhờ BCTC kỳ khác)"
+        tally[result.split(" (")[0]] += 1
+        tally[f"nguồn bằng chứng: {'trong BCTC' if in_scope else 'BCTC kỳ khác'}: {result.split(' (')[0]}"] += 1
         tally[f"{source}: {result}"] += 1
         if verbose:
             p = sure.get(key) or grouped.get(key)
@@ -125,13 +141,13 @@ def main() -> None:
                 record = _load_record(conn, doc_id)
             except RuntimeError:
                 continue
-            t = evaluate(record, args.verbose)
+            t = evaluate(record, args.verbose, conn)
             if t:
                 docs += 1
                 total += t
     cells = total["đúng"] + total["cần đọc lại"] + total["sót"]
     print(f"{docs} tài liệu, {cells + total['ngoài tầm']} ô đã biết là đọc sai")
-    print(f"  ngoài tầm (không làm lệch phép cộng nào trong chính BCTC): {total['ngoài tầm']}")
+    print(f"  ngoài tầm (không phép cộng nào trong BCTC hay đối chiếu kỳ khác chỉ ra): {total['ngoài tầm']}")
     print(f"  trong tầm: {cells}")
     for k in ("đúng", "cần đọc lại", "sót"):
         print(f"  {k:12s} {total[k]:4d}  ({total[k] / cells:.0%})" if cells else "")

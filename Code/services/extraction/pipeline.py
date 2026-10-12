@@ -23,8 +23,8 @@ import psycopg
 from services.extraction import prompts
 from services.extraction.bank import canonicalize
 from services.extraction.numbers import normalize_code, parse_amount
-from services.extraction.sources import candidates, open_pdf, render_page
-from services.extraction.repair import agrees, localize, proposal_dict
+from services.extraction.sources import candidates, open_pdf, render_page, render_strips
+from services.extraction.repair import agrees, cross_proposals, localize, proposal_dict
 from services.extraction.rules import RULESETS
 from services.extraction.validate import (
     ExtractedItem,
@@ -142,7 +142,7 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
         record["raw"][st] = raw
     record["company_template"] = company_template
 
-    _escalate(record, client, doc)
+    _escalate(record, client, doc, conn)
     record["usage"] = {k: v - usage_before[k] for k, v in asdict(client.usage).items()}
     record["usage_by_step"] = usage_delta(client.steps_snapshot(), steps_before)
     return _finalize(conn, record)
@@ -150,10 +150,11 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
 
 REREAD_ROUNDS = 1
 REREAD_LONG_SIDE = 3000
+ZOOM_LONG_SIDE = 4200       # đọc lại theo dải: mỗi dải ~40% chiều cao trang ở độ phân giải này
 REEXTRACT_LONG_SIDE = 2600
 
 
-def _escalate(record: dict, client: VisionClient, doc) -> None:
+def _escalate(record: dict, client: VisionClient, doc, conn: psycopg.Connection | None = None) -> None:
     """Thang leo thang khi ràng buộc bắt buộc bị lệch (architecture.md mục 4.3):
     1. đọc lại đúng các ô liên quan ở độ phân giải cao hơn;
     2. vẫn lệch thì chép lại cả báo cáo đó, mỗi trang một lần gọi (sửa lỗi bỏ sót dòng), giữ bản ít lệch hơn,
@@ -161,7 +162,7 @@ def _escalate(record: dict, client: VisionClient, doc) -> None:
     Trước đó: BCĐKT chưa kiểm được tổng tài sản = tổng nguồn vốn thì chép thêm trang kế tiếp (bước định vị trang có
     thể bỏ sót trang nguồn vốn). Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
     _extend_balance_sheet(record, client, doc)
-    _repair_by_constraints(record, client, doc)
+    _repair_by_constraints(record, client, doc, conn)
     for _ in range(REREAD_ROUNDS):
         if not _reread_failed(record, client, doc):
             break
@@ -169,7 +170,7 @@ def _escalate(record: dict, client: VisionClient, doc) -> None:
         _reread_failed(record, client, doc)
 
 
-def _repair_by_constraints(record: dict, client: VisionClient, doc) -> bool:
+def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycopg.Connection | None = None) -> bool:
     """Định vị ô đọc sai bằng ràng buộc kế toán (repair.localize), đọc lại riêng các ô đó và chỉ nhận số mới khi lần
     đọc lại ra đúng số mà ràng buộc đòi hỏi: hai nguồn độc lập (phép cộng và ảnh) cùng chỉ một số.
 
@@ -178,6 +179,16 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc) -> bool:
     extracted, statements, sep, template, _ = _check(record)
     loc = localize(extracted, statements, sep, template)
     groups = [[p] for p in loc.proposals if not any(p is q.partner for q in loc.proposals)] + loc.ambiguous
+    if conn is not None:
+        # Thêm đề xuất từ đối chiếu với BCTC kỳ khác (ô không làm lệch phép cộng nào trong chính BCTC này)
+        from services.extraction.evidence import document_evidence
+        taken = {(q.statement, q.row, q.column_kind) for g in groups for q in g}
+        load_self = lambda d: record if d == record["document_id"] else _try_load(conn, d)
+        try:
+            ev = document_evidence(conn, record["document_id"], load=load_self)
+        except Exception:       # tài liệu mới chưa có trong CSDL đầy đủ: bỏ qua phần đối chiếu
+            ev = None
+        groups += cross_proposals(ev, extracted, statements, sep, template, taken)
     if not groups:
         return False
     cells = {}
@@ -204,10 +215,34 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc) -> bool:
                 reread[(q.statement, q.row, q.column_kind)] = ans.get("value")
 
     mult = {name: st.multiplier for name, st in statements.items()}
+    zoomed: dict[tuple[str, int, str], list[str | None]] = {}
 
     def confirmed(q) -> bool:
         key = (q.statement, q.row, q.column_kind)
-        return key in reread and agrees(q, reread[key], sep, mult[q.statement])
+        return (key in reread and agrees(q, reread[key], sep, mult[q.statement])) or             any(agrees(q, v, sep, mult[q.statement]) for v in zoomed.get(key, []))
+
+    # Đọc lại cả trang mà vẫn ra đúng số cũ ở mọi ô của nhóm: có thể mô hình lặp cùng một lỗi vì chữ số quá nhỏ (VHM quý
+    # 4/2025: 34.276.497 đọc hai lần đều ra 34.276.197). Đọc thêm một lần trên các dải phóng to trước khi kết luận
+    # chính BCTC in lệch.
+    pending = [q for group in groups if not any(confirmed(p) for p in group)
+               and all(_same_raw(reread.get((p.statement, p.row, p.column_kind)), p.before, sep) for p in group)
+               for p in group for q in (p, p.partner) if q is not None]
+    zoom_pages: dict[tuple[str, int], list] = {}
+    for q in pending:
+        page = record["raw"][q.statement]["rows"][q.row].get("page")
+        if page:
+            zoom_pages.setdefault((q.statement, int(page)), []).append(q)
+    for (st, page), qs in zoom_pages.items():
+        ids = {f"o{n}": q for n, q in enumerate(qs, 1)}
+        asked = [(cid, None if q.code.startswith(("~", "b.")) else q.code, q.label, q.column_kind) for cid, q in ids.items()]
+        for strip in render_strips(doc, page, ZOOM_LONG_SIDE, _rotation(record, page)):
+            result = client.json_from_images(
+                prompts.verify_prompt(st, asked) + "\nẢnh chỉ là một dải của trang: ô nào không có trong ảnh thì trả null.",
+                [(f"Trang {page} (một phần)", strip)], prompts.REREAD_SCHEMA, "reread_cells", step="repair_zoom")
+            for ans in result.get("cells", []):
+                q = ids.get((ans.get("code") or "").strip())
+                if q is not None and ans.get("value"):
+                    zoomed.setdefault((q.statement, q.row, q.column_kind), []).append(ans["value"])
 
     log = record.setdefault("repairs", [])
     changed = False
@@ -219,6 +254,7 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc) -> bool:
                 if q is None:
                     continue
                 log.append(proposal_dict(q) | {"reread": reread.get((q.statement, q.row, q.column_kind)),
+                                               "zoomed": zoomed.get((q.statement, q.row, q.column_kind)),
                                                "accepted": accepted is not None and q in (accepted, accepted.partner),
                                                "group_size": len(group), "model": client.cfg.model})
         if accepted is not None:
@@ -226,9 +262,18 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc) -> bool:
                 if q is not None:
                     record["raw"][q.statement]["rows"][q.row]["values"][q.column_kind] = q.after
             changed = True
-        elif all(_same_raw(reread.get((p.statement, p.row, p.column_kind)), p.before, sep) for p in group):
+        elif all(_same_raw(reread.get((p.statement, p.row, p.column_kind)), p.before, sep)
+                 and all(_same_raw(v, p.before, sep) for v in zoomed.get((p.statement, p.row, p.column_kind), []))
+                 for p in group):
             record.setdefault("filing_mismatch", []).append(sorted({f for p in group for f in p.fixes}))
     return changed
+
+
+def _try_load(conn, document_id: int) -> dict | None:
+    try:
+        return _load_record(conn, document_id)
+    except RuntimeError:
+        return None
 
 
 def _same_raw(a: str | None, b: str | None, sep: str) -> bool:
@@ -499,8 +544,16 @@ def _swap_stt_code(raw: dict, pages: set, promote: bool = False) -> dict:
     return raw | {"rows": rows}
 
 
+def _gate_score(record: dict) -> tuple[int, int]:
+    """(tổng số ràng buộc bắt buộc lệch, tổng số đạt) của cả tài liệu."""
+    tally = _gate_tally(record).values()
+    return sum(f for f, _ in tally), sum(p for _, p in tally)
+
+
 def _reread_failed(record: dict, client: VisionClient, doc) -> bool:
-    """Đọc lại các ô thuộc ràng buộc bắt buộc bị lệch. Trả về True nếu có ô được đọc ra khác lần trước."""
+    """Đọc lại các ô thuộc ràng buộc bắt buộc bị lệch. Số đọc lại chỉ được giữ khi làm giảm số ràng buộc lệch mà không
+    làm giảm số ràng buộc đạt (trước 12/10/2026 giữ mọi số đọc ra khác: một lần đọc lại nhầm dòng cũng được nhận).
+    Trả về True nếu có ô được sửa."""
     _, statements, _, template, checks = _check(record)
     failed = [c for c in checks if c.gate and not c.passed]
     if not failed:
@@ -536,11 +589,18 @@ def _reread_failed(record: dict, client: VisionClient, doc) -> bool:
             if row is None or col not in row["values"] or value is None:
                 continue
             before = row["values"][col]
-            log.append({"statement": st, "code": code, "column_kind": col, "page": page,
-                        "before": before, "after": value, "model": client.cfg.model})
+            kept = False
             if value != before:
+                failed0, passed0 = _gate_score(record)
                 row["values"][col] = value
-                changed = True
+                failed1, passed1 = _gate_score(record)
+                kept = failed1 < failed0 and passed1 >= passed0
+                if kept:
+                    changed = True
+                else:
+                    row["values"][col] = before
+            log.append({"statement": st, "code": code, "column_kind": col, "page": page,
+                        "before": before, "after": value, "kept": kept, "model": client.cfg.model})
     return changed
 
 
@@ -549,7 +609,7 @@ def reread_document(conn: psycopg.Connection, document_id: int, client: VisionCl
     record = _load_record(conn, document_id)
     doc = open_record_pdf(conn, record)
     with track_usage(record, client):
-        _escalate(record, client, doc)
+        _escalate(record, client, doc, conn)
     return _finalize(conn, record)
 
 

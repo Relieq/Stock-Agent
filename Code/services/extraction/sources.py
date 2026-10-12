@@ -87,3 +87,22 @@ def render_page(doc: pymupdf.Document, page: int, long_side: int, rotate: int = 
     zoom = long_side / max(p.rect.width, p.rect.height)
     pix = p.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom).prerotate(rotate), colorspace=pymupdf.csGRAY)
     return pix.tobytes("png")
+
+
+STRIPS = ((0.0, 0.4), (0.3, 0.7), (0.6, 1.0))
+
+
+def render_strips(doc: pymupdf.Document, page: int, long_side: int, rotate: int = 0) -> list[bytes]:
+    """Trang (đã xoay đúng chiều) cắt thành các dải ngang chồng lên nhau, mỗi dải ảnh rộng như trang ở `long_side` nên
+    chữ số to gấp vài lần so với ảnh cả trang. Dùng khi đọc lại cả trang vẫn lặp một lỗi đọc nhầm. Cắt trên ảnh đã xoay
+    (vùng cắt của pymupdf tính theo tọa độ trang chưa xoay)."""
+    full = render_page(doc, page, long_side, rotate)
+    tmp = pymupdf.open()
+    pix = pymupdf.Pixmap(full)
+    canvas = tmp.new_page(width=pix.width, height=pix.height)
+    canvas.insert_image(canvas.rect, pixmap=pix)
+    out = []
+    for top, bottom in STRIPS:
+        clip = pymupdf.Rect(0, pix.height * top, pix.width, pix.height * bottom)
+        out.append(canvas.get_pixmap(clip=clip, colorspace=pymupdf.csGRAY).tobytes("png"))
+    return out

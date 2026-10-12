@@ -255,3 +255,71 @@ def agrees(proposal: Proposal | dict, reread_raw: str | None, sep: str, multipli
 
 def _negative(raw: str | None) -> bool:
     return (raw or "").strip().startswith(("(", "-"))
+
+
+EQUALITY_KINDS = ("bs_begin", "same_date", "year_start")
+
+
+def cross_proposals(evidence, extracted: list[ExtractedStatement], statements: dict[str, Statement], sep: str,
+                    template: str | None, taken: set[tuple[str, int, str]] = frozenset()) -> list[list[Proposal]]:
+    """Đề xuất từ đối chiếu với BCTC khác của cùng công ty (evidence.document_evidence): số đầu năm bằng số đầu năm
+    của quý trước, quý = lũy kế − lũy kế quý trước, quý 2 bằng bán niên, đầu năm bằng cuối năm trước.
+
+    Chỉ dùng các chỗ lệch bị nghi đọc sai (PeriodCheck.suspect_misread), vì chênh giữa hai bản có thể là công ty hoặc
+    kiểm toán sửa số thật. Số mới phải khác số cũ tối đa MAX_DIGITS_CHANGED chữ số và không làm lệch thêm ràng buộc
+    nào của chính BCTC. Mỗi chỗ lệch cho một nhóm (ô của tài liệu này có thể sửa được); đọc lại sẽ chọn."""
+    if evidence is None or template is None:
+        return []
+    me = evidence.cells.document_id
+    base = set(_failures(statements, template))
+    groups: list[list[Proposal]] = []
+    for pc in evidence.period_checks:
+        if not pc.suspect_misread:
+            continue
+        options = []                                    # (ô của tài liệu này, số mới)
+        later_cell = pc.cells[0]
+        if later_cell[0] == me:
+            options.append((later_cell, pc.expected))
+            if pc.kind == "is_quarter":                 # hoặc ô lũy kế của chính tài liệu sau sai
+                ytd = pc.cells[1]
+                cur = evidence.cells.values.get((ytd[1], ytd[2]), {}).get(ytd[3])
+                if cur is not None:
+                    options.append((ytd, cur + pc.later - pc.expected))
+        if pc.kind in EQUALITY_KINDS and pc.cells[1][0] == me:
+            options.append((pc.cells[1], pc.later))
+        group = []
+        for (_, st_name, key, col), new in options:
+            keys = evidence.cells.item_keys.get(st_name, [])
+            if key not in keys:
+                continue
+            row = keys.index(key)
+            if (st_name, row, col) in taken:
+                continue
+            ex = next((e for e in extracted if e.statement == st_name), None)
+            st = statements.get(st_name)
+            if ex is None or st is None or row >= len(ex.items):
+                continue
+            code = normalize_code(ex.items[row].code)
+            if code is None or code not in st.values or col not in st.values[code]:
+                continue
+            units = new / st.multiplier
+            if units != units.to_integral_value():
+                continue
+            before = ex.items[row].values_raw.get(col)
+            after_raw = format_like(before, units, sep)
+            n = digits_changed(before, after_raw)
+            if n > MAX_DIGITS_CHANGED:
+                continue
+            cur = st.values[code][col]
+            st.values[code][col] = new
+            after = set(_failures(statements, template))
+            st.values[code][col] = cur
+            if not after <= base:
+                continue
+            fixes = [f"X:{pc.kind}@{pc.column}", *sorted(base - after)]
+            group.append(Proposal(st_name, code, col, row, ex.items[row].label, before, after_raw, new, fixes, n))
+        if group:
+            for p in group:
+                p.alternatives = len(group) - 1
+            groups.append(group)
+    return groups

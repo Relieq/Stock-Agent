@@ -114,6 +114,29 @@ def test_label_variants_seen_in_q2_2026():
     assert codes == ["b.cash", "b.sbv", "b.interbank", "b.gov", None, "b.deriv_liab"]
 
 
+def test_label_variants_seen_in_q4_2025():
+    rows = [
+        (None, "Tiền; vàng gửi và cho vay các tổ chức tín dụng (\"TCTD\")", "30"),    # MBB
+        (None, "Các công cụ tài chính phái sinh và các khoản nợ", "5"),              # STB, tên bị cắt khi xuống dòng
+    ]
+    extracted = [_st("BS", rows, "end_period")]
+    canonicalize(extracted)
+    assert [it.code for it in extracted[0].items] == ["b.interbank", "b.deriv_liab"]
+
+
+def test_operating_cash_flow_takes_the_last_matching_total():
+    # BID quý 4/2025: dòng tổng tạm trước phần thay đổi tài sản/công nợ hoạt động mang cùng tên với dòng tổng thật
+    rows = [
+        (None, "Lưu chuyển tiền thuần từ hoạt động kinh doanh", "50"),
+        (None, "(Tăng) các khoản cho vay khách hàng", "(30)"),
+        (None, "Lưu chuyển tiền thuần từ hoạt động KD", "20"),
+        (None, "Lưu chuyển tiền thuần từ hoạt động đầu tư", "(5)"),
+    ]
+    extracted = [_st("CF", rows, "ytd_cur")]
+    canonicalize(extracted)
+    assert [it.code for it in extracted[0].items] == [None, None, "b.cfo", "b.cfi"]
+
+
 def test_minority_interest_sign_does_not_follow_expense_convention():
     # Chi phí in số dương (không đảo dấu), nhưng lợi ích cổ đông không kiểm soát in trong ngoặc (như MBB, VPB)
     rows = [

@@ -184,10 +184,11 @@ def apply_manual_fix(conn: psycopg.Connection, document_id: int, statement: str,
     return entry
 
 
-def approve_document(conn: psycopg.Connection, document_id: int, user_id: int | None, by: str) -> str:
-    """Người duyệt đã đối chiếu các chỗ lệch với ảnh gốc và cho xuất bản BCTC chưa đạt kiểm chứng tự động."""
+def approve_document(conn: psycopg.Connection, document_id: int, user_id: int | None, by: str, note: str = "") -> str:
+    """Người duyệt đã đối chiếu các chỗ lệch với ảnh gốc và cho xuất bản BCTC chưa đạt kiểm chứng tự động. `note` ghi
+    vì sao chỗ lệch còn lại không phải đọc sai (ví dụ chính BCTC cộng lệch)."""
     record = _load_record(conn, document_id)
-    record["approval"] = {"by": by, "at": datetime.now(timezone.utc).isoformat()}
+    record["approval"] = {"by": by, "at": datetime.now(timezone.utc).isoformat(), "note": note}
     record = _finalize(conn, record)
     conn.execute("UPDATE documents SET reviewed_by = %s, reviewed_at = now() WHERE id = %s", (user_id, document_id))
     return record["status"]

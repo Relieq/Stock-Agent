@@ -190,6 +190,14 @@ def cmd_fix(args) -> None:
               f"{e['before']} -> {e['after']}")
 
 
+def cmd_approve(args) -> None:
+    from services.extraction.verify import approve_document
+    with connect() as conn:
+        status = approve_document(conn, args.doc_id, None, args.by, args.note)
+        conn.commit()
+        print(f"[{args.doc_id}] -> {status}")
+
+
 def cmd_cost(args) -> None:
     """Chi phí gọi mô hình đã ghi trong các bản ghi trích xuất. Mỗi tài liệu chỉ giữ bản ghi mới nhất, nên các lần
     chạy bị ghi đè không được tính; bản ghi cũ chưa có số liệu theo bước."""
@@ -273,6 +281,12 @@ def main(argv: list[str] | None = None) -> None:
     f.add_argument("--by", required=True, help="Người sửa")
     f.add_argument("--note", default="")
     f.set_defaults(func=cmd_fix)
+
+    a = sub.add_parser("approve", help="Duyệt xuất bản BCTC còn lệch sau khi đối chiếu ảnh gốc (có ghi lại)")
+    a.add_argument("--doc-id", type=int, required=True)
+    a.add_argument("--by", required=True, help="Người duyệt")
+    a.add_argument("--note", required=True, help="Vì sao chỗ lệch còn lại không phải do đọc sai")
+    a.set_defaults(func=cmd_approve)
 
     c = sub.add_parser("cost", help="Chi phí gọi mô hình theo bước, từ các bản ghi đã lưu")
     c.set_defaults(func=cmd_cost)

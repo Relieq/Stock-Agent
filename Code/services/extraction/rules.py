@@ -82,7 +82,7 @@ _TT200_BS = (
     rule("BS", "230", "231", "232"),
     rule("BS", "240", "241", "242"),
     rule("BS", "250", *codes(251, 255)),
-    rule("BS", "260", "261", "262", "263", "268"),
+    rule("BS", "260", "261", "262", "263", "268", "269"),   # 269: lợi thế thương mại (BCTC hợp nhất)
     rule("BS", "270", "100", "200"),
     rule("BS", "300", "310", "330"),
     rule("BS", "310", *codes(311, 324)),
@@ -117,7 +117,7 @@ _CF = (
     rule("CF", "30", *codes(21, 27, 2), include_suffixed=True),
     rule("CF", "40", *codes(31, 36, 2), include_suffixed=True),
     rule("CF", "50", "20", "30", "40"),
-    rule("CF", "70", "50", "60", "61"),
+    rule("CF", "70", "50", "60", "61", "62"),   # 62: chênh lệch quy đổi BCTC công ty con nước ngoài (VNM)
 )
 
 _CASH_CROSS = (

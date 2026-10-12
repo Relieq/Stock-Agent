@@ -22,7 +22,9 @@ _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
         ("b.cash", [r"^tiền mặt(, vàng( bạc, đá quý)?)?$"]),
         ("b.sbv", [r"^tiền gửi tại (ngân hàng nhà nước|ngân hàng trung ương|nhnn)( việt nam)?( nhnn| nhnnvn)?$"]),
         ("b.interbank", [r"^tiền(, vàng)? gửi (tại )?và (cho vay|cấp tín dụng cho) (các )?(tổ chức tín dụng|tctd)( tctd)? khác( tctd)?$",
-                          r"^tiền(, vàng)? gửi tại các (tổ chức tín dụng|tctd) khác và cho vay các (tổ chức tín dụng|tctd) khác$"]),
+                          r"^tiền(, vàng)? gửi tại các (tổ chức tín dụng|tctd) khác và cho vay các (tổ chức tín dụng|tctd) khác$",
+                          # MBB quý 4/2025: "Tiền; vàng gửi và cho vay các tổ chức tín dụng ("TCTD")", không có "khác"
+                          r"^tiền[,;] vàng gửi và cho vay các (tổ chức tín dụng|tctd)( tctd)?( khác)?$"]),
         ("b.trading_sec", [r"^chứng khoán kinh doanh$"]),
         ("b.deriv_asset", [r"^các công cụ tài chính phái sinh và các tài sản tài chính khác$"]),
         ("b.loans", [r"^cho vay khách hàng$"]),
@@ -37,7 +39,8 @@ _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
         ("b.gov", [r"^các khoản nợ chính phủ và (ngân hàng nhà nước|ngân hàng trung ương|nhnnvn|nhnn)( việt nam)?( nhnn)?$"]),
         ("b.interbank_liab", [r"^tiền gửi và (tiền )?vay (của )?các (tổ chức tài chính( tctc)?, (các )?)?(tổ chức tín dụng|tctd)( tctd)? khác$"]),
         ("b.cust_dep", [r"^tiền gửi của khách hàng$"]),
-        ("b.deriv_liab", [r"^các công cụ tài chính phái sinh và các (khoản nợ|công nợ) tài chính khác$"]),
+        # Tên dài xuống dòng, mô hình có khi chỉ chép dòng đầu (STB quý 4/2025: "... và các khoản nợ")
+        ("b.deriv_liab", [r"^các công cụ tài chính phái sinh và các (khoản nợ|công nợ)( tài chính khác)?$"]),
         ("b.trust_funds", [r"^vốn tài trợ,? ủy thác đầu tư"]),
         ("b.papers", [r"^phát hành giấy tờ có giá$"]),
         ("b.other_liab", [r"^các khoản nợ khác$"]),
@@ -85,6 +88,10 @@ _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
         ("b.cash_end", [r"^tiền và các khoản tương đương tiền .*(cuối kỳ|cuối năm|ngày 3[01] tháng)"]),
     ],
 }
+
+# Lấy dòng khớp cuối cùng: BID quý 4/2025 in dòng tổng tạm trước phần thay đổi tài sản/công nợ hoạt động với đúng
+# tên "Lưu chuyển tiền thuần từ hoạt động kinh doanh"; dòng tổng thật đứng sau
+_LAST_MATCH = {"b.cfo"}
 
 _STT_PREFIX = re.compile(r"^(?:[ivxlc]+|\d+|[a-z])[.)]\s+")
 
@@ -144,9 +151,8 @@ def canonicalize(extracted: list[ExtractedStatement], repair_labels: bool = Fals
         for canonical, patterns in _PATTERNS.get(st.statement, []):
             hit = None
             for pattern in (fold(p) for p in patterns):
-                hit = next((it for it, lab in items
-                            if it.code is None and re.search(pattern, lab)
-                            and _has_values(it)), None)
+                hits = [it for it, lab in items if it.code is None and re.search(pattern, lab) and _has_values(it)]
+                hit = (hits[-1] if canonical in _LAST_MATCH else hits[0]) if hits else None
                 if hit:
                     break
             if hit:

@@ -192,7 +192,7 @@ BCTC là dữ liệu công khai nên chỉ có **một kho chung**: mỗi BCTC c
 | | Thuê VPS, mua tên miền (nếu muốn), tạo mật khẩu ứng dụng Gmail | Bạn | |
 | **14–19/10** | Bộ tính chỉ số, quy tắc hiển thị tăng trưởng, 6 cờ v1, API trả về thẻ. Ánh xạ theo tên chỉ tiêu cho DN thường không in mã số (VIC). Chạy bù quý 1/2026 và quý 4/2025 (chỉ BCTC hợp nhất) | Kỹ thuật | Thẻ đúng cho 30 mã quý 2 |
 | | Duyệt tay bộ rút gọn: các ô hiện trên thẻ, khoảng 25 ô × 5 BCTC | Bạn (~3 giờ) | Có số độ chính xác theo ô đầu tiên |
-| **20–26/10** | Web: bảng mùa, trang mã, theo dõi, hàng duyệt, đăng nhập bằng email. Triển khai lên VPS | Kỹ thuật | Chạy trên điện thoại, có HTTPS |
+| **20–26/10** | Web: bảng mùa, trang mã, theo dõi, hàng duyệt, đăng nhập bằng email. ~~Triển khai lên VPS~~ (12/10: phát triển tiếp trên máy, chỉ triển khai khi sản phẩm hoàn thiện; BCTC quý 3 vẫn được canh/đọc trên máy hoặc chạy bù sau) | Kỹ thuật | Chạy trên điện thoại, có HTTPS |
 | | Mời 5–10 người; phỏng vấn 5 người theo mục 1.5 | Bạn | |
 | **27/10–08/11** | Email cho danh sách theo dõi; tóm tắt giải trình (nếu kịp); vận hành qua đỉnh 30/10; đo các chỉ số mục 5; chạy "ChatGPT test" với 20 câu hỏi về KQKD quý 3 | Cả hai | Có số liệu cho báo cáo tuần |
 | 09/11–06/12 | Theo kế hoạch học kỳ: agent phân tích và báo cáo so sánh, VN100; cờ v2 và sàng lọc tăng trưởng v1 | | |
@@ -225,7 +225,7 @@ Số người dùng ở mức này chỉ để học hỏi, không đủ để k
 
 | Hạng mục | Lựa chọn | Chi phí ước tính |
 |---|---|---|
-| Máy chủ | VPS 2 vCPU, 2–4 GB RAM, ổ ≥ 40 GB (chứa PDF), Ubuntu; Docker Compose gồm CSDL, web (FastAPI), bộ canh; Caddy cấp HTTPS. Chọn nhà cung cấp khi sẵn sàng deploy | ~5 USD/tháng, nâng ~10 USD/tháng khi có nhiều người dùng |
+| Máy chủ | VPS ở Việt Nam, ≥ 3 vCPU, 4–8 GB RAM, ổ ≥ 40 GB (chứa PDF), Ubuntu 24.04, ảo hóa KVM (để chạy Docker); Docker Compose gồm CSDL, web (FastAPI), bộ canh; Caddy cấp HTTPS cho `soi.rediov.com`. **Hoãn thuê tới khi sản phẩm hoàn thiện** (quyết định 12/10). Ứng viên đã so (giá 12 tháng, chưa VAT): InterData Inter Platinum 2 (5 vCPU / 8 GB, ~2,67 triệu/năm, gói khuyến mãi), LANIT VPS giá rẻ gói 2 (3 vCPU / 3,5 GB, 169k/tháng), VinaHost Cheap-SSD3 (3 vCPU / 3 GB, 225k/tháng). Trước khi trả tiền hỏi: giá đã gồm VAT chưa, giá gia hạn, băng thông quốc tế (gửi ảnh sang OpenAI), có KVM không | ~7–9 USD/tháng |
 | Tên miền | `rediov.com` (đã mua trên Namecheap) | ~10 USD/năm |
 | Email | Gmail SMTP với mật khẩu ứng dụng (đủ cho vài chục người dùng) | 0 |
 | Mô hình đọc ảnh | OpenAI `gpt-5.4-mini`, mức suy luận `low` (thử `none` rẻ hơn ~8% nhưng sai nhiều hơn) | ~0,1 USD mỗi BCTC |

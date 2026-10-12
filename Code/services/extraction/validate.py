@@ -36,6 +36,9 @@ class Statement:
     # Mã in trùng trên chính BCTC (ví dụ HPG quý 2/2026 in mã 230 cho cả tài sản sinh học dài hạn lẫn BĐS đầu tư).
     # Giữ dòng đầu tiên; ràng buộc có dùng mã trùng thì kết quả cần xem lại.
     duplicate_codes: list[str] = field(default_factory=list)
+    # LCTT: công ty tách một khoản thành nhiều dòng cùng mã (VNM quý 4/2025 in hai dòng 02 khấu hao và phân bổ lợi thế
+    # thương mại; MCH in ba dòng 05, hai cặp 23/24). Các dòng chi tiết cùng mã được cộng lại.
+    summed_codes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -52,6 +55,10 @@ class Check:
     @property
     def diff(self) -> Decimal:
         return self.lhs - self.rhs
+
+
+# Dòng tổng của LCTT: in trùng với số khác thì không cộng mà coi là mã trùng cần xem lại
+CF_TOTALS = {"08", "20", "30", "40", "50", "60", "70"}
 
 
 def normalize(extracted: list[ExtractedStatement], default_unit: str | None = None) -> tuple[dict[str, Statement], str]:
@@ -72,7 +79,17 @@ def normalize(extracted: list[ExtractedStatement], default_unit: str | None = No
                 # Dòng lặp lại ở đầu trang sau với cùng số liệu (ví dụ VNM in lại dòng 50) thì bỏ qua
                 same = all(parse_amount(raw, sep) is None or parse_amount(raw, sep) * mult == norm.values.get(code, {}).get(col)
                            for col, raw in it.values_raw.items())
-                if not same and code not in norm.duplicate_codes:
+                if same:
+                    continue
+                if st.statement == "CF" and code not in CF_TOTALS:
+                    for col, raw in it.values_raw.items():
+                        value = parse_amount(raw, sep)
+                        if value is not None:
+                            cell = norm.values.setdefault(code, {})
+                            cell[col] = cell.get(col, Decimal(0)) + value * mult
+                    if code not in norm.summed_codes:
+                        norm.summed_codes.append(code)
+                elif code not in norm.duplicate_codes:
                     norm.duplicate_codes.append(code)
                 continue
             seen.add(code)

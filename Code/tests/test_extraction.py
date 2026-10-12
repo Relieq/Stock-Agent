@@ -156,6 +156,27 @@ def test_duplicate_code_is_reported_not_overwritten():
     assert statements["BS"].values["221"]["end_period"] == Decimal(2_500_000)
 
 
+def test_cash_flow_detail_lines_with_same_code_are_summed():
+    # VNM quý 4/2025: khấu hao và phân bổ lợi thế thương mại cùng in mã 02
+    cf = ExtractedStatement("CF", "VND", [
+        ExtractedItem("01", "Lợi nhuận trước thuế", {"ytd_cur": "1.000"}),
+        ExtractedItem("02", "Khấu hao", {"ytd_cur": "200"}),
+        ExtractedItem("02", "Phân bổ lợi thế thương mại", {"ytd_cur": "50"}),
+        ExtractedItem("08", "Lợi nhuận trước thay đổi vốn lưu động", {"ytd_cur": "1.250"}),
+    ])
+    statements, _ = normalize([cf])
+    assert statements["CF"].values["02"]["ytd_cur"] == Decimal(250)
+    assert statements["CF"].summed_codes == ["02"] and statements["CF"].duplicate_codes == []
+    assert {c.rule_id: c for c in validate(statements, "TT200")}["CF_08"].passed
+
+
+def test_goodwill_269_counts_in_other_long_term_assets():
+    rows = [("260", "Tài sản dài hạn khác", "150", "150"), ("261", "Chi phí trả trước dài hạn", "100", "100"),
+            ("269", "Lợi thế thương mại", "50", "50")]
+    statements, _ = normalize([_bs(rows)])
+    assert all(c.passed for c in validate(statements, "TT200") if c.rule_id == "BS_260")
+
+
 def _record(rows_by_statement, company_template="corporate"):
     return {"company_template": company_template,
             "raw": {st: {"unit_text": "Đơn vị tính: VND", "rows": rows} for st, rows in rows_by_statement.items()}}

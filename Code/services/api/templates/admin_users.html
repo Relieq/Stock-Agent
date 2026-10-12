@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Người dùng · Soi{% endblock %}
+{% block body %}
+<h1>Người dùng</h1>
+<p class="muted small">Chỉ người có trong danh sách mới đăng nhập được. Quản trị vào được hàng duyệt, trang này và trang nội bộ.
+  Hạn mức: số yêu cầu đọc BCTC mới mỗi ngày (trong đó tối đa 1 file tải lên).</p>
+{% if tb %}<p class="infobox">{{ tb }}</p>{% endif %}
+
+<form method="post" action="/quan-tri/moi" class="row">
+  <input type="email" name="email" placeholder="email@vidu.com" required>
+  <select name="role"><option value="user">Người dùng</option><option value="admin">Quản trị</option></select>
+  <label class="small"><input type="checkbox" name="notify" value="1" checked> gửi email mời</label>
+  <button>Mời</button>
+</form>
+
+<table class="list">
+  <thead><tr><th>Email</th><th>Quyền · hạn mức/ngày</th><th>Được mời</th><th>Đăng nhập gần nhất</th><th>Theo dõi</th><th>Yêu cầu</th><th></th></tr></thead>
+  <tbody>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.email }}{% if u.id == request.state.user.id %} <span class="muted small">(bạn)</span>{% endif %}</td>
+    <td><form method="post" action="/quan-tri/{{ u.id }}/sua" class="row">
+      <select name="role"><option value="user" {% if u.role == "user" %}selected{% endif %}>Người dùng</option>
+        <option value="admin" {% if u.role == "admin" %}selected{% endif %}>Quản trị</option></select>
+      <input type="number" name="daily_quota" min="0" max="50" value="{{ u.daily_quota }}" style="width:70px">
+      <button>Lưu</button></form></td>
+    <td class="small">{{ u.invited_at | gio }}</td>
+    <td class="small">{{ u.last_login_at | gio }}</td>
+    <td>{{ u.watching }}</td><td>{{ u.requests }}</td>
+    <td>{% if u.id != request.state.user.id %}<form method="post" action="/quan-tri/{{ u.id }}/xoa" class="inline">
+      <button class="link">xóa</button></form>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

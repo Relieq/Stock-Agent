@@ -109,6 +109,55 @@ def end_session(conn: psycopg.Connection, session: str | None) -> None:
         conn.execute("DELETE FROM sessions WHERE token_hash = %s", (_hash(session),))
 
 
+def list_users(conn: psycopg.Connection) -> list[dict]:
+    rows = conn.execute(
+        """SELECT u.id, u.email, u.role, u.daily_quota, u.invited_at, u.last_login_at,
+                  (SELECT count(*) FROM watchlist w WHERE w.user_id = u.id),
+                  (SELECT count(*) FROM processing_requests r WHERE r.user_id = u.id)
+           FROM users u ORDER BY u.role, u.email""").fetchall()
+    keys = ("id", "email", "role", "daily_quota", "invited_at", "last_login_at", "watching", "requests")
+    return [dict(zip(keys, r)) for r in rows]
+
+
+def _admins(conn) -> int:
+    return conn.execute("SELECT count(*) FROM users WHERE role = 'admin'").fetchone()[0]
+
+
+def update_user(conn: psycopg.Connection, user_id: int, role: str, daily_quota: int) -> None:
+    if role not in ("user", "admin") or not 0 <= daily_quota <= 50:
+        raise ValueError("Quyền là user/admin, hạn mức 0-50 yêu cầu mỗi ngày")
+    current = conn.execute("SELECT role FROM users WHERE id = %s", (user_id,)).fetchone()
+    if current is None:
+        raise ValueError("Không có người dùng này")
+    if current[0] == "admin" and role != "admin" and _admins(conn) <= 1:
+        raise ValueError("Phải còn ít nhất một quản trị")
+    conn.execute("UPDATE users SET role = %s, daily_quota = %s WHERE id = %s", (role, daily_quota, user_id))
+
+
+def remove_user(conn: psycopg.Connection, user_id: int, acting_user_id: int) -> None:
+    """Xóa người dùng cùng phiên, danh sách theo dõi, yêu cầu (bảng liên quan ON DELETE CASCADE). BCTC riêng họ tải
+    lên vẫn giữ trong kho (owner_user_id về NULL thì thành công khai, nên chặn: phải xử lý các BCTC đó trước)."""
+    if user_id == acting_user_id:
+        raise ValueError("Không tự xóa chính mình")
+    row = conn.execute("SELECT role FROM users WHERE id = %s", (user_id,)).fetchone()
+    if row is None:
+        raise ValueError("Không có người dùng này")
+    if row[0] == "admin" and _admins(conn) <= 1:
+        raise ValueError("Phải còn ít nhất một quản trị")
+    if conn.execute("SELECT 1 FROM documents WHERE owner_user_id = %s LIMIT 1", (user_id,)).fetchone():
+        raise ValueError("Người này có BCTC riêng tự tải lên; cần xử lý các BCTC đó trước khi xóa")
+    conn.execute("UPDATE documents SET reviewed_by = NULL WHERE reviewed_by = %s", (user_id,))
+    conn.execute("DELETE FROM users WHERE id = %s", (user_id,))
+
+
+def send_invitation(user: User) -> bool:
+    return send_email(user.email, "[Soi] Lời mời dùng thử Soi",
+                      "Bạn được mời dùng thử Soi: thẻ KQKD đã kiểm chứng cho các mã VN30, kèm cờ cảnh báo và nguồn tới "
+                      f"từng trang BCTC.\n\nĐăng nhập bằng email này tại: {site_url()}/dang-nhap\n\n"
+                      "Đây là sản phẩm thử nghiệm trong khuôn khổ đồ án tốt nghiệp, chỉ cung cấp thông tin, không phải "
+                      "khuyến nghị đầu tư.")
+
+
 def watchlist(conn: psycopg.Connection, user_id: int) -> list[str]:
     return [r[0] for r in conn.execute("SELECT ticker FROM watchlist WHERE user_id = %s ORDER BY ticker", (user_id,))]
 

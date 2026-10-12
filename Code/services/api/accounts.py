@@ -11,7 +11,8 @@ from services.alerts import notify_watchers
 from services.db import connect
 from services.extraction.verify import apply_manual_fix, approve_document
 from services.ondemand import month_spend, monthly_budget, request_ticker, request_upload, used_today
-from services.users import end_session, finish_login, set_watch, start_login, watchlist
+from services.users import (end_session, finish_login, invite, list_users, remove_user, send_invitation, set_watch,
+                            start_login, update_user, watchlist)
 
 COOKIE = "soi_session"
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
@@ -154,6 +155,51 @@ async def request_upload_submit(request: Request, file: UploadFile = File(...), 
         return _back("/yeu-cau", str(e))
     return _back("/yeu-cau", "File này đã được đọc trước đây: dùng lại kết quả." if status == "done" else
                  "Đã nhận file; hệ thống sẽ tìm bản chính thức trên Vietstock trước, rồi đọc và báo qua email.")
+
+
+# ---- quản trị người dùng (nội bộ) ----------------------------------------------------------------------------------
+
+@router.get("/quan-tri")
+def admin_users(request: Request, tb: str | None = None):
+    require_admin(request)
+    with connect() as conn:
+        users = list_users(conn)
+    return templates().TemplateResponse(request, "admin_users.html", {"users": users, "tb": tb})
+
+
+@router.post("/quan-tri/moi")
+def admin_invite(request: Request, email: str = Form(...), role: str = Form("user"), notify: str = Form("")):
+    require_admin(request)
+    try:
+        with connect() as conn:
+            user = invite(conn, email, role == "admin")
+    except ValueError as e:
+        return _back("/quan-tri", str(e))
+    sent = send_invitation(user) if notify else False
+    return _back("/quan-tri", f"Đã mời {user.email}" + ("; đã gửi email mời" if sent else
+                 "; chưa gửi email (chưa cấu hình SMTP hoặc không chọn gửi)" if notify else ""))
+
+
+@router.post("/quan-tri/{user_id}/sua")
+def admin_update(request: Request, user_id: int, role: str = Form(...), daily_quota: int = Form(...)):
+    require_admin(request)
+    try:
+        with connect() as conn:
+            update_user(conn, user_id, role, daily_quota)
+    except ValueError as e:
+        return _back("/quan-tri", str(e))
+    return _back("/quan-tri", "Đã cập nhật")
+
+
+@router.post("/quan-tri/{user_id}/xoa")
+def admin_remove(request: Request, user_id: int):
+    me = require_admin(request)
+    try:
+        with connect() as conn:
+            remove_user(conn, user_id, me.id)
+    except ValueError as e:
+        return _back("/quan-tri", str(e))
+    return _back("/quan-tri", "Đã xóa người dùng")
 
 
 # ---- hàng duyệt (nội bộ) -------------------------------------------------------------------------------------------

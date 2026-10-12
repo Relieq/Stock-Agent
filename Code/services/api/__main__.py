@@ -1,11 +1,14 @@
 """Chạy giao diện web trên máy: python -m services.api [--port 8000], rồi mở http://127.0.0.1:8000"""
 
 import argparse
+import sys
 
 import uvicorn
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")   # console Windows: in email, log tiếng Việt
+    sys.stderr.reconfigure(encoding="utf-8")
     p = argparse.ArgumentParser(prog="python -m services.api")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)

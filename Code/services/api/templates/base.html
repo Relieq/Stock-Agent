@@ -7,7 +7,14 @@
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header class="top"><a href="/" class="brand">Soi</a><span class="sub">xem lại kết quả đọc BCTC (bản nội bộ)</span></header>
+{% set me = request.state.user if request and request.state and request.state.user is defined else none %}
+<header class="top"><a href="/mua-bctc" class="brand">Soi</a>
+  {% if me %}<nav class="nav"><a href="/mua-bctc">Mùa BCTC</a> <a href="/theo-doi">Theo dõi</a> <a href="/yeu-cau">Yêu cầu</a>
+    {% if me.is_admin %}<a href="/duyet">Duyệt</a> <a href="/noi-bo" class="muted">Nội bộ</a>{% endif %}
+    <form method="post" action="/dang-xuat" class="inline"><button class="link" title="{{ me.email }}">Đăng xuất</button></form></nav>{% endif %}
+</header>
 <main>{% block body %}{% endblock %}</main>
+<footer class="foot small muted">Thử nghiệm trong khuôn khổ đồ án tốt nghiệp, chỉ dành cho người được mời. Số liệu do AI hỗ trợ trích xuất
+  từ BCTC đã công bố và được kiểm chứng bằng ràng buộc kế toán; mỗi số mở được trang BCTC gốc. Đây là thông tin, không phải khuyến nghị đầu tư.</footer>
 </body>
 </html>

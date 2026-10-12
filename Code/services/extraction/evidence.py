@@ -136,7 +136,7 @@ class PeriodCheck:
             return False
         if digit_slip(self.later, self.expected):
             return True
-        return not self.consistent and self.kind != "same_date"
+        return not self.consistent and self.kind not in ("same_date", "year_start")
 
     @property
     def diff(self) -> Decimal:
@@ -219,6 +219,24 @@ def compare_same_date(quarter: Cells, period_report: Cells) -> list[PeriodCheck]
     return _mark_consistency(out, quarter, period_report)
 
 
+def compare_year_start(year_end: Cells, next_q1: Cells) -> list[PeriodCheck]:
+    """Số cuối kỳ của BCTC quý 4 năm trước với số đầu năm của BCTC quý 1 năm sau (cùng ngày 31/12). BCTC năm đã kiểm
+    toán có thể điều chỉnh số quý 4, nên chênh lớn là chuyện thường như quý 2 với bán niên."""
+    out: list[PeriodCheck] = []
+    for (st, key), qv in next_q1.values.items():
+        if st != "BS" or "begin_year" not in qv:
+            continue
+        ev = year_end.values.get((st, key), {})
+        if "end_period" not in ev:
+            continue
+        tol = max(year_end.multiplier.get(st, Decimal(1)), next_q1.multiplier.get(st, Decimal(1))) * 3
+        a, b = qv["begin_year"], ev["end_period"]
+        out.append(PeriodCheck("year_start", st, key, "begin_year", a, b, _same(st, a, b, tol),
+                               (st, "begin_year") in next_q1.restated,
+                               [(next_q1.document_id, st, key, "begin_year"), (year_end.document_id, st, key, "end_period")]))
+    return _mark_consistency(out, year_end, next_q1)
+
+
 # Trạng thái một ô, từ mạnh đến yếu
 STATUS_LABELS = {
     "conflict": "Cần xem lại",
@@ -285,30 +303,36 @@ def neighbours(conn, document_id: int) -> list[tuple[int, str, str]]:
     """Các BCTC đã đọc dùng để đối chiếu, cùng mã, cùng phạm vi, cùng năm: [(id, kỳ, quan hệ)].
 
     Quan hệ: "earlier"/"later" = quý liền trước/liền sau; "report" = BCTC cả kỳ cùng ngày kết thúc với quý này
-    (bán niên cho quý 2, năm cho quý 4); "quarter" = BCTC quý cùng ngày kết thúc với BCTC cả kỳ này.
+    (bán niên cho quý 2, năm cho quý 4); "quarter" = BCTC quý cùng ngày kết thúc với BCTC cả kỳ này;
+    "prev_year_end"/"next_year_start" = quý 4 năm trước / quý 1 năm sau (cuối năm trước là đầu năm nay).
+    Kỳ của BCTC khác năm được ghi kèm năm, ví dụ "Q4/2025".
     """
     row = conn.execute("SELECT ticker, scope, fiscal_year, fiscal_period, doc_type FROM documents WHERE id = %s",
                        (document_id,)).fetchone()
     if row is None:
         return []
     ticker, scope, year, period, doc_type = row
-    wanted: list[tuple[str, str, str]] = []          # (loại BCTC, kỳ, quan hệ)
+    wanted: list[tuple[str, str, str, int]] = []          # (loại BCTC, kỳ, quan hệ, năm)
     if doc_type == "fs_quarter" and period in PERIOD_ORDER:
         i = PERIOD_ORDER.index(period)
-        wanted += [("fs_quarter", p, "earlier" if p_i < i else "later")
+        wanted += [("fs_quarter", p, "earlier" if p_i < i else "later", year)
                    for p_i, p in enumerate(PERIOD_ORDER) if abs(p_i - i) == 1]
-        wanted += [(t, rp, "report") for q, t, rp in SAME_DATE if q == period]
-    wanted += [("fs_quarter", q, "quarter") for q, t, rp in SAME_DATE if t == doc_type and rp == period]
+        wanted += [(t, rp, "report", year) for q, t, rp in SAME_DATE if q == period]
+        if period == "Q1":
+            wanted.append(("fs_quarter", "Q4", "prev_year_end", year - 1))
+        if period == "Q4":
+            wanted.append(("fs_quarter", "Q1", "next_year_start", year + 1))
+    wanted += [("fs_quarter", q, "quarter", year) for q, t, rp in SAME_DATE if t == doc_type and rp == period]
     out = []
-    for t, p, relation in wanted:
+    for t, p, relation, y in wanted:
         hit = conn.execute(
             """SELECT id FROM documents
                WHERE ticker = %s AND scope = %s AND fiscal_year = %s AND doc_type = %s AND fiscal_period = %s
-                 AND content_kind = 'full' AND processed_at IS NOT NULL AND NOT is_amended
+                 AND content_kind = 'full' AND processed_at IS NOT NULL AND NOT is_amended AND owner_user_id IS NULL
                ORDER BY source_listed_at DESC LIMIT 1""",
-            (ticker, scope, year, t, p)).fetchone()
+            (ticker, scope, y, t, p)).fetchone()
         if hit:
-            out.append((hit[0], p, relation))
+            out.append((hit[0], p if y == year else f"{p}/{y}", relation))
     return out
 
 
@@ -354,5 +378,7 @@ def document_evidence(conn, document_id: int, load=None, cells_fn=None) -> Docum
         peer = cells_fn(peer_id, peer_period, peer_record)
         checks += {"earlier": lambda: compare_periods(peer, cells), "later": lambda: compare_periods(cells, peer),
                    "report": lambda: compare_same_date(cells, peer), "quarter": lambda: compare_same_date(peer, cells),
+                   "prev_year_end": lambda: compare_year_start(peer, cells),
+                   "next_year_start": lambda: compare_year_start(cells, peer),
                    }[relation]()
     return DocumentEvidence(cells, checks, cell_status(cells, checks), peers)

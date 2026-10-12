@@ -1,3 +1,24 @@
+# Chạy từ thư mục Code/:
+#   docker compose -f infra/docker-compose.yml up -d                 # CSDL + web + bộ canh
+#   docker compose -f infra/docker-compose.yml up -d db              # chỉ CSDL
+#   docker compose -f infra/docker-compose.yml run --rm app python -m services.extraction cost   # lệnh chạy một lần
+# Trên máy phát triển, thư mục Code/ và Data/raw/ được gắn vào container: sửa code có hiệu lực ngay, không cần build lại
+# (web cần khởi động lại: docker compose ... restart web).
+
+x-app: &app
+  build: ..
+  image: soi-app
+  env_file: ../.env
+  environment:
+    DATABASE_URL: postgresql://soi:soi@db:5432/soi
+    RAW_DATA_DIR: /app/Data/raw
+  volumes:
+    - ..:/app/Code
+    - ../../Data/raw:/app/Data/raw
+  depends_on:
+    db:
+      condition: service_healthy
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -16,6 +37,31 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+
+  web:
+    <<: *app
+    container_name: soi-web
+    command: python -m services.api --host 0.0.0.0 --port 8765
+    environment:
+      DATABASE_URL: postgresql://soi:soi@db:5432/soi
+      RAW_DATA_DIR: /app/Data/raw
+      DEV_LOGIN_LINK: "1"          # chỉ trên máy phát triển: hiện link đăng nhập ngay trên trang khi chưa có SMTP
+    ports:
+      - "127.0.0.1:8765:8765"     # chỉ mở cho chính máy này
+    restart: unless-stopped
+
+  watcher:
+    <<: *app
+    container_name: soi-watcher
+    command: python -u -m services.watcher --interval 15
+    restart: unless-stopped
+
+  # Lệnh chạy một lần: docker compose -f infra/docker-compose.yml run --rm app <lệnh>
+  app:
+    <<: *app
+    profiles: ["tools"]
+    command: python -m pytest -q
 
 volumes:
   soi-db-data:

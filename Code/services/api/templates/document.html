@@ -37,6 +37,22 @@
     </ul>
   </div>
   {% endif %}
+  {% if admin and doc.status == "needs_review" %}
+  <div class="reviewbox">
+    <b>Duyệt tay</b> <span class="small muted">Đối chiếu các dòng tô đỏ với ảnh bên phải. Ô đọc sai: nhập vị trí dòng (cột #), cột và số nguyên văn như in.</span>
+    <form method="post" action="/duyet/{{ doc.id }}/sua" class="row">
+      <select name="statement">{% for t in d.tables %}<option value="{{ t.statement }}">{{ t.name }}</option>{% endfor %}</select>
+      <input name="row" type="number" min="0" placeholder="dòng #" required style="width:80px">
+      <select name="column">{% for k, n in [("end_period","Cuối kỳ"),("begin_year","Đầu năm"),("q_cur","Quý này"),("q_prev_year","Cùng kỳ"),("ytd_cur","Lũy kế"),("ytd_prev_year","Lũy kế năm trước")] %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select>
+      <input name="value" placeholder="số như in, ví dụ (1.234.567)" required>
+      <input name="note" placeholder="ghi chú (trang...)">
+      <button>Sửa ô</button>
+    </form>
+    <form method="post" action="/duyet/{{ doc.id }}/xuat-ban" class="row"><button>Đã đối chiếu xong: xuất bản</button></form>
+  </div>
+  {% endif %}
+  {% if record.manual_fixes %}<div class="small">Đã sửa tay {{ record.manual_fixes | length }} ô:
+    {% for m in record.manual_fixes %}{{ m.statement }} "{{ m.label }}" {{ m.column_kind }}: {{ m.before }} → {{ m.after }} ({{ m.by }}){% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
   {% if d.duplicate_codes %}<div class="warnbox">Mã số in trùng trên chính BCTC: {{ d.duplicate_codes }}</div>{% endif %}
 </section>
 
@@ -58,11 +74,11 @@
       <span class="ev-restated">khác kỳ trước do trình bày lại</span> <span class="ev-differs">hai BCTC in khác nhau (công ty/kiểm toán sửa số)</span>
       <span class="ev-conflict">cần xem lại</span></p>
     <table class="fs">
-      <thead><tr><th>STT</th><th>Mã</th><th>Chỉ tiêu</th><th>TM</th>{% for k, name in t.columns %}<th class="num">{{ name }}</th>{% endfor %}<th>Tr.</th></tr></thead>
+      <thead><tr>{% if admin %}<th title="Vị trí dòng, dùng khi sửa tay">#</th>{% endif %}<th>STT</th><th>Mã</th><th>Chỉ tiêu</th><th>TM</th>{% for k, name in t.columns %}<th class="num">{{ name }}</th>{% endfor %}<th>Tr.</th></tr></thead>
       <tbody>
       {% for r in t.rows %}
       <tr data-page="{{ r.page or (t.pages[0] if t.pages else 1) }}" {% if r.flagged %}class="flag"{% endif %}>
-        <td>{{ r.stt or "" }}</td><td class="code">{{ r.code or "" }}</td><td>{{ r.label }}</td><td>{{ r.note or "" }}</td>
+        {% if admin %}<td class="muted small">{{ r.index }}</td>{% endif %}<td>{{ r.stt or "" }}</td><td class="code">{{ r.code or "" }}</td><td>{{ r.label }}</td><td>{{ r.note or "" }}</td>
         {% for k, name in t.columns %}{% set ev = r.evidence.get(k) %}<td class="num{% if ev %} ev-{{ ev.status }}{% endif %}"
           {% if ev %}title="{{ EVIDENCE[ev.status] }}{% if ev.sum %}&#10;Cộng tổng: {{ ev.sum | join(', ') }}{% endif %}{% if ev.period %}&#10;Giữa các kỳ: {{ ev.period | join(', ') }}{% endif %}{% if ev.differs %}&#10;Khác: {{ ev.differs | join(', ') }}{% endif %}{% if ev.conflict %}&#10;Cần xem lại: {{ ev.conflict | join(', ') }}{% endif %}"{% endif %}>{{ r.values.get(k) or "" }}</td>{% endfor %}
         <td class="muted">{{ r.page or "" }}</td>

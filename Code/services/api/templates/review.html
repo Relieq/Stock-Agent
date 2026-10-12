@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Hàng duyệt · Soi{% endblock %}
+{% block body %}
+<h1>Hàng duyệt</h1>
+<p class="muted small">BCTC chưa đạt kiểm chứng tự động (đã qua bước tự đọc lại và chép lại). Mở từng BCTC, đối chiếu các dòng tô đỏ
+  với ảnh gốc, sửa ô đọc sai, rồi bấm "Xuất bản". Mọi sửa tay được ghi lại (ai, khi nào, số cũ, số mới).</p>
+{% if rows %}
+<table class="list">
+  <thead><tr><th>Mã</th><th>Kỳ</th><th>Loại</th><th>Ràng buộc lệch</th><th></th></tr></thead>
+  <tbody>
+  {% for id, ticker, period, year, doc_type, scope, title, failed, private in rows %}
+  <tr><td><b>{{ ticker }}</b>{% if private %} <span class="badge muted">tải lên</span>{% endif %}</td><td>{{ period }}/{{ year }}</td>
+    <td class="small">{{ title }}</td><td>{{ failed }}</td><td><a href="/tai-lieu/{{ id }}">Đối chiếu</a></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p>Không có BCTC nào chờ duyệt.</p>{% endif %}
+{% endblock %}

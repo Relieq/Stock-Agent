@@ -10,11 +10,11 @@
 
 <form class="filter" method="get">
   <label>Kỳ
-    <select onchange="const [y,p]=this.value.split('-');location='/?year='+y+'&period='+p">
+    <select onchange="const [y,p]=this.value.split('-');location='/noi-bo?year='+y+'&period='+p">
     {% for y, p in periods %}<option value="{{ y }}-{{ p }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
     </select>
   </label>
-  <a href="/?year={{ year }}&period={{ period }}&all={{ 'false' if all else 'true' }}">{{ "Chỉ hiện BCTC hợp nhất" if all else "Hiện cả BCTC riêng" }}</a>
+  <a href="/noi-bo?year={{ year }}&period={{ period }}&all={{ 'false' if all else 'true' }}">{{ "Chỉ hiện BCTC hợp nhất" if all else "Hiện cả BCTC riêng" }}</a>
 </form>
 
 <table class="list">

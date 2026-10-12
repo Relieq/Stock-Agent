@@ -545,6 +545,8 @@ def _finalize(conn: psycopg.Connection, record: dict) -> dict:
     if (template and summary["gate_checks"] and summary["gate_failed"] == 0 and {"BS", "IS"} <= covered
             and balanced):
         status = "verified"
+    elif record.get("approval"):
+        status = "approved"     # người duyệt đã đối chiếu ảnh gốc và cho xuất bản (verify.approve_document)
     else:
         status = "needs_review"
     record.update({

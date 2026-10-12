@@ -881,9 +881,29 @@ Mùa BCTC chỉ tạo đỉnh truy cập vài tuần mỗi quý. Danh mục mớ
 
 **Hoãn sang sau ĐATN** (để dồn sức cho ba trụ): English edition, Broker Copilot, video ngắn, theo dõi trái phiếu, cuộc thi dự báo (chỉ làm bản nhỏ nếu còn sức), MCP (kênh phụ).
 
+### Điều chỉnh 12/10/2026: làm sâu một nhóm mã thay vì làm nông cả thị trường
+
+Tiền gọi mô hình tăng theo số BCTC phải đọc. Toàn thị trường với lịch sử 5 năm là khoảng 48.000 BCTC, tức khoảng
+4.800 USD chỉ riêng tiền đọc: không khả thi với một người làm và ngân sách sinh viên (ngân sách chi tiết ở
+[ke-hoach-mvp.md mục 6](ke-hoach-mvp.md#6-vận-hành-và-chi-phí-cập-nhật-12102026)). Vì vậy:
+
+- **Độ phủ:** VN30 (mùa quý 3/2026) → **VN100** (từ 11/2026). Mã ngoài VN100 chỉ đọc khi người dùng yêu cầu, có hạn mức.
+  Lịch sử: đọc 4 quý gần nhất là có 8 quý số liệu nhờ cột "cùng kỳ năm trước", không đọc lùi 5 năm.
+- **Đưa phần agent của đề bài lên sớm (11–12/2026):** agent báo cáo so sánh. Người dùng hỏi (ví dụ "so sánh lợi nhuận các
+  ngân hàng quý 3"), agent lập kế hoạch, lấy số từ CSDL, code tính, mô hình chỉ viết lời; báo cáo có bảng, biểu đồ, nguồn
+  tới từng trang; mọi số và từ chỉ hướng được kiểm lại với bảng số đã tính.
+- **Chức năng thu hút người dùng, gần như không tốn tiền đọc thêm** (chốt thứ tự sau phỏng vấn): ảnh thẻ KQKD chia sẻ được
+  lên Facebook/Zalo; bảng xếp hạng mùa BCTC kèm cờ; lịch BCTC (mã nào sắp công bố, nộp muộn); bản tin sáng theo danh mục.
+- **ĐATN (2–4/2027) giữ trọng tâm danh mục:** danh mục v1 (nhập tay/CSV), radar sự kiện (cổ tức, giao dịch nội bộ), cờ sau
+  kiểm toán (mùa BCTC năm 3/2027), bản tin sáng.
+- **Hoãn:** toàn thị trường, lịch sử 5 năm, Zalo OA, MCP, nhập danh mục từ ảnh chụp, kiểm chứng tin đồn, thống kê phản
+  ứng giá, % kế hoạch ĐHCĐ, thẻ cho công ty chứng khoán và bảo hiểm.
+
+Các trục dưới đây giữ làm tầm nhìn dài hạn; phần nào bị hoãn thì theo điều chỉnh này.
+
 ### Trục 1: Độ phủ
-- Toàn thị trường: HOSE + HNX + UPCoM.
-- Lịch sử từ 5 năm trở lên (backfill tự động), để phân tích xu hướng dài hạn, TTM, CAGR.
+- Toàn thị trường: HOSE + HNX + UPCoM (hoãn, xem điều chỉnh 12/10/2026).
+- Lịch sử từ 5 năm trở lên (hoãn; hiện dùng 8 quý từ cột "cùng kỳ"), để phân tích xu hướng dài hạn, TTM, CAGR.
 - Đủ các loại tài liệu:
   - BCTC quý, bán niên đã soát xét, năm đã kiểm toán; cả hợp nhất và riêng lẻ;
   - công văn giải trình;

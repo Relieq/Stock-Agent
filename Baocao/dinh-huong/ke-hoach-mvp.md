@@ -10,7 +10,7 @@
 ## 0. Tóm tắt
 
 - **MVP trong một câu:** khi một mã VN30 công bố BCTC quý 3/2026, trong vòng 30 phút có một **thẻ KQKD đã kiểm chứng**.
-  - Thẻ có các con số chính so với cùng kỳ và % kế hoạch năm.
+  - Thẻ có các con số chính so với cùng kỳ (% kế hoạch năm hoãn từ 12/10, xem mục 2.1).
   - Thẻ có **cờ cảnh báo khi con số tăng trưởng dễ gây hiểu nhầm**.
   - Mỗi số bấm vào là thấy trang PDF gốc.
   - Người theo dõi mã đó nhận **một email**.
@@ -96,7 +96,7 @@ Kiểm chứng bằng phỏng vấn 5 người trước 26/10; kịch bản ở 
 | Đầu thẻ | Mã, tên, kỳ, hợp nhất hay riêng, đã soát xét hay chưa, **giờ Vietstock đăng**, giờ hệ thống xử lý xong | BCTC quý thường chưa soát xét: ghi rõ |
 | Số chính, DN thường | Doanh thu thuần, lợi nhuận gộp, LNST của cổ đông công ty mẹ; quý này, cùng kỳ, % so với cùng kỳ; lũy kế và % so với cùng kỳ | |
 | Số chính, ngân hàng | Thu nhập lãi thuần, tổng thu nhập hoạt động, chi phí dự phòng, LNTT, LNST của cổ đông ngân hàng | |
-| % kế hoạch năm | Lũy kế chia kế hoạch ĐHCĐ 2026, có link nguồn kế hoạch | Kế hoạch nhập tay cho 30 mã |
+| % kế hoạch năm | **Hoãn (12/10/2026).** Không làm thẻ chính xác hơn, lại phải nhập tay 30 nghị quyết mỗi năm. Code đã có (`agm_plans`, `python -m services.metrics plans`); chỉ bật lại nếu phỏng vấn cho thấy người dùng cần | |
 | Cờ | Mục 2.2 | Mỗi cờ có một câu giải thích và dòng nguồn |
 | Lý do theo doanh nghiệp | Tóm tắt công văn giải trình **nếu công văn có số liệu**, gắn nhãn "theo giải trình của doanh nghiệp", kèm trang | Nên có; cắt đầu tiên nếu trễ |
 | Nguồn | Mỗi số mở được ảnh trang PDF gốc | Bắt buộc |
@@ -119,6 +119,7 @@ Cờ là **thông tin để người đọc xem kỹ hơn**, không phải nhậ
 | Hoàn nhập dự phòng lớn | DN thường: dòng "các khoản dự phòng" trên LCTT âm và lớn hơn 20% LNTT lũy kế. Ngân hàng: chi phí dự phòng đổi dấu (hoàn nhập) hoặc giảm > 50% so với cùng kỳ trong khi LNTT tăng | DN thường, ngân hàng | GAS Q2/2025 |
 | Thay đổi phạm vi hợp nhất | LCTT có dòng tiền của công ty con khi mất hoặc giành quyền kiểm soát; hoặc lãi từ công ty liên doanh, liên kết tăng hơn 3 lần | DN thường | FPT Q2/2026 (dòng 26b, −713 tỷ), KDH Q2/2026 |
 | LNST dương, dòng tiền KD lũy kế âm | LNST lũy kế > 0 và lưu chuyển tiền thuần từ HĐKD lũy kế < 0 | DN thường (không áp dụng cho ngân hàng) | HUT Q2/2026 |
+| Số liệu bị sửa giữa các BCTC (thêm 11/10) | Doanh thu, LNTT hoặc LNST khác giữa hai BCTC của cùng công ty (quý 2 với bán niên đã soát xét, quý này với lũy kế quý trước), chênh từ 0,5% và từ 1 tỷ; số đã được đọc lại để loại lỗi đọc | Mọi mẫu | VPL: LNST 6 tháng giảm 40 tỷ sau soát xét; VIC: LNTT 6 tháng tăng 694 tỷ |
 
 Nên có thêm nếu kịp: cờ lãi/lỗ tỷ giá lớn; chuỗi 4–8 quý để người đọc tự thấy nền thấp hoặc đỉnh chu kỳ.
 
@@ -150,7 +151,17 @@ Nên có thêm nếu kịp: cờ lãi/lỗ tỷ giá lớn; chuỗi 4–8 quý �
   - mọi sửa tay được ghi lại (ai, khi nào, giá trị cũ và mới) và trở thành dữ liệu vàng cho đánh giá.
 - **Mục tiêu:** không có con số sai nào được xuất bản.
 
-### 2.6 Ngoài phạm vi MVP
+### 2.6 BCTC ngoài danh sách theo dõi (thêm vào MVP ngày 11/10)
+
+BCTC là dữ liệu công khai nên chỉ có **một kho chung**: mỗi BCTC chỉ đọc một lần, mọi người dùng sau dùng lại kết quả.
+
+| Trường hợp | Cách xử lý |
+|---|---|
+| Người dùng hỏi một mã chưa theo dõi | Tìm BCTC trên Vietstock, đọc và kiểm chứng như VN30 (khoảng 0,1 USD, vài phút), lưu vào kho chung |
+| Người dùng tải file lên | Người dùng khai mã và kỳ. Tính mã băm SHA-256 của file: trùng file đã đọc thì trả kết quả ngay. Chưa có thì đọc 2 trang đầu (ảnh nhỏ, khoảng 0,002 USD) để kiểm tra file đúng là BCTC của mã và kỳ đã khai, sai thì từ chối. Sau đó tìm bản chính thức trên Vietstock để đọc; không tìm được thì vẫn đọc file tải lên nhưng chỉ người đó xem, ghi rõ "chưa đối chiếu với nguồn chính thức" |
+| Giới hạn chi phí | Mỗi người 3 yêu cầu BCTC mới mỗi ngày, trong đó tối đa 1 file tải lên; trần chi phí gọi mô hình cho các yêu cầu này 5 USD/tháng, vượt thì xếp hàng chờ tháng sau |
+
+### 2.7 Ngoài phạm vi MVP
 
 - Danh mục và giá vốn.
 - Đặt lệnh, và hỗ trợ ra quyết định có người duyệt (phần mở rộng ĐATN, cho người dùng nội bộ, sau mùa quý 3).
@@ -180,7 +191,7 @@ Nên có thêm nếu kịp: cờ lãi/lỗ tỷ giá lớn; chuỗi 4–8 quý �
 | **11–13/10** | Chạy nốt BCTC quý 2 VN30, đo tỷ lệ tự kiểm chứng, sửa lỗi gặp phải. Chạy bộ canh liên tục. Cấu hình email cho người vận hành | Kỹ thuật | Bộ canh chạy trước khi BCTC quý 3 đầu tiên xuất hiện |
 | | Thuê VPS, mua tên miền (nếu muốn), tạo mật khẩu ứng dụng Gmail | Bạn | |
 | **14–19/10** | Bộ tính chỉ số, quy tắc hiển thị tăng trưởng, 6 cờ v1, API trả về thẻ. Ánh xạ theo tên chỉ tiêu cho DN thường không in mã số (VIC). Chạy bù quý 1/2026 và quý 4/2025 (chỉ BCTC hợp nhất) | Kỹ thuật | Thẻ đúng cho 30 mã quý 2 |
-| | Nhập kế hoạch ĐHCĐ 2026 cho 30 mã. Duyệt tay bộ rút gọn: các ô hiện trên thẻ, khoảng 25 ô × 5 BCTC | Bạn (~3 giờ) | Có số độ chính xác theo ô đầu tiên |
+| | Duyệt tay bộ rút gọn: các ô hiện trên thẻ, khoảng 25 ô × 5 BCTC | Bạn (~3 giờ) | Có số độ chính xác theo ô đầu tiên |
 | **20–26/10** | Web: bảng mùa, trang mã, theo dõi, hàng duyệt, đăng nhập bằng email. Triển khai lên VPS | Kỹ thuật | Chạy trên điện thoại, có HTTPS |
 | | Mời 5–10 người; phỏng vấn 5 người theo mục 1.5 | Bạn | |
 | **27/10–08/11** | Email cho danh sách theo dõi; tóm tắt giải trình (nếu kịp); vận hành qua đỉnh 30/10; đo các chỉ số mục 5; chạy "ChatGPT test" với 20 câu hỏi về KQKD quý 3 | Cả hai | Có số liệu cho báo cáo tuần |
@@ -208,15 +219,55 @@ Nên có thêm nếu kịp: cờ lãi/lỗ tỷ giá lớn; chuỗi 4–8 quý �
 
 Số người dùng ở mức này chỉ để học hỏi, không đủ để kết luận về nhu cầu.
 
-## 6. Vận hành và chi phí
+## 6. Vận hành và chi phí (cập nhật 12/10/2026)
+
+### 6.1 Hạ tầng
 
 | Hạng mục | Lựa chọn | Chi phí ước tính |
 |---|---|---|
-| Máy chủ | VPS 2 vCPU, 2–4 GB RAM, Ubuntu; Docker Compose gồm CSDL, web (FastAPI), bộ canh; Caddy cấp HTTPS | ~5 USD/tháng |
-| Tên miền | Tùy chọn (có thể dùng tên miền miễn phí lúc đầu) | ~10 USD/năm |
+| Máy chủ | VPS 2 vCPU, 2–4 GB RAM, ổ ≥ 40 GB (chứa PDF), Ubuntu; Docker Compose gồm CSDL, web (FastAPI), bộ canh; Caddy cấp HTTPS. Chọn nhà cung cấp khi sẵn sàng deploy | ~5 USD/tháng, nâng ~10 USD/tháng khi có nhiều người dùng |
+| Tên miền | `rediov.com` (đã mua trên Namecheap) | ~10 USD/năm |
 | Email | Gmail SMTP với mật khẩu ứng dụng (đủ cho vài chục người dùng) | 0 |
-| Mô hình | OpenAI `gpt-5.4-mini` (đang dùng thử; chọn chính thức sau khi có bộ duyệt tay) | Quý 3 VN30 ~3 USD; chạy bù 3 quý ~9 USD |
+| Mô hình đọc ảnh | OpenAI `gpt-5.4-mini`, mức suy luận `low` (thử `none` rẻ hơn ~8% nhưng sai nhiều hơn) | ~0,1 USD mỗi BCTC |
 | Sao lưu | `pg_dump` hằng ngày lên Google Drive | 0 |
+
+Vì sao vẫn cần API khi đã có VPS: VPS là máy tính thường, không có GPU. Nó làm mọi việc chạy bằng code (canh, tải, lưu,
+kiểm tra cộng tổng, tính thẻ và cờ, web, email). Chỉ hai bước cần mô hình nhìn ảnh BCTC scan: tìm trang chứa bảng và chép
+số. Thuê máy có GPU đắt hơn nhiều lần so với trả theo lượt khi mỗi quý chỉ đọc vài chục đến vài trăm BCTC.
+
+Code chạy trong Docker cả khi phát triển trên máy (từ 12/10): Smart App Control của Windows chặn thư viện kết nối
+PostgreSQL, và đây cũng là cách chạy trên VPS.
+
+### 6.2 Ngân sách đến 4/2027
+
+Tiền gọi mô hình tăng theo **số BCTC phải đọc**, không theo số người dùng (mỗi BCTC đọc một lần, phục vụ mọi người).
+Đến 11/10/2026 đã tiêu khoảng 10 USD theo các bản ghi còn lưu, phần lớn là chi phí phát triển (đọc lại cả loạt khi sửa
+lỗi, thí nghiệm); số thật xem ở trang Usage của OpenAI.
+
+| Khoản | Cách tính | Dự kiến | Trần |
+|---|---|---:|---:|
+| VPS | 5 → 10 USD/tháng | 50 | 60 |
+| Tên miền | Đã mua | 10 | 10 |
+| Mùa quý 3/2026 (VN30) | ~40 BCTC | 4 | 6 |
+| Mở rộng VN100: 3 quý gần nhất của 70 mã mới | ~210 BCTC; cột "cùng kỳ" cho thêm 3 quý năm trước | 21 | 25 |
+| Mùa quý 4/2026, BCTC năm 2026, quý 1/2027 (VN100) | ~300 BCTC | 30 | 40 |
+| Đọc BCTC theo yêu cầu người dùng | Trần 5 USD/tháng | 15 | 35 |
+| Agent viết báo cáo, bản tin sáng (mô hình chỉ viết lời) | Vài nghìn lượt × ~0,005 USD | 15 | 30 |
+| Radar sự kiện (văn bản công bố) | | 10 | 20 |
+| Phát triển, thí nghiệm | ~5 USD/tháng | 30 | 35 |
+| **Tổng** | | **~185 USD** | **~260 USD** |
+
+Nếu bảo vệ muộn (đến 7/2027): thêm khoảng 80 USD. Đọc toàn thị trường thêm khoảng 160 USD mỗi quý, nên chỉ đọc khi có
+người yêu cầu (có trần) cho tới khi tìm được cách đọc rẻ hơn (mô hình chạy trên máy, chỉ gửi trang cần thiết).
+
+### 6.3 Quy tắc chi tiêu
+
+1. Giới hạn trên tài khoản OpenAI: 15 USD/tháng trong mùa BCTC, 10 USD/tháng ngoài mùa.
+2. Trần trong code cho yêu cầu của người dùng: 5 USD/tháng (`LLM_MONTHLY_BUDGET_USD`).
+3. Khi sửa lỗi chỉ thử trên 3–5 BCTC đại diện; sửa luật kiểm tra thì dùng `recheck` (không gọi mô hình).
+4. Lần chạy nào ước tính trên 1 USD thì báo trước và chờ đồng ý; sau mỗi đợt báo chi phí (`python -m services.extraction cost`).
+5. Bộ canh chỉ tự đọc BCTC của năm đang canh; dữ liệu cũ chạy bù có kiểm soát. Tài khoản hết tiền thì bộ canh dừng lượt
+   đọc và giữ BCTC ở trạng thái chờ, không đánh dấu lỗi.
 
 ## 7. Rủi ro
 

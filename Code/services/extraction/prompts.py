@@ -57,6 +57,28 @@ Mỗi ảnh có nhãn "Trang N" ngay trước nó. Với MỖI trang, cho biết
 Trang bảng biểu kéo dài sang trang sau thì trang sau cũng mang cùng loại. Trả về đúng một phần tử cho mỗi trang."""
 
 
+IDENTIFY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "is_financial_statement": {"type": "boolean"},
+        "company_name": _NULLABLE_STRING,
+        "ticker": _NULLABLE_STRING,
+        "fiscal_year": {"type": ["integer", "null"]},
+        "period": {"type": ["string", "null"], "enum": ["Q1", "Q2", "Q3", "Q4", "H1", "9M", "FY", None]},
+        "scope": {"type": ["string", "null"], "enum": ["consolidated", "separate", None]},
+    },
+    "required": ["is_financial_statement", "company_name", "ticker", "fiscal_year", "period", "scope"],
+    "additionalProperties": False,
+}
+
+IDENTIFY_PROMPT = """Ảnh sau là các trang đầu của một file người dùng tải lên. Cho biết, chép đúng như in trên trang:
+- is_financial_statement: đây có phải báo cáo tài chính của một doanh nghiệp Việt Nam không;
+- company_name: tên doanh nghiệp lập báo cáo; ticker: mã chứng khoán nếu có in;
+- fiscal_year, period: kỳ báo cáo (Q1..Q4 cho quý, H1 cho 6 tháng/bán niên, 9M cho 9 tháng, FY cho cả năm);
+- scope: consolidated nếu là báo cáo hợp nhất, separate nếu là báo cáo riêng.
+Không thấy thông tin nào thì trả null cho trường đó."""
+
+
 REREAD_SCHEMA = {
     "type": "object",
     "properties": {

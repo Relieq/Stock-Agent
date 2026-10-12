@@ -21,35 +21,44 @@ from services.extraction.pipeline import extract_document
 from services.ingestion.registry import discover, download_pending
 from services.ingestion.vietstock import VietstockClient
 from services.llm import VisionClient
+from services.alerts import notify_watchers
 from services.notify import notify_admin
+from services.ondemand import process_queue
 
 VN_TZ = timezone(timedelta(hours=7))
 
 
-def _pending_extraction(conn, since: date) -> list[tuple]:
+def _out_of_credit(e: Exception) -> bool:
+    """Tài khoản mô hình hết tiền: lỗi của cả lượt, không phải của tài liệu."""
+    return "insufficient_quota" in str(e) or "credit_balance_exhausted" in str(e)
+
+
+def _pending_extraction(conn, since: date, year: int) -> list[tuple]:
     return conn.execute(
         """
         SELECT d.id, d.ticker, d.title_raw, d.source_listed_at, d.discovered_at
         FROM documents d
         WHERE d.status = 'downloaded' AND d.content_kind = 'full' AND d.scope IN ('consolidated', 'standalone')
-          AND d.discovered_at >= %s
+          AND d.discovered_at >= %s AND d.fiscal_year >= %s AND d.owner_user_id IS NULL
+          AND EXISTS (SELECT 1 FROM companies c WHERE c.ticker = d.ticker AND c.tracked)
         ORDER BY d.discovered_at
         """,
-        (datetime.combine(since, datetime.min.time(), VN_TZ),),
+        (datetime.combine(since, datetime.min.time(), VN_TZ), year),
     ).fetchall()
 
 
 def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
     vs = VietstockClient()
     with connect() as conn:
-        tickers = [r[0] for r in conn.execute("SELECT ticker FROM companies ORDER BY ticker")]
+        tickers = [r[0] for r in conn.execute("SELECT ticker FROM companies WHERE tracked ORDER BY ticker")]
         stats = discover(conn, vs, tickers, year)
         conn.commit()
         # Luôn thử tải các tài liệu chưa có file (kể cả lượt trước tải lỗi); chỉ là một truy vấn nếu không có gì
         for period in ("Q1", "Q2", "Q3", "Q4", "H1", "9M", "FY"):
             download_pending(conn, vs, year=year, period=period, doc_type=None, tickers=None)
         conn.commit()
-        pending = _pending_extraction(conn, since)
+        # Chỉ tự đọc BCTC của năm đang canh; dữ liệu năm trước chạy bù bằng services.extraction run
+        pending = _pending_extraction(conn, since, year)
         lines = []
         for doc_id, ticker, title, listed_at, discovered_at in pending:
             if vision is None:
@@ -58,6 +67,11 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             try:
                 rec = extract_document(conn, doc_id, vision)
             except Exception as e:  # một tài liệu lỗi không dừng bộ canh
+                conn.rollback()
+                if _out_of_credit(e):
+                    # Giữ trạng thái 'downloaded' để lượt sau đọc lại khi đã nạp tiền
+                    lines.append(f"Tài khoản mô hình đã hết tiền: dừng đọc, còn {len(pending)} BCTC chờ. Nạp tiền rồi bộ canh tự đọc tiếp.")
+                    break
                 conn.execute("UPDATE documents SET status = 'failed' WHERE id = %s", (doc_id,))
                 conn.commit()
                 lines.append(f"{ticker}: {title} -> LỖI {e}")
@@ -65,11 +79,16 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             conn.commit()
             s = rec["summary"]
             lag = datetime.now(timezone.utc) - listed_at if listed_at else None
+            sent = notify_watchers(conn, doc_id)
+            conn.commit()
             lines.append(
                 f"{ticker}: {title} -> {rec['status']} ({s['gate_checks'] - s['gate_failed']}/{s['gate_checks']} ràng buộc"
                 f" bắt buộc đạt); Vietstock đăng {listed_at.astimezone(VN_TZ):%d/%m %H:%M}"
                 + (f", xử lý xong sau {lag.total_seconds() / 60:.0f} phút" if lag else "")
+                + (f"; gửi {sent} email cho người theo dõi" if sent else "")
             )
+        # Yêu cầu của người dùng: mã ngoài danh sách, file tải lên
+        lines += process_queue(conn, vision)
     stamp = datetime.now(VN_TZ).strftime("%d/%m %H:%M")
     print(f"[{stamp}] {stats['seen']} tài liệu trong danh sách, {stats['new']} mới, {len(pending)} BCTC mới đã xử lý")
     if lines:

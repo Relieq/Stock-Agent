@@ -167,3 +167,27 @@ def decide(conn: psycopg.Connection, document_id: int, record: dict) -> None:
         kept = []
     for e in kept:
         e["applied"] = True
+
+
+def apply_manual_fix(conn: psycopg.Connection, document_id: int, statement: str, row: int, column_kind: str,
+                     value: str, by: str, note: str = "") -> dict:
+    """Sửa tay một ô sau khi người xem đối chiếu ảnh gốc. Ghi lại ai sửa, lúc nào, số cũ và số mới
+    (record["manual_fixes"]); đây cũng là dữ liệu vàng để đo độ chính xác."""
+    record = _load_record(conn, document_id)
+    r = record["raw"][statement]["rows"][row]
+    entry = {"statement": statement, "row": row, "label": r.get("label"), "column_kind": column_kind,
+             "before": r["values"].get(column_kind), "after": value, "by": by, "note": note,
+             "at": datetime.now(timezone.utc).isoformat()}
+    r["values"][column_kind] = value
+    record.setdefault("manual_fixes", []).append(entry)
+    _finalize(conn, record)
+    return entry
+
+
+def approve_document(conn: psycopg.Connection, document_id: int, user_id: int | None, by: str) -> str:
+    """Người duyệt đã đối chiếu các chỗ lệch với ảnh gốc và cho xuất bản BCTC chưa đạt kiểm chứng tự động."""
+    record = _load_record(conn, document_id)
+    record["approval"] = {"by": by, "at": datetime.now(timezone.utc).isoformat()}
+    record = _finalize(conn, record)
+    conn.execute("UPDATE documents SET reviewed_by = %s, reviewed_at = now() WHERE id = %s", (user_id, document_id))
+    return record["status"]

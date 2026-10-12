@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Theo dõi · Soi{% endblock %}
+{% block body %}
+<section class="narrow">
+  <h1>Mã đang theo dõi</h1>
+  <p class="muted small">Mỗi khi BCTC quý của một mã trong danh sách được kiểm chứng xong, bạn nhận một email. Không có thông báo theo giá.</p>
+  {% if tb %}<p class="infobox">{{ tb }}</p>{% endif %}
+  {% if mine %}
+  <ul class="plain">
+  {% for t in mine %}
+    <li><a href="/ma/{{ t }}"><b>{{ t }}</b></a>
+      <form method="post" action="/theo-doi" class="inline"><input type="hidden" name="ticker" value="{{ t }}">
+        <input type="hidden" name="action" value="remove"><button class="link">bỏ theo dõi</button></form></li>
+  {% endfor %}
+  </ul>
+  {% else %}<p>Chưa theo dõi mã nào.</p>{% endif %}
+  <form method="post" action="/theo-doi" class="stack">
+    <label>Thêm mã
+      <input name="ticker" list="tickers" placeholder="Ví dụ FPT" required maxlength="10"></label>
+    <datalist id="tickers">{% for t, n in companies %}<option value="{{ t }}">{{ n }}</option>{% endfor %}</datalist>
+    <button>Theo dõi</button>
+  </form>
+  <p class="small muted">Mã ngoài danh sách VN30: gửi yêu cầu đọc BCTC ở <a href="/yeu-cau">trang Yêu cầu</a>; sau khi đọc xong, mã đó theo dõi được.</p>
+</section>
+{% endblock %}

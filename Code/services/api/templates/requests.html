@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Yêu cầu đọc BCTC · Soi{% endblock %}
+{% set KIND = {"ticker": "Mã", "upload": "Tải lên"} %}
+{% set RSTATUS = {"queued": ("Đang chờ", "muted"), "processing": ("Đang đọc", "muted"), "done": ("Xong", "ok"),
+                  "failed": ("Không thực hiện được", "bad"), "rejected": ("Từ chối", "bad")} %}
+{% block body %}
+<section class="narrow">
+  <h1>Yêu cầu đọc BCTC</h1>
+  <p class="muted small">Mỗi BCTC chỉ đọc một lần rồi dùng chung cho mọi người. Bạn còn <b>{{ [quota - used, 0] | max }}/{{ quota }}</b>
+    yêu cầu mới trong 24 giờ, trong đó tối đa 1 file tải lên (BCTC đã có sẵn thì không tính).
+    {% if over_budget %}<br><b>Tháng này đã dùng hết ngân sách đọc BCTC; yêu cầu mới sẽ nằm chờ.</b>{% endif %}</p>
+  {% if tb %}<p class="infobox">{{ tb }}</p>{% endif %}
+
+  <h2>Đọc BCTC quý của một mã</h2>
+  <form method="post" action="/yeu-cau/ma" class="stack">
+    <label>Mã chứng khoán <input name="ticker" required maxlength="3" placeholder="Ví dụ HUT"></label>
+    <label>Kỳ <input name="ky" required placeholder="q2-2026" pattern="[qQ][1-4]-20[0-9]{2}"></label>
+    <button>Gửi yêu cầu</button>
+  </form>
+
+  <h2>Tải file BCTC lên</h2>
+  <p class="small muted">Hệ thống nhận diện file bằng mã băm SHA-256 (dấu vân tay của file): file đã đọc thì trả kết quả ngay.
+    Nếu chưa có, hệ thống đọc trang đầu để kiểm tra file đúng là BCTC của mã và kỳ bạn khai, rồi dùng bản chính thức trên
+    Vietstock nếu có; không có thì đọc file của bạn và chỉ bạn xem được.</p>
+  <form method="post" action="/yeu-cau/tai-len" enctype="multipart/form-data" class="stack">
+    <input type="file" name="file" accept=".pdf,.zip" required>
+    <label>Mã chứng khoán <input name="ticker" required maxlength="3"></label>
+    <label>Kỳ <input name="ky" required placeholder="q2-2026" pattern="[qQ][1-4]-20[0-9]{2}"></label>
+    <button>Tải lên</button>
+  </form>
+
+  {% if rows %}
+  <h2>Yêu cầu của bạn</h2>
+  <table class="list">
+    <thead><tr><th>Loại</th><th>Mã · kỳ</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+    {% for id, kind, ticker, year, period, status, note, created, doc_id, private in rows %}
+    <tr><td>{{ KIND[kind] }}</td>
+      <td>{% if status == "done" and doc_id %}<a href="{{ '/the/' ~ doc_id if private else '/ma/' ~ ticker ~ '?ky=' ~ (period|lower) ~ '-' ~ year }}">{{ ticker }} {{ period }}/{{ year }}</a>{% else %}{{ ticker }} {{ period }}/{{ year }}{% endif %}</td>
+      <td><span class="badge {{ RSTATUS[status][1] }}">{{ RSTATUS[status][0] }}</span></td>
+      <td class="small">{{ note or "" }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endblock %}

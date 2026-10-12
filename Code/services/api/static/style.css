@@ -56,3 +56,41 @@ td.ev-restated, .legend .ev-restated, .chip.ev-restated { background:var(--warnb
 td.ev-conflict, .legend .ev-conflict, .chip.ev-conflict { background:#f7b9b9; font-weight:600; }
 .legend span, .chip { padding:0 6px; border-radius:4px; margin-right:4px; white-space:nowrap; }
 td.ev-differs, .legend .ev-differs, .chip.ev-differs { background:#dfe9ff; }
+.nav { margin-left:auto; display:flex; gap:12px; }
+.foot { padding:12px 16px 24px; border-top:1px solid var(--line); margin-top:24px; }
+.seasonhead, .kyrow { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.seasonhead h1, .cardhead h1 { margin:4px 0; font-size:20px; }
+.seasonlist { display:flex; flex-direction:column; }
+.srow { display:flex; gap:12px; padding:10px 4px; border-bottom:1px solid var(--line); color:var(--fg); text-decoration:none; }
+.srow:hover { background:var(--soft); }
+.sticker { width:150px; flex-shrink:0; display:flex; flex-direction:column; }
+.sbody { flex:1; min-width:0; }
+.chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+.chip.flag { background:var(--warnbg); color:var(--warn); border-radius:10px; padding:1px 8px; font-size:12px; }
+h2 { font-size:16px; margin:16px 0 8px; }
+.flagbox { background:var(--warnbg); border-radius:6px; padding:8px 10px; margin:6px 0; }
+.metric { border-bottom:1px solid var(--line); padding:8px 0; }
+.mname { font-weight:600; margin-bottom:4px; }
+.mgrid { display:grid; grid-template-columns:1fr 1fr 2fr; gap:4px 12px; font-variant-numeric:tabular-nums; }
+.mchange { align-self:end; }
+button.src { border:0; background:none; padding:0; font:inherit; color:#0b5cad; cursor:pointer; text-decoration:underline dotted; }
+button.src.link { font-size:12px; }
+dialog#viewer { width:min(960px, 96vw); height:90vh; padding:8px; border:1px solid var(--line); }
+dialog#viewer .imgwrap { height:calc(90vh - 70px); }
+dialog .close { float:right; }
+@media (max-width: 600px) {
+  .srow { flex-direction:column; gap:2px; }
+  .sticker { width:auto; flex-direction:row; gap:8px; align-items:baseline; }
+  .mgrid { grid-template-columns:1fr 1fr; }
+  .mchange { grid-column:1 / -1; }
+}
+.narrow { max-width:640px; }
+form.stack { display:flex; flex-direction:column; gap:8px; max-width:420px; margin:8px 0 16px; }
+form.stack label { display:flex; flex-direction:column; gap:2px; font-size:13px; }
+form.inline { display:inline; }
+form.row { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+input, select, button { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); }
+button { cursor:pointer; background:var(--soft); }
+button.link { border:0; background:none; color:#0b5cad; padding:0 4px; }
+ul.plain { list-style:none; padding:0; } ul.plain li { padding:4px 0; border-bottom:1px solid var(--line); }
+.reviewbox { background:var(--sel); border-radius:6px; padding:8px 10px; margin:8px 0; }

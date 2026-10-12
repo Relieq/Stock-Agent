@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Mùa BCTC {{ period }}/{{ year }} · Soi{% endblock %}
+{% block body %}
+<div class="seasonhead">
+  <h1>BCTC {{ period }}/{{ year }}</h1>
+  <select onchange="location='/mua-bctc/'+this.value">
+  {% for y, p in quarters %}<option value="{{ p|lower }}-{{ y }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
+  </select>
+</div>
+{% set done = rows | selectattr('card') | list %}
+<p class="muted small">{{ done | length }}/{{ rows | length }} mã đã có BCTC. LNST: của cổ đông công ty mẹ (ngân hàng: của cổ đông ngân hàng mẹ), quý này so với cùng kỳ.</p>
+<div class="seasonlist">
+{% for r in rows %}
+  <a class="srow" href="/ma/{{ r.ticker }}?ky={{ period|lower }}-{{ year }}">
+    <div class="sticker"><b>{{ r.ticker }}</b><span class="muted small">{{ r.name }}</span></div>
+    <div class="sbody">
+    {% if r.card and r.info.published and r.card.supported %}
+      {% set np = (r.card.metrics | selectattr('key', 'equalto', 'npat_parent') | first) %}
+      <div>LNST quý <b>{{ np.q_cur.value | tien }}</b> <span class="muted">· {{ np.q_change }}</span></div>
+      {% if r.card.flags %}<div class="chips">{% for f in r.card.flags %}<span class="chip flag">{{ f.title }}</span>{% endfor %}</div>{% endif %}
+    {% elif r.card and not r.card.supported %}<span class="muted">Thẻ chưa hỗ trợ công ty chứng khoán</span>
+    {% elif r.info %}<span class="muted">Đã có BCTC, đang chờ kiểm chứng</span>
+    {% else %}<span class="muted">Chưa công bố</span>{% endif %}
+    </div>
+  </a>
+{% endfor %}
+</div>
+{% endblock %}

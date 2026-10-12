@@ -11,22 +11,28 @@ Mã nguồn của dự án. Cấu trúc theo [kiến trúc kỹ thuật](../Baoc
 | `services/extraction/` | Đọc và kiểm chứng BCTC: chọn PDF, định vị trang, chép bảng bằng mô hình đọc ảnh, chuẩn hóa số, kiểm tra ràng buộc kế toán | Bản đầu; 30/30 BCTC hợp nhất quý 2/2026 của VN30 đạt |
 | `services/llm.py` | Gọi mô hình qua giao diện kiểu OpenAI (Gemini, OpenAI, OpenRouter, Ollama) | Có |
 | `eval/` | Chấm kết quả trích xuất với bộ duyệt tay (`Data/golden/`) | Có |
-| `services/api/` | Web xem lại kết quả đọc BCTC: số đã chép đặt cạnh ảnh trang gốc, các phép kiểm tra | Bản đầu, chạy trên máy |
+| `services/metrics/` | Thẻ KQKD: số chính kèm nguồn tới trang, quy tắc hiển thị tăng trưởng, 7 cờ cảnh báo, % kế hoạch ĐHCĐ | Bản đầu |
+| `services/api/` | Web: bảng mùa BCTC, thẻ từng mã, theo dõi, yêu cầu đọc BCTC / tải file lên, hàng duyệt; đăng nhập bằng link email | Bản đầu, chạy trên máy |
+| `services/watcher/`, `services/alerts.py`, `services/ondemand.py`, `services/users.py` | Bộ canh, email cho người theo dõi, hàng chờ yêu cầu, người dùng được mời | Bản đầu |
 | `services/analyst/`, `services/news/`, `apps/web/`, `eval/` | Phân tích, tin tức, giao diện, đánh giá | Sau |
 
 ## Cài đặt
 
-Cần Python 3.12 và Docker Desktop.
+Cần Docker Desktop. Mọi thứ chạy trong container Linux: CSDL, web, bộ canh và các lệnh chạy một lần. Đây cũng là cách
+chạy trên VPS. Trên Windows có bật Smart App Control, thư viện kết nối PostgreSQL (`psycopg`) chạy trực tiếp bị chặn.
 
 ```bash
 cd Code
-python -m venv .venv
-.venv\Scripts\activate          # Windows; Linux/macOS: source .venv/bin/activate
-pip install -e ".[dev]"
-copy .env.example .env          # Linux/macOS: cp .env.example .env
-
-docker compose -f infra/docker-compose.yml up -d   # PostgreSQL ở cổng 5433
+copy .env.example .env          # Linux/macOS: cp .env.example .env; rồi điền key mô hình
+docker compose -f infra/docker-compose.yml up -d --build      # CSDL (cổng 5433), web (http://127.0.0.1:8765), bộ canh
+docker compose -f infra/docker-compose.yml run --rm app python -m services.ingestion migrate
+docker compose -f infra/docker-compose.yml run --rm app python -m pytest -q
 ```
+
+Thư mục `Code/` và `Data/raw/` được gắn vào container, nên sửa code có hiệu lực ngay (web cần
+`docker compose -f infra/docker-compose.yml restart web`). Các lệnh `python -m ...` dưới đây chạy trong container bằng
+`docker compose -f infra/docker-compose.yml run --rm app <lệnh>`. Vẫn có thể chạy trực tiếp bằng venv (Python 3.12,
+`pip install -e ".[dev]"`) trên máy không chặn `psycopg`.
 
 ## Thu thập BCTC
 
@@ -107,14 +113,44 @@ Kết quả thử với `gpt-5.4-mini` trên BCTC hợp nhất quý 2/2026 (03/1
 
 Trung bình khoảng 50 nghìn token vào và 12 nghìn token ra cho mỗi BCTC (khoảng 0,09 USD với giá ngày 03/10/2026).
 
-## Xem kết quả trên web
+## Thẻ KQKD và cờ cảnh báo
+
+`services/metrics/card.py` tính bằng code từ số đã kiểm chứng (mô hình ngôn ngữ không tham gia), theo kế hoạch MVP:
+
+- Số chính (DN thường: doanh thu thuần, lợi nhuận gộp, LNST của cổ đông công ty mẹ; ngân hàng: thu nhập lãi thuần, tổng thu
+  nhập hoạt động, chi phí dự phòng, LNTT, LNST), quý và lũy kế so với cùng kỳ. Mỗi số mang nguồn: tài liệu, mã số, trang,
+  chuỗi nguyên văn.
+- Kỳ này hoặc cùng kỳ lỗ thì không in %, viết bằng chữ ("lỗ thu hẹp từ X còn Y", "chuyển từ lỗ X sang lãi Y").
+- 7 cờ: lỗ hoặc đổi dấu; tăng trưởng do nền thấp (cần LNST ít nhất 2 trong 4 quý trước quý cùng kỳ); lợi nhuận phần lớn
+  ngoài hoạt động chính; hoàn nhập dự phòng; mua bán công ty con hoặc biến động lớn ở công ty liên kết; có lãi nhưng dòng
+  tiền kinh doanh âm; số liệu bị sửa giữa các BCTC (dùng đối chiếu ở `evidence.py`). Khoản nhỏ hơn ngưỡng (5% LNTT,
+  hoặc chênh dưới 0,5% và dưới 1 tỷ) không gắn cờ.
+- % kế hoạch năm: kế hoạch ĐHCĐ nhập tay vào `db/seeds/agm_plans_2026.csv` (cột `value_ty` tính bằng tỷ đồng, bắt buộc
+  có link nghị quyết), nạp bằng `python -m services.metrics plans`.
+- Công ty chứng khoán, bảo hiểm: chưa có thẻ.
 
 ```bash
-python -m services.api --port 8765     # rồi mở http://127.0.0.1:8765
+python -m services.metrics card --ticker FPT --year 2026 --period Q2
 ```
 
-- Trang đầu: các BCTC của kỳ, trạng thái kiểm chứng, doanh thu và LNST quý (tỷ đồng).
-- Bấm vào mã: bảng số chép nguyên văn từ BCTC đặt cạnh ảnh trang gốc; bấm một dòng để mở đúng trang. Tab "Kiểm tra" liệt kê từng ràng buộc kế toán và các lần đọc lại.
+## Web
+
+```bash
+python -m services.users invite ban@example.com [--admin]   # chỉ người được mời mới đăng nhập được
+python -m services.api --port 8765                          # rồi mở http://127.0.0.1:8765
+```
+
+- Đăng nhập bằng link gửi qua email (không mật khẩu). Chưa cấu hình SMTP mà đang chạy trên chính máy đó thì link hiện
+  ngay trên trang. Token chỉ lưu dạng mã băm.
+- `/mua-bctc/q2-2026`: các mã VN30, LNST quý và cờ. `/ma/FPT?ky=q2-2026`: thẻ KQKD, bấm vào số để mở trang BCTC gốc.
+  `/api/the/FPT?ky=q2-2026`: thẻ dạng JSON. BCTC chỉ được xuất bản khi đã kiểm chứng hoặc đã duyệt tay.
+- `/theo-doi`: danh sách theo dõi. Bộ canh gửi một email cho mỗi BCTC của mã đang theo dõi khi thẻ được xuất bản.
+- `/yeu-cau`: đọc BCTC quý của mã ngoài VN30, hoặc tải file lên. Một kho chung: BCTC đã đọc thì trả ngay. File tải lên
+  nhận diện bằng mã băm SHA-256; có bản chính thức trên Vietstock thì dùng bản đó, không có thì đọc file tải lên và chỉ
+  người tải lên xem được. Mỗi người `daily_quota` yêu cầu mới mỗi ngày (mặc định 3); tổng chi phí mô hình mỗi tháng
+  không vượt `LLM_MONTHLY_BUDGET_USD` (mặc định 20). Bộ canh xử lý hàng chờ mỗi lượt.
+- Người duyệt (`--admin`): `/duyet` liệt kê BCTC chưa đạt kiểm chứng; trang `/tai-lieu/{id}` đặt số cạnh ảnh gốc, cho
+  sửa từng ô (ghi lại người sửa, số cũ, số mới) rồi xuất bản. `/noi-bo`: mọi BCTC đã đọc và độ phủ bằng chứng.
 
 ## Kiểm thử
 

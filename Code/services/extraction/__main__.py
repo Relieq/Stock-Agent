@@ -181,6 +181,15 @@ def cmd_verify(args) -> None:
           + (f", khoảng {cost:.2f} USD" if cost is not None else ""))
 
 
+def cmd_fix(args) -> None:
+    from services.extraction.verify import apply_manual_fix
+    with connect() as conn:
+        e = apply_manual_fix(conn, args.doc_id, args.statement, args.row, args.column, args.value, args.by, args.note)
+        conn.commit()
+        print(f"[{args.doc_id}] {e['statement']} dòng {e['row']} ({e['label']}) {e['column_kind']}: "
+              f"{e['before']} -> {e['after']}")
+
+
 def cmd_cost(args) -> None:
     """Chi phí gọi mô hình đã ghi trong các bản ghi trích xuất. Mỗi tài liệu chỉ giữ bản ghi mới nhất, nên các lần
     chạy bị ghi đè không được tính; bản ghi cũ chưa có số liệu theo bước."""
@@ -254,6 +263,16 @@ def main(argv: list[str] | None = None) -> None:
     v.add_argument("--period")
     v.add_argument("--redecide", action="store_true", help="Chỉ chọn lại số đọc lại nào được giữ, không gọi mô hình")
     v.set_defaults(func=cmd_verify)
+
+    f = sub.add_parser("fix", help="Sửa tay một ô sau khi đối chiếu ảnh gốc (có ghi lại)")
+    f.add_argument("--doc-id", type=int, required=True)
+    f.add_argument("--statement", required=True, choices=["BS", "IS", "CF"])
+    f.add_argument("--row", type=int, required=True, help="Vị trí dòng trong bản chép (bắt đầu từ 0)")
+    f.add_argument("--column", required=True, help="end_period, begin_year, q_cur, ytd_cur...")
+    f.add_argument("--value", required=True, help="Số nguyên văn như in trên BCTC")
+    f.add_argument("--by", required=True, help="Người sửa")
+    f.add_argument("--note", default="")
+    f.set_defaults(func=cmd_fix)
 
     c = sub.add_parser("cost", help="Chi phí gọi mô hình theo bước, từ các bản ghi đã lưu")
     c.set_defaults(func=cmd_cost)

@@ -24,6 +24,7 @@ PERIOD_KIND = {
     "bs_begin": "Số đầu năm khác với BCTC quý liền kề",
     "is_quarter": "Quý ≠ lũy kế kỳ này − lũy kế kỳ trước",
     "same_date": "Khác BCTC cùng ngày kết thúc kỳ (bán niên/năm)",
+    "year_start": "Số đầu năm khác số cuối năm trước (BCTC quý 4)",
 }
 STATEMENT_NAMES = {"BS": "Cân đối kế toán", "IS": "Kết quả kinh doanh", "CF": "Lưu chuyển tiền tệ"}
 
@@ -88,6 +89,7 @@ class Row:
     values: dict[str, str | None]
     flagged: bool
     evidence: dict[str, dict] = field(default_factory=dict)   # cột -> {"status", "sum", "period", "conflict"}
+    index: int = 0            # vị trí dòng trong bản chép (để sửa tay: verify.apply_manual_fix)
 
 
 def detail(record: dict, evidence=None) -> dict:
@@ -113,7 +115,7 @@ def detail(record: dict, evidence=None) -> dict:
             ev = {col: evidence.status[(st.statement, key, col)] for col in it.values_raw
                   if key and (st.statement, key, col) in evidence.status} if evidence else {}
             rows.append(Row(it.stt, it.code, it.label, it.note, it.page, it.values_raw,
-                            bool(it.code) and it.code in flagged.get(st.statement, set()), ev))
+                            bool(it.code) and it.code in flagged.get(st.statement, set()), ev, i))
         tables.append({"statement": st.statement, "name": STATEMENT_NAMES[st.statement], "unit": st.unit_raw,
                        "columns": COLUMNS[st.statement], "rows": rows,
                        "pages": chosen["statement_pages"].get(st.statement, [])})

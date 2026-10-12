@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Đăng nhập · Soi{% endblock %}
+{% block body %}
+<section class="narrow">
+  <h1>Đăng nhập</h1>
+  <p class="muted">Soi đang thử nghiệm, chỉ dành cho người được mời. Nhập email để nhận link đăng nhập (không cần mật khẩu).</p>
+  {% if error %}<p class="warnbox">{{ error }}</p>{% endif %}
+  {% if sent %}
+    <p class="infobox">Nếu email này đã được mời, link đăng nhập đã được gửi tới hộp thư. Link dùng được một lần trong 30 phút.</p>
+    {% if dev_link %}<p class="small">Máy chủ chưa cấu hình gửi email, đang chạy trên máy này nên hiện link ở đây:
+      <a href="{{ dev_link }}?next={{ next | urlencode }}">đăng nhập</a></p>{% endif %}
+  {% else %}
+  <form method="post" action="/dang-nhap" class="stack">
+    <input type="hidden" name="next" value="{{ next }}">
+    <input type="email" name="email" placeholder="email@vidu.com" required autofocus>
+    <button>Gửi link đăng nhập</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

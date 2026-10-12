@@ -57,3 +57,14 @@ def test_verified_reread_turns_suspect_into_real_difference():
     [check] = compare_same_date(q2, h1)
     assert not check.suspect_misread
     assert cell_status(q2, [check])[("BS", "311", "end_period")]["status"] == "differs"
+
+
+def test_year_end_is_next_year_begin_balance():
+    from services.extraction.evidence import compare_year_start
+    q4 = _cells(1, "Q4", {("BS", "110"): {"end_period": 70000, "begin_year": 40}, ("IS", "10"): {"q_cur": 5}})
+    q1 = _cells(2, "Q1", {("BS", "110"): {"end_period": 90, "begin_year": 70000}, ("IS", "10"): {"q_cur": 6}})
+    [check] = compare_year_start(q4, q1)
+    assert (check.kind, check.statement, check.passed) == ("year_start", "BS", True)
+    q1.values[("BS", "110")]["begin_year"] = D(64321)     # BCTC năm đã kiểm toán sửa số cuối quý 4: chênh lớn, không nghi đọc sai
+    [check] = compare_year_start(q4, q1)
+    assert not check.passed and not check.suspect_misread

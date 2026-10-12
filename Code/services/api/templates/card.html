@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ ticker }} {{ period }}/{{ year }} · Soi{% endblock %}
+{% macro num(v) -%}
+  {%- if v.value is none %}<span class="muted">–</span>
+  {%- elif v.source and v.source.page %}<button class="src" data-doc="{{ v.source.document_id }}" data-page="{{ v.source.page }}"
+     title="{{ v.source.label }} (mã {{ v.source.code }}), trang {{ v.source.page }}: in là {{ v.source.raw }}">{{ v.value | tien }}</button>
+  {%- else %}<span title="{{ v.computed or '' }}">{{ v.value | tien }}{% if v.computed %}*{% endif %}</span>{% endif -%}
+{%- endmacro %}
+{% block body %}
+<section class="cardhead">
+  <h1>{{ ticker }} <span class="muted">· {{ name }}</span></h1>
+  <div class="kyrow">
+    <select onchange="location='/ma/{{ ticker }}?ky='+this.value">
+    {% for y, p in quarters %}<option value="{{ p|lower }}-{{ y }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
+    </select>
+    {% if info %}<span class="small">{{ SCOPE.get(info.scope, info.scope) }} · {{ info.reviewed }}</span>{% endif %}
+    {% if not private %}<form method="post" action="/theo-doi" class="inline"><input type="hidden" name="ticker" value="{{ ticker }}">
+      <input type="hidden" name="action" value="{{ 'remove' if watching else 'add' }}"><input type="hidden" name="back" value="/ma/{{ ticker }}?ky={{ period|lower }}-{{ year }}">
+      <button>{{ "Đang theo dõi ✓" if watching else "Theo dõi, nhận email" }}</button></form>{% endif %}
+  </div>
+  {% if private %}<p class="warnbox small">BCTC từ file bạn tải lên, chưa đối chiếu được với bản chính thức trên Vietstock; chỉ bạn xem được.</p>{% endif %}
+  {% if info %}<div class="small muted">Vietstock đăng: {{ info.listed_at | gio }} · Hệ thống xử lý xong: {{ info.processed_at | gio }}</div>{% endif %}
+</section>
+
+{% if not card %}
+  <p>Chưa có BCTC {{ period }}/{{ year }} của {{ ticker }}.</p>
+{% elif not info.published %}
+  <p class="warnbox">BCTC đã có nhưng chưa qua được kiểm chứng tự động; đang chờ người duyệt đối chiếu với bản gốc trước khi xuất bản.</p>
+{% elif not card.supported %}
+  <p class="muted">{{ card.not_evaluated | join('; ') }}</p>
+{% else %}
+  <p>{% if info.status == "approved" %}<span class="badge ok">Đã duyệt tay</span>{% else %}<span class="badge ok">Đã kiểm chứng</span>{% endif %} <span class="small">{{ info.gate[0] }}/{{ info.gate[1] }} ràng buộc kế toán đạt{% if info.manual_fixes %}; {{ info.manual_fixes }} ô đã được người đối chiếu ảnh gốc sửa{% endif %}</span></p>
+
+  {% if card.flags %}
+  <section class="flags">
+    <h2>Cần xem kỹ</h2>
+    {% for f in card.flags %}
+    <div class="flagbox"><b>{{ f.title }}</b>
+      <div>{{ f.detail }}</div>
+      {% if f.sources %}<div class="small muted">Nguồn: {% for s in f.sources %}<button class="src link" data-doc="{{ s.document_id }}" data-page="{{ s.page }}">{{ s.label | trim }} (trang {{ s.page }})</button>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section>
+    <h2>Số chính <span class="muted small">(tỷ đồng; bấm vào số để xem trang BCTC gốc)</span></h2>
+    {% for m in card.metrics %}
+    <div class="metric">
+      <div class="mname">{{ m.name }}</div>
+      <div class="mgrid">
+        <div><span class="muted small">Quý này</span><br>{{ num(m.q_cur) }}</div>
+        <div><span class="muted small">Cùng kỳ</span><br>{{ num(m.q_prev_year) }}</div>
+        <div class="mchange">{{ m.q_change or "" }}</div>
+        <div><span class="muted small">Lũy kế</span><br>{{ num(m.ytd_cur) }}</div>
+        <div><span class="muted small">Lũy kế năm trước</span><br>{{ num(m.ytd_prev_year) }}</div>
+        <div class="mchange">{{ m.ytd_change or "" }}</div>
+      </div>
+    </div>
+    {% endfor %}
+    {% if card.plan %}<p>Lũy kế {{ card.plan.name }} <b>{{ card.plan.ytd | tien }}</b>, đạt <b>{{ card.plan.pct_text }}</b> kế hoạch năm {{ year }}
+      ({{ card.plan.plan | tien }}, <a href="{{ card.plan.source_url }}" target="_blank" rel="noopener">nghị quyết ĐHCĐ</a>).</p>
+    {% endif %}
+    <p class="small muted">* Số tính từ các dòng in trên BCTC vì BCTC không in sẵn.</p>
+  </section>
+
+  {% if card.not_evaluated %}<p class="small muted">Chưa xét được: {{ card.not_evaluated | join('; ') }}</p>{% endif %}
+  <p class="small"><a href="/tai-lieu/{{ doc_id }}">Xem toàn bộ số đã đọc và các phép kiểm tra</a> · <a href="{{ info.source_url }}" target="_blank" rel="noopener">Nguồn Vietstock</a></p>
+{% endif %}
+
+<dialog id="viewer"><form method="dialog"><button class="close">Đóng</button></form>
+  <div class="small muted" id="viewercap"></div><div class="imgwrap"><img id="viewerimg" alt="Trang BCTC gốc"></div></dialog>
+<script>
+const dlg = document.getElementById('viewer'), img = document.getElementById('viewerimg'), cap = document.getElementById('viewercap');
+document.querySelectorAll('button.src').forEach(b => b.onclick = () => {
+  img.src = '/tai-lieu/' + b.dataset.doc + '/trang/' + b.dataset.page + '.png';
+  cap.textContent = b.title || b.textContent;
+  dlg.showModal();
+});
+</script>
+{% endblock %}

@@ -23,7 +23,7 @@ from decimal import Decimal
 
 from services.extraction.bank import clean_label, fold
 from services.extraction.numbers import normalize_code, parse_amount
-from services.extraction.pipeline import _check
+from services.extraction.pipeline import _check_cached
 from services.extraction.rules import RULESETS
 
 EPS = re.compile(r"(lai|lo).*tren (mot )?co phieu")
@@ -51,7 +51,7 @@ def label_key(label: str) -> str:
 
 
 def cells_of(document_id: int, period: str, record: dict) -> Cells:
-    extracted, statements, sep, template, checks = _check(record)
+    extracted, statements, sep, template, checks = _check_cached(record)
     values: dict[tuple[str, str], dict[str, Decimal]] = {}
     labels: dict[tuple[str, str], str] = {}
     item_keys: dict[str, list[str | None]] = {}

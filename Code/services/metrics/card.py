@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from services.extraction.bank import clean_label, fold
 from services.extraction.numbers import normalize_code
-from services.extraction.pipeline import _check
+from services.extraction.pipeline import _check_cached
 from services.extraction.rules import BANK_INCOME_PARTS, RULESETS
 from services.extraction.validate import expenses_printed_negative
 from services.metrics.canonical import code_for
@@ -91,7 +91,7 @@ class Facts:
     """Số đã chuẩn hóa của một tài liệu (đồng) kèm nguồn từng ô."""
 
     def __init__(self, document_id: int, record: dict):
-        extracted, statements, _, template, _ = _check(record)
+        extracted, statements, _, template, _ = _check_cached(record)
         self.document_id = document_id
         self.template = template
         self.statements = statements

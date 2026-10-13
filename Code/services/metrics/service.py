@@ -81,6 +81,24 @@ def quarter_document(conn: psycopg.Connection, ticker: str, year: int, period: s
     return row[0] if row else None
 
 
+def growth(card: Card) -> dict:
+    """Nhóm và % thay đổi LNST công ty mẹ quý này so với cùng kỳ, để xếp hạng. % chỉ tính khi cả hai kỳ đều lãi (lỗ
+    thì xếp theo nhóm, không in %, cùng quy tắc với change_text)."""
+    np = next((m for m in card.metrics if m.key == "npat_parent"), None)
+    cur = np.q_cur.value if np else None
+    prev = np.q_prev_year.value if np else None
+    if cur is None or prev is None:
+        return {"group": "unknown", "pct": None}
+    if cur > 0 and prev > 0:
+        pct = float((cur - prev) / prev * 100)
+        return {"group": "up" if pct >= 0 else "down", "pct": pct}
+    if prev <= 0 < cur:
+        return {"group": "to_profit", "pct": None}
+    if cur <= 0 < prev:
+        return {"group": "to_loss", "pct": None}
+    return {"group": "loss", "pct": None}
+
+
 def season(conn: psycopg.Connection, year: int, period: str) -> list[dict]:
     """Bảng mùa BCTC: mỗi công ty đang theo dõi một dòng, kèm thẻ nếu BCTC đã đọc."""
     out = []
@@ -92,6 +110,8 @@ def season(conn: psycopg.Connection, year: int, period: str) -> list[dict]:
             got = card_for(conn, doc_id)
             if got is not None:
                 item["card"], item["info"] = got
+                item["growth"] = growth(item["card"])
+                item["flag_keys"] = [fl.key for fl in item["card"].flags]
             else:
                 item["info"] = {"status": conn.execute("SELECT status FROM documents WHERE id = %s",
                                                        (doc_id,)).fetchone()[0], "published": False}

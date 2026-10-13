@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{% set title = card.ticker ~ " " ~ card.period ~ "/" ~ card.year ~ ": thẻ KQKD đã kiểm chứng" %}
+{% set desc = (np.name ~ " " ~ (np.q_cur.value | tien) ~ ", " ~ np.q_change) if np and np.q_cur.value is not none else info.name %}
+<title>{{ title }} · Soi</title>
+<meta name="description" content="{{ desc }}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="{{ desc }}">
+<meta property="og:image" content="{{ site }}/anh/{{ card.ticker }}/{{ ky }}.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="{{ site }}/chia-se/{{ card.ticker }}/{{ ky }}">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top"><a href="/mua-bctc" class="brand">Soi</a></header>
+<main class="narrow">
+  <h1>{{ card.ticker }} · {{ card.period }}/{{ card.year }}</h1>
+  <p class="muted">{{ info.name }}</p>
+  <img src="/anh/{{ card.ticker }}/{{ ky }}.png" alt="Thẻ KQKD {{ card.ticker }} {{ card.period }}/{{ card.year }}" style="max-width:100%;border:1px solid var(--line);border-radius:6px">
+  <p>Mỗi con số trên thẻ đầy đủ mở được đúng trang BCTC gốc, kèm các cờ cần xem kỹ và lịch sử đối chiếu.</p>
+  <p><a href="/ma/{{ card.ticker }}?ky={{ ky }}">Xem thẻ đầy đủ</a> <span class="muted small">(đang thử nghiệm, chỉ dành cho người được mời)</span></p>
+</main>
+<footer class="foot small muted">Thử nghiệm trong khuôn khổ đồ án tốt nghiệp. Số liệu do AI hỗ trợ trích xuất từ BCTC đã công bố và được kiểm chứng
+  bằng ràng buộc kế toán. Đây là thông tin, không phải khuyến nghị đầu tư.</footer>
+</body>
+</html>

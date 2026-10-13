@@ -143,6 +143,12 @@ python -m services.api --port 8765                          # rồi mở http://
 - Đăng nhập bằng link gửi qua email (không mật khẩu). Chưa cấu hình SMTP mà đang chạy trên chính máy đó thì link hiện
   ngay trên trang. Token chỉ lưu dạng mã băm.
 - `/mua-bctc/q2-2026`: các mã VN30, LNST quý và cờ. `/ma/FPT?ky=q2-2026`: thẻ KQKD, bấm vào số để mở trang BCTC gốc.
+  Bảng mùa xếp hạng theo tăng trưởng LNST (lãi tăng/giảm, chuyển lỗ sang lãi... không in % khi có kỳ lỗ), lọc theo cờ,
+  cờ "số bị sửa" và loại công ty.
+- `/lich` (mặc định mùa đang diễn ra) hoặc `/lich/q3-2026`: mã nào đã công bố, ngày dự kiến theo thói quen các quý
+  trước, hạn 20 hoặc 30 ngày, quá hạn chưa công bố.
+- `/chia-se/FPT/q2-2026` và `/anh/FPT/q2-2026.png`: trang và ảnh thẻ 1200x630 để chia sẻ, công khai (không cần đăng
+  nhập), chỉ cho thẻ đã kiểm chứng hoặc duyệt tay. Ảnh vẽ bằng pymupdf với phông DejaVu (cài trong image Docker).
   `/api/the/FPT?ky=q2-2026`: thẻ dạng JSON. BCTC chỉ được xuất bản khi đã kiểm chứng hoặc đã duyệt tay.
 - `/theo-doi`: danh sách theo dõi. Bộ canh gửi một email cho mỗi BCTC của mã đang theo dõi khi thẻ được xuất bản.
 - `/yeu-cau`: đọc BCTC quý của mã ngoài VN30, hoặc tải file lên. Một kho chung: BCTC đã đọc thì trả ngay. File tải lên

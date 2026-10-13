@@ -20,10 +20,12 @@ from services.api.accounts import COOKIE, require_admin, router as accounts_rout
 from services.db import connect
 from services.extraction.evidence import STATUS_LABELS
 from services.ingestion.registry import raw_data_dir
+from services.metrics import calendar as cal
 from services.metrics import service as cards
+from services.metrics import share
 from services.metrics.card import card_dict
 from services.metrics.card import ty as card_ty
-from services.users import session_user, watchlist
+from services.users import session_user, site_url, watchlist
 
 VN_TZ = timezone(timedelta(hours=7))
 
@@ -33,7 +35,8 @@ app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 app.include_router(accounts_router)
 
-PUBLIC_PATHS = ("/dang-nhap", "/static/")
+# Trang và ảnh chia sẻ thẻ KQKD công khai để mạng xã hội đọc được thẻ xem trước; chỉ thẻ đã kiểm chứng/duyệt tay
+PUBLIC_PATHS = ("/dang-nhap", "/static/", "/chia-se/", "/anh/")
 
 
 @app.middleware("http")
@@ -131,6 +134,52 @@ def season_page(request: Request, ky: str | None = None):
         "rows": rows, "year": year, "period": period, "quarters": quarters})
 
 
+@app.get("/lich")
+@app.get("/lich/{ky}")
+def calendar_page(request: Request, ky: str | None = None):
+    """Lịch công bố BCTC quý: mặc định là mùa đang diễn ra (quý vừa kết thúc), không phải quý mới nhất đã đọc."""
+    with connect() as conn:
+        year, period = _parse_ky(ky, conn) if ky else cal.current_quarter()
+        entries = cal.calendar(conn, year, period)
+        quarters = _quarters(conn)
+    today = cal.today_vn()
+    if (year, period) not in quarters:
+        quarters = sorted([*quarters, (year, period)], reverse=True)
+    groups = {k: [e for e in entries if e.status(today) == k] for k in ("overdue", "pending", "late", "published")}
+    groups["pending"].sort(key=lambda e: (e.expected or e.deadline, e.ticker))
+    for k in ("late", "published"):
+        groups[k].sort(key=lambda e: e.published, reverse=True)
+    return templates.TemplateResponse(request, "calendar.html", {
+        "year": year, "period": period, "quarters": quarters, "groups": groups, "today": today,
+        "quarter_end": cal.quarter_end(year, period), "total": len(entries)})
+
+
+def _shared_card(ticker: str, ky: str):
+    """Thẻ công khai để chia sẻ: chỉ BCTC quý chính thức (không phải bản tải lên riêng) đã kiểm chứng hoặc duyệt tay."""
+    with connect() as conn:
+        year, period = _parse_ky(ky, conn)
+        doc_id = cards.quarter_document(conn, ticker.upper(), year, period)
+        got = cards.card_for(conn, doc_id) if doc_id else None
+    if got is None or not got[1]["published"] or not got[0].supported:
+        raise HTTPException(404, "Chưa có thẻ đã kiểm chứng cho mã và kỳ này")
+    return got
+
+
+@app.get("/anh/{ticker}/{ky}.png")
+def share_image(ticker: str, ky: str):
+    card, info = _shared_card(ticker, ky)
+    return Response(share.card_png(card, info["name"]), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/chia-se/{ticker}/{ky}")
+def share_page(request: Request, ticker: str, ky: str):
+    card, info = _shared_card(ticker, ky)
+    np = next((m for m in card.metrics if m.key == "npat_parent"), None)
+    return templates.TemplateResponse(request, "share.html", {
+        "card": card, "info": info, "ky": ky.lower(), "np": np, "site": site_url()})
+
+
 @app.get("/ma/{ticker}")
 def card_page(request: Request, ticker: str, ky: str | None = None):
     ticker = ticker.upper()
@@ -146,7 +195,7 @@ def card_page(request: Request, ticker: str, ky: str | None = None):
     card, info = got if got else (None, None)
     return templates.TemplateResponse(request, "card.html", {
         "ticker": ticker, "name": name[0], "year": year, "period": period, "card": card, "info": info,
-        "doc_id": doc_id, "quarters": quarters, "watching": watching, "private": False})
+        "doc_id": doc_id, "quarters": quarters, "watching": watching, "private": False, "site": site_url()})
 
 
 @app.get("/the/{doc_id}")

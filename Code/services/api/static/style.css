@@ -94,3 +94,18 @@ button { cursor:pointer; background:var(--soft); }
 button.link { border:0; background:none; color:#0b5cad; padding:0 4px; }
 ul.plain { list-style:none; padding:0; } ul.plain li { padding:4px 0; border-bottom:1px solid var(--line); }
 .reviewbox { background:var(--sel); border-radius:6px; padding:8px 10px; margin:8px 0; }
+.toolbar { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin:8px 0 4px; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+.seg button { border:0; border-radius:0; background:var(--bg); padding:5px 10px; }
+.seg button + button { border-left:1px solid var(--line); }
+.seg button.on { background:var(--fg); color:#fff; }
+.srank { width:36px; text-align:right; flex-shrink:0; }
+.srow[hidden] { display:none; }
+.cal h2 { margin-top:20px; }
+.calrow { display:flex; gap:12px; padding:6px 4px; border-bottom:1px solid var(--line); align-items:baseline; }
+.calrow .when { width:120px; flex-shrink:0; font-variant-numeric:tabular-nums; }
+.calrow .who { flex:1; min-width:0; }
+.late { color:var(--bad); font-weight:600; }
+.sharebox { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
+.sharebox img { max-width:100%; border:1px solid var(--line); border-radius:6px; }
+@media (max-width: 600px) { .calrow { flex-direction:column; gap:0; } .calrow .when { width:auto; } }

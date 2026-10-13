@@ -31,6 +31,13 @@
 {% else %}
   <p>{% if info.status == "approved" %}<span class="badge ok">Đã duyệt tay</span>{% else %}<span class="badge ok">Đã kiểm chứng</span>{% endif %} <span class="small">{{ info.gate[0] }}/{{ info.gate[1] }} ràng buộc kế toán đạt{% if info.manual_fixes %}; {{ info.manual_fixes }} ô đã được người đối chiếu ảnh gốc sửa{% endif %}</span></p>
 
+  {% if not private %}{% set ky = period|lower ~ '-' ~ year %}{% set share_url = site ~ '/chia-se/' ~ ticker ~ '/' ~ ky %}
+  <div class="sharebox small">Chia sẻ thẻ:
+    <a href="/anh/{{ ticker }}/{{ ky }}.png" download="soi-{{ ticker }}-{{ ky }}.png">Tải ảnh</a> ·
+    <a href="https://www.facebook.com/sharer/sharer.php?u={{ share_url | urlencode }}" target="_blank" rel="noopener">Facebook</a> ·
+    <button class="link" type="button" onclick="navigator.clipboard.writeText('{{ share_url }}').then(() => this.textContent = 'Đã chép link')">Chép link (dán vào Zalo)</button>
+  </div>{% endif %}
+
   {% if card.flags %}
   <section class="flags">
     <h2>Cần xem kỹ</h2>

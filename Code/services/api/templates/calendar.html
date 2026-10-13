@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Lịch BCTC {{ period }}/{{ year }} · Soi{% endblock %}
+{% macro d(x) %}{{ x.strftime('%d/%m') if x else '–' }}{% endmacro %}
+{% block body %}
+<div class="seasonhead">
+  <h1>Lịch công bố BCTC {{ period }}/{{ year }}</h1>
+  <select onchange="location='/lich/'+this.value">
+  {% for y, p in quarters %}<option value="{{ p|lower }}-{{ y }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
+  </select>
+  <a class="small" href="/mua-bctc/{{ period|lower }}-{{ year }}">Bảng mùa BCTC</a>
+</div>
+<p class="muted small">Quý kết thúc {{ quarter_end.strftime('%d/%m/%Y') }}. Hạn công bố BCTC quý: 20 ngày; công ty mẹ lập BCTC hợp nhất: 30 ngày.
+  "Thường công bố" là trung vị số ngày sau khi hết quý ở các quý trước. Ngày công bố tính theo lúc Vietstock đăng. Hạn 20 hay 30 ngày suy từ việc mã có BCTC hợp nhất trong kho hay không, nên là ước tính.
+  Đã công bố {{ groups.published | length + groups.late | length }}/{{ total }} mã.</p>
+
+<div class="cal">
+{% if groups.overdue %}
+<h2>Quá hạn, chưa thấy công bố ({{ groups.overdue | length }})</h2>
+{% for e in groups.overdue %}
+<div class="calrow"><span class="when late">hạn {{ d(e.deadline) }}</span>
+  <span class="who"><a href="/ma/{{ e.ticker }}?ky={{ period|lower }}-{{ year }}"><b>{{ e.ticker }}</b></a> <span class="muted small">{{ e.name }}</span></span></div>
+{% endfor %}
+{% endif %}
+
+<h2>Sắp công bố ({{ groups.pending | length }})</h2>
+{% for e in groups.pending %}
+<div class="calrow">
+  <span class="when">{% if e.expected %}khoảng {{ d(e.expected) }}{% else %}chưa rõ{% endif %}</span>
+  <span class="who"><a href="/ma/{{ e.ticker }}?ky={{ period|lower }}-{{ year }}"><b>{{ e.ticker }}</b></a> <span class="muted small">{{ e.name }}</span></span>
+  <span class="small muted">hạn {{ d(e.deadline) }}{% if e.expected %} · thường sau {{ e.typical_days }} ngày ({{ e.history }} quý){% endif %}</span>
+</div>
+{% else %}<p class="muted">Không còn mã nào chờ công bố.</p>
+{% endfor %}
+
+{% if groups.late or groups.published %}
+<h2>Đã công bố ({{ groups.published | length + groups.late | length }})</h2>
+{% for e in (groups.late + groups.published) | sort(attribute='published', reverse=True) %}
+<div class="calrow">
+  <span class="when">{{ e.published | gio }}</span>
+  <span class="who"><a href="/ma/{{ e.ticker }}?ky={{ period|lower }}-{{ year }}"><b>{{ e.ticker }}</b></a> <span class="muted small">{{ e.name }}</span></span>
+  <span class="small {{ 'late' if e in groups.late else 'muted' }}">{{ (e.published_date - e.quarter_end).days }} ngày sau khi hết quý{% if e in groups.late %}, trễ hạn {{ d(e.deadline) }}{% endif %}</span>
+</div>
+{% endfor %}
+{% endif %}
+</div>
+{% endblock %}

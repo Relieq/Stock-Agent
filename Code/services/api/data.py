@@ -8,7 +8,7 @@ from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 
-from services.extraction.pipeline import _check, _rotation
+from services.extraction.pipeline import _check, _read_text, _record_files, _rotation
 from services.extraction.rules import BANK_INCOME_PARTS, RULESETS
 from services.extraction.sources import candidates, open_pdf, render_page
 from services.ingestion.registry import raw_data_dir
@@ -30,18 +30,13 @@ STATEMENT_NAMES = {"BS": "Cân đối kế toán", "IS": "Kết quả kinh doanh
 
 
 def record_path(document_id: int) -> Path | None:
-    files = sorted((raw_data_dir() / "extracted").glob(f"*/{document_id}_*.json"), key=lambda p: p.stat().st_mtime)
+    files = _record_files(document_id)          # chỉ mục chung của pipeline, cũ -> mới
     return files[-1] if files else None
-
-
-@lru_cache(maxsize=64)
-def _load(path: str, mtime: float) -> dict:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def load_record(document_id: int) -> dict | None:
     p = record_path(document_id)
-    return _load(str(p), p.stat().st_mtime) if p else None
+    return json.loads(_read_text(p)) if p else None
 
 
 def headline(record: dict) -> dict[str, Decimal | None]:
@@ -157,15 +152,6 @@ def page_image(record: dict, storage_key: str, page: int) -> bytes:
     return page_png(storage_key, record["chosen"], page, _rotation(record, page))
 
 
-_cells_cache: dict[tuple, object] = {}
-
-
 def evidence(conn, document_id: int):
-    """Bằng chứng từng ô (services.extraction.evidence), cache theo file kết quả trích xuất."""
-    def cells_fn(doc_id, period, record):
-        p = record_path(doc_id)
-        key = (doc_id, period, str(p), p.stat().st_mtime if p else None)
-        if key not in _cells_cache:
-            _cells_cache[key] = cells_of(doc_id, period, record)
-        return _cells_cache[key]
-    return document_evidence(conn, document_id, load=load_record, cells_fn=cells_fn)
+    """Bằng chứng từng ô (services.extraction.evidence); phần tốn thời gian (_check) đã được pipeline lưu tạm."""
+    return document_evidence(conn, document_id, load=load_record)

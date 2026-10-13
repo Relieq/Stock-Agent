@@ -6,15 +6,32 @@
   <select onchange="location='/mua-bctc/'+this.value">
   {% for y, p in quarters %}<option value="{{ p|lower }}-{{ y }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
   </select>
+  <a class="small" href="/lich/{{ period|lower }}-{{ year }}">Lịch công bố</a>
 </div>
 {% set done = rows | selectattr('card') | list %}
-<p class="muted small">{{ done | length }}/{{ rows | length }} mã đã có BCTC. LNST: của cổ đông công ty mẹ (ngân hàng: của cổ đông ngân hàng mẹ), quý này so với cùng kỳ.</p>
-<div class="seasonlist">
+<p class="muted small">{{ done | length }}/{{ rows | length }} mã đã có BCTC. LNST: của cổ đông công ty mẹ (ngân hàng: của cổ đông ngân hàng mẹ), quý này so với cùng kỳ.
+  Xếp hạng chỉ theo số liệu đã kiểm chứng, không phải khuyến nghị đầu tư.</p>
+
+<div class="toolbar">
+  <span class="seg" id="sort">
+    <button data-sort="up" class="on">Tăng mạnh nhất</button><button data-sort="down">Giảm mạnh nhất</button><button data-sort="new">Mới công bố</button><button data-sort="az">A–Z</button>
+  </span>
+  <label class="small"><input type="checkbox" id="f-flag"> có cờ cảnh báo</label>
+  <label class="small" title="Số trên BCTC này khác số công ty đã công bố trước đó (soát xét, kiểm toán hoặc công ty sửa)"><input type="checkbox" id="f-revised"> có số bị sửa</label>
+  <select id="f-kind" class="small"><option value="">Mọi loại</option><option value="bank">Ngân hàng</option><option value="corporate">Doanh nghiệp</option></select>
+</div>
+
+<div class="seasonlist" id="list">
 {% for r in rows %}
-  <a class="srow" href="/ma/{{ r.ticker }}?ky={{ period|lower }}-{{ year }}">
+  {% set ok = r.card and r.info.published and r.card.supported %}
+  <a class="srow" href="/ma/{{ r.ticker }}?ky={{ period|lower }}-{{ year }}"
+     data-ticker="{{ r.ticker }}" data-kind="{{ r.kind }}" data-ok="{{ 1 if ok else 0 }}"
+     data-group="{{ r.growth.group if ok else 'none' }}" data-pct="{{ r.growth.pct if ok and r.growth.pct is not none else '' }}"
+     data-flags="{{ (r.flag_keys or []) | join(' ') if ok else '' }}"
+     data-listed="{{ r.info.listed_at.isoformat() if r.info and r.info.listed_at else '' }}">
     <div class="sticker"><b>{{ r.ticker }}</b><span class="muted small">{{ r.name }}</span></div>
     <div class="sbody">
-    {% if r.card and r.info.published and r.card.supported %}
+    {% if ok %}
       {% set np = (r.card.metrics | selectattr('key', 'equalto', 'npat_parent') | first) %}
       <div>LNST quý <b>{{ np.q_cur.value | tien }}</b> <span class="muted">· {{ np.q_change }}</span></div>
       {% if r.card.flags %}<div class="chips">{% for f in r.card.flags %}<span class="chip flag">{{ f.title }}</span>{% endfor %}</div>{% endif %}
@@ -22,7 +39,45 @@
     {% elif r.info %}<span class="muted">Đã có BCTC, đang chờ kiểm chứng</span>
     {% else %}<span class="muted">Chưa công bố</span>{% endif %}
     </div>
+    <div class="srank small muted"></div>
   </a>
 {% endfor %}
 </div>
+<script>
+(() => {
+  const list = document.getElementById('list'), rows = [...list.children];
+  // Thứ tự nhóm khi xếp "tăng mạnh nhất": lãi tăng, chuyển lỗ sang lãi, lãi giảm, lỗ, chuyển lãi sang lỗ, chưa có số
+  const UP = {up: 0, to_profit: 1, down: 2, loss: 3, to_loss: 4, unknown: 5, none: 6};
+  const DOWN = {to_loss: 0, loss: 1, down: 2, up: 3, to_profit: 4, unknown: 5, none: 6};
+  let mode = 'up';
+  try { mode = localStorage.getItem('soi-sort') || 'up'; } catch (e) {}
+  const pct = r => r.dataset.pct === '' ? null : parseFloat(r.dataset.pct);
+  function key(r) {
+    if (mode === 'az') return [0, r.dataset.ticker];
+    if (mode === 'new') return [r.dataset.listed ? 0 : 1, r.dataset.listed ? -Date.parse(r.dataset.listed) : 0, r.dataset.ticker];
+    const g = (mode === 'up' ? UP : DOWN)[r.dataset.group], p = pct(r);
+    return [g, p === null ? 0 : (mode === 'up' ? -p : p), r.dataset.ticker];
+  }
+  function cmp(a, b) { for (let i = 0; i < a.length; i++) { if (a[i] < b[i]) return -1; if (a[i] > b[i]) return 1; } return 0; }
+  function render() {
+    const fFlag = document.getElementById('f-flag').checked, fRev = document.getElementById('f-revised').checked,
+          fKind = document.getElementById('f-kind').value;
+    const sorted = rows.slice().sort((a, b) => cmp(key(a), key(b)));
+    let n = 0;
+    for (const r of sorted) {
+      const flags = r.dataset.flags.split(' ').filter(Boolean);
+      const show = (!fFlag || flags.length) && (!fRev || flags.includes('revised')) && (!fKind || r.dataset.kind === fKind);
+      r.hidden = !show;
+      const rank = r.querySelector('.srank');
+      rank.textContent = show && r.dataset.ok === '1' && (mode === 'up' || mode === 'down') ? '#' + (++n) : '';
+      list.appendChild(r);
+    }
+    document.querySelectorAll('#sort button').forEach(b => b.classList.toggle('on', b.dataset.sort === mode));
+  }
+  document.querySelectorAll('#sort button').forEach(b => b.onclick = () => {
+    mode = b.dataset.sort; try { localStorage.setItem('soi-sort', mode); } catch (e) {} render(); });
+  ['f-flag', 'f-revised', 'f-kind'].forEach(id => document.getElementById(id).onchange = render);
+  render();
+})();
+</script>
 {% endblock %}

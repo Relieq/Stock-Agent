@@ -10,8 +10,11 @@ validations để làm bước đó sau.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
+import time
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -400,6 +403,25 @@ def _rotation(record: dict, page: int) -> int:
     return int(rotations.get(page, rotations.get(str(page), 0)))
 
 
+_CHECK_CACHE: dict[tuple, tuple] = {}
+
+
+def _check_cached(record: dict):
+    """_check cho chỗ chỉ đọc (thẻ, bằng chứng ô): dùng lại kết quả khi phần số đã chép và mẫu công ty không đổi. Khóa
+    lấy theo nội dung nên bản ghi đang sửa dở trong bộ nhớ (đọc lại, bộ đo) không bao giờ nhận nhầm kết quả cũ. Kết
+    quả dùng chung: người gọi không được sửa."""
+    key = (record.get("company_template"),
+           hashlib.sha1(json.dumps(record.get("raw"), sort_keys=True, ensure_ascii=False).encode()).hexdigest())
+    got = _CHECK_CACHE.get(key)
+    if got is None:
+        if len(_CHECK_CACHE) > 2000:
+            _CHECK_CACHE.clear()
+        got = _CHECK_CACHE[key] = (_check(record), record.get("codes_inferred"))
+    else:
+        record["codes_inferred"] = got[1]
+    return got[0]
+
+
 def _check(record: dict):
     extracted, statements, sep, template, checks = _check_variants(record)
     inferred = _infer_missing_codes(extracted, statements, sep, template, checks) if template else []
@@ -636,11 +658,59 @@ def track_usage(record: dict, client: VisionClient):
             cur[k] = cur.get(k, 0) + v
 
 
+# Chỉ mục file kết quả theo mã tài liệu. Trước đây mỗi lần đọc là một lần glob cả thư mục extracted: trên ổ Windows gắn
+# vào Docker, mỗi lần hỏi thông tin file mất ~0,3 ms nên trang mùa BCTC (vài trăm lần đọc) mất ~10 giây. Chỉ mục và nội
+# dung file được dùng lại trong REFRESH_SECONDS; quá thời gian đó thì quét lại (bản ghi vừa ghi xong được thấy ngay vì
+# _finalize xóa chỉ mục).
+REFRESH_SECONDS = 2.0
+_INDEX: dict = {"at": 0.0, "files": {}}
+_TEXT: dict[Path, tuple[float, int, int, str]] = {}
+
+
+def _invalidate_index() -> None:
+    _INDEX["at"] = 0.0
+
+
+def _record_files(document_id: int) -> list[Path]:
+    now = time.monotonic()
+    if now - _INDEX["at"] > REFRESH_SECONDS:
+        root = raw_data_dir() / "extracted"
+        files: dict[int, list[tuple[float, Path]]] = {}
+        if root.exists():
+            for d in os.scandir(root):
+                if not d.is_dir():
+                    continue
+                for f in os.scandir(d.path):
+                    head = f.name.split("_", 1)[0]
+                    if f.name.endswith(".json") and head.isdigit():
+                        files.setdefault(int(head), []).append((f.stat().st_mtime, Path(f.path)))
+        _INDEX.update(at=now, files={k: [p for _, p in sorted(v)] for k, v in files.items()})
+    return _INDEX["files"].get(document_id, [])
+
+
+def _read_text(path: Path) -> str:
+    """Nội dung file kết quả; dùng lại bản đã đọc nếu vừa kiểm trong REFRESH_SECONDS hoặc file không đổi."""
+    now = time.monotonic()
+    cached = _TEXT.get(path)
+    if cached and now - cached[0] <= REFRESH_SECONDS:
+        return cached[3]
+    st = path.stat()
+    if cached and cached[1:3] == (st.st_mtime_ns, st.st_size):
+        _TEXT[path] = (now, *cached[1:])
+        return cached[3]
+    text = path.read_text(encoding="utf-8")
+    _TEXT[path] = (now, st.st_mtime_ns, st.st_size, text)
+    return text
+
+
 def _load_record(conn: psycopg.Connection, document_id: int) -> dict:
-    files = sorted((raw_data_dir() / "extracted").glob(f"*/{document_id}_*.json"), key=lambda p: p.stat().st_mtime)
+    files = _record_files(document_id)       # cũ -> mới theo thời điểm sửa
+    if not files:
+        # Chỉ mục có thể cũ (file mới ghi đè cùng thư mục chưa đổi thời điểm): tìm lại kiểu cũ
+        files = sorted((raw_data_dir() / "extracted").glob(f"*/{document_id}_*.json"), key=lambda p: p.stat().st_mtime)
     if not files:
         raise RuntimeError(f"Tài liệu {document_id} chưa có kết quả trích xuất")
-    record = json.loads(files[-1].read_text(encoding="utf-8"))
+    record = json.loads(_read_text(files[-1]))
     if "company_template" not in record:
         record["company_template"] = conn.execute(
             "SELECT c.template FROM documents d JOIN companies c ON c.ticker = d.ticker WHERE d.id = %s",
@@ -699,6 +769,8 @@ def _finalize(conn: psycopg.Connection, record: dict) -> dict:
     out_path = raw_data_dir() / "extracted" / ticker / f"{document_id}_{sha256[:8]}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(record, ensure_ascii=False, indent=1, default=_json_default), encoding="utf-8")
+    _invalidate_index()
+    _TEXT.pop(out_path, None)
     record["output_path"] = str(out_path)
 
     # 4. Ghi CSDL (chạy lại cùng phiên bản pipeline thì thay kết quả cũ)

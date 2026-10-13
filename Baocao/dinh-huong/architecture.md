@@ -390,6 +390,14 @@ flowchart LR
 | **So với trợ lý AI đa năng ("ChatGPT test")** | Tỷ lệ đúng số (sai số ≤ 0,5%), độ mới (hỏi ngay sau công bố), khả năng trả lời câu hỏi toàn thị trường, có nguồn kiểm chứng được hay không, thời gian, chi phí | 50–100 câu hỏi thật chia 5 loại. Chạy trên ChatGPT/Gemini/Perplexity (có tìm web) và trên Soi. Lặp lại sau mỗi mùa BCTC với phiên bản mô hình mới nhất |
 | Sản phẩm | UV, MAU, WAU, retention theo cohort, lượt chia sẻ, CSAT; người dùng và lượt gọi qua MCP | Analytics, log MCP |
 
+**Đối chiếu với nguồn ngoài (13/10/2026, chỉ dùng nội bộ, không hiển thị số của bên khác).** LNST của cổ đông công ty mẹ
+theo quý của Soi so với bảng KQKD trên CafeF, VN30, các quý 4/2025, 1/2026, 2/2026: 80 ô so được (HDB không đọc được
+trang). Lần đầu 76 khớp, 4 lệch. Một chỗ là lỗi của Soi: VIC quý 1/2026 không in mã 61/62 nên thẻ lấy nhầm dòng 60
+(LNST gồm cả cổ đông không kiểm soát), hiện tăng ~150% thay vì +4,3%; đã sửa bằng cách gán mã 61/62 theo tên dòng để
+ràng buộc 61 + 62 = 60 kiểm được. Ba chỗ còn lại (VJC quý 1/2026, VHM quý 4/2025 và quý 1/2026) số của Soi khớp phép
+cộng của chính BCTC, số của CafeF thì không. Bài học: lỗi "đọc đúng nhưng lấy nhầm dòng" không lộ qua ràng buộc khi
+dòng đúng thiếu mã; đối chiếu nguồn ngoài nên chạy sau mỗi mùa BCTC.
+
 ## 11. Danh mục (ĐATN): kế toán danh mục và quản trị rủi ro
 
 ### 11.1 Mô hình dữ liệu

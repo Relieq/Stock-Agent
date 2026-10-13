@@ -15,6 +15,7 @@ import json
 import os
 import re
 import time
+import unicodedata
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -422,8 +423,35 @@ def _check_cached(record: dict):
     return got[0]
 
 
+# Dòng chia LNST theo công ty mẹ / cổ đông không kiểm soát mà BCTC không in mã số (VIC quý 1/2026): gán mã 61/62 theo
+# tên để ràng buộc 61 + 62 = 60 kiểm được chúng. Thiếu bước này thì thẻ lấy nhầm dòng 60 (gồm cả phần cổ đông không
+# kiểm soát) làm LNST công ty mẹ: VIC quý 1/2026 hiện 5.611 tỷ thay vì 7.276 tỷ.
+_SPLIT_LABELS = (("61", re.compile(r"sau thuế (thu nhập doanh nghiệp )?(của )?(cổ đông )?(của )?công ty mẹ|chủ sở hữu (của )?công ty mẹ")),
+                 ("62", re.compile(r"cổ đông không kiểm soát|cổ đông thiểu số|lợi ích (của )?cổ đông không")))
+
+
+def _label_split_codes(extracted, statements) -> list[dict]:
+    st = statements.get("IS")
+    ex = next((e for e in extracted if e.statement == "IS"), None)
+    if st is None or ex is None or "60" not in st.values or "61" in st.values or "62" in st.values:
+        return []
+    out = []
+    for code, pattern in _SPLIT_LABELS:
+        hit = next((it for it in ex.items if normalize_code(it.code) is None
+                    and pattern.search(unicodedata.normalize("NFC", it.label or "").casefold())
+                    and any(v not in (None, "", "-") for v in it.values_raw.values())), None)
+        if hit is not None:
+            hit.code = code
+            out.append({"statement": "IS", "code": code, "label": hit.label, "rule": "label"})
+    return out
+
+
 def _check(record: dict):
     extracted, statements, sep, template, checks = _check_variants(record)
+    if template in ("TT200", "TT99") and (labelled := _label_split_codes(extracted, statements)):
+        statements, sep = normalize(extracted)
+        checks = validate(statements, template)
+        record["codes_from_labels"] = labelled
     inferred = _infer_missing_codes(extracted, statements, sep, template, checks) if template else []
     record["codes_inferred"] = inferred
     if inferred:

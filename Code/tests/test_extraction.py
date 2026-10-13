@@ -220,3 +220,18 @@ def test_missing_code_is_inferred_only_when_numbers_prove_it():
     rec = _record({"IS": is_rows}, "securities")
     _check(rec)
     assert rec["codes_inferred"] == []
+
+
+def test_parent_and_minority_rows_without_codes_get_61_62_from_labels():
+    # VIC quý 1/2026: hai dòng chia LNST không in mã số; thiếu bước này thẻ lấy dòng 60 làm LNST công ty mẹ
+    from services.extraction.pipeline import _label_split_codes
+    is_ = ExtractedStatement("IS", "Triệu VND", [
+        ExtractedItem("60", "Lợi nhuận sau thuế TNDN", {"q_cur": "5.610.779"}),
+        ExtractedItem(None, "Trong đó:", {"q_cur": None}),
+        ExtractedItem(None, "- Lợi nhuận/(lỗ) sau thuế của công ty mẹ", {"q_cur": "7.276.018"}),
+        ExtractedItem(None, "- Lợi nhuận/(lỗ) sau thuế của cổ đông không kiểm soát", {"q_cur": "(1.665.239)"}),
+    ])
+    statements, _ = normalize([is_])
+    assert [d["code"] for d in _label_split_codes([is_], statements)] == ["61", "62"]
+    statements, _ = normalize([is_])
+    assert all(c.passed for c in validate(statements, "TT200") if c.rule_id == "IS_60_split")

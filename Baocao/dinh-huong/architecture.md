@@ -396,7 +396,12 @@ trang). Lần đầu 76 khớp, 4 lệch. Một chỗ là lỗi của Soi: VIC q
 (LNST gồm cả cổ đông không kiểm soát), hiện tăng ~150% thay vì +4,3%; đã sửa bằng cách gán mã 61/62 theo tên dòng để
 ràng buộc 61 + 62 = 60 kiểm được. Ba chỗ còn lại (VJC quý 1/2026, VHM quý 4/2025 và quý 1/2026) số của Soi khớp phép
 cộng của chính BCTC, số của CafeF thì không. Bài học: lỗi "đọc đúng nhưng lấy nhầm dòng" không lộ qua ràng buộc khi
-dòng đúng thiếu mã; đối chiếu nguồn ngoài nên chạy sau mỗi mùa BCTC.
+dòng đúng thiếu mã; đối chiếu nguồn ngoài chạy sau mỗi mùa BCTC.
+
+Từ 13/10/2026 việc này thành lệnh cố định `python eval/external.py --year <năm> --period <quý>`, mở rộng sang doanh thu
+thuần và lợi nhuận gộp (doanh nghiệp), tổng thu nhập hoạt động (ngân hàng; CafeF không có dòng thu nhập lãi thuần).
+Lần chạy đầu: 211 ô, 208 khớp, 3 lệch (VJC quý 1/2026 chênh 2 nghìn đồng ở lợi nhuận gộp và LNST, VHM quý 4/2025
+chênh 200 triệu, đều là chỗ đã phân xử ở trên); không phát hiện thêm lỗi lấy nhầm dòng ở doanh thu và lợi nhuận gộp.
 
 ## 11. Danh mục (ĐATN): kế toán danh mục và quản trị rủi ro
 

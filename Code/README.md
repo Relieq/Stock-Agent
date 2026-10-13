@@ -59,6 +59,7 @@ python -m services.extraction show --doc-id 28                    # các ràng b
 python -m services.extraction reread --doc-id 28                  # đọc lại các ô thuộc ràng buộc bị lệch
 python -m services.extraction recheck --doc-id 28                 # kiểm tra lại từ kết quả đã lưu (khi sửa rules.py), không gọi mô hình
 python eval/golden.py                                             # chấm với bộ duyệt tay
+python eval/external.py --year 2026 --period Q2                 # đối chiếu thẻ với CafeF, chỉ dùng nội bộ
 ```
 
 - Mô hình chỉ định vị trang và chép nguyên văn các ô; đổi chuỗi thành số, đổi đơn vị, kiểm tra cộng tổng đều bằng code.

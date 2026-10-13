@@ -42,6 +42,7 @@ BANK: dict[tuple[str, str], str] = {
     ("IS", "opex"): "b.opex",
     ("IS", "ppop"): "b.ppop",
     ("IS", "provision"): "b.prov",
+    ("IS", "other_profit"): "b.nother",
     ("IS", "pbt"): "b.pbt",
     ("IS", "npat"): "b.npat",
     ("IS", "npat_parent"): "b.npat_parent",

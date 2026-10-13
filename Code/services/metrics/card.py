@@ -265,6 +265,31 @@ CONSOLIDATION_LINE = re.compile(r"quyen kiem soat|hop nhat kinh doanh|thanh ly.*
 MATERIAL_SHARE = Decimal("0.05")       # khoản bất thường dưới 5% LNTT thì không gắn cờ
 
 
+OTHER_SHARE_OF_GROWTH = Decimal(1) / 3     # lãi khác tăng chiếm từ 1/3 mức tăng LNTT
+OTHER_SHARE_OF_PBT = Decimal("0.1")         # và phần tăng đó từ 10% LNTT quý
+
+
+def flag_other_income(f: Facts) -> Flag | None:
+    """LNTT quý tăng mà một phần lớn mức tăng đến từ lợi nhuận khác (dòng 40; ngân hàng: lãi thuần hoạt động khác,
+    thường là thu hồi nợ đã xử lý), là khoản khó lặp lại."""
+    oth, oth_prev = f.metric("IS", "other_profit", "q_cur"), f.metric("IS", "other_profit", "q_prev_year")
+    pbt, pbt_prev = f.metric("IS", "pbt", "q_cur"), f.metric("IS", "pbt", "q_prev_year")
+    if None in (oth.value, oth_prev.value, pbt.value, pbt_prev.value) or pbt.value <= pbt_prev.value or pbt.value <= 0:
+        return None
+    rise, growth = oth.value - oth_prev.value, pbt.value - pbt_prev.value
+    if pbt_prev.value > 0 and growth < pbt_prev.value * OTHER_SHARE_OF_PBT:
+        return None                              # LNTT gần như đi ngang: không có "mức tăng" để giải thích
+    if rise < growth * OTHER_SHARE_OF_GROWTH or rise < pbt.value * OTHER_SHARE_OF_PBT:
+        return None
+    name = "lãi thuần từ hoạt động khác" if f.template == "TCTD" else "lợi nhuận khác"
+    signed = lambda v: ("−" if v < 0 else "") + ty(v)
+    share = "lớn hơn cả mức tăng LNTT" if rise > growth else f"bằng {vn(rise / growth * 100, 0)}% mức tăng"
+    return Flag("other_income", "Lợi nhuận tăng nhờ thu nhập khác",
+                f"LNTT quý tăng {ty(growth)} (từ {signed(pbt_prev.value)} lên {ty(pbt.value)}), trong đó {name} tăng "
+                f"{ty(rise)} (từ {signed(oth_prev.value)} lên {signed(oth.value)}), {share}. "
+                f"Đây là khoản ngoài hoạt động chính, thường khó lặp lại đều đặn.", _src(oth, oth_prev, pbt, pbt_prev))
+
+
 def flag_consolidation(f: Facts) -> Flag | None:
     if f.template == "TCTD":
         return None
@@ -377,7 +402,7 @@ def build_card(document_id: int, ticker: str, year: int, period: str, record: di
 
     flags: list[Flag] = []
     not_evaluated: list[str] = []
-    for fn in (flag_sign_change, flag_non_core, flag_provision, flag_consolidation, flag_cash):
+    for fn in (flag_sign_change, flag_non_core, flag_other_income, flag_provision, flag_consolidation, flag_cash):
         if (x := fn(f)) is not None:
             flags.append(x)
     low = flag_low_base(f, history or {}, year, period)

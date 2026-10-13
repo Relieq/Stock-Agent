@@ -793,6 +793,8 @@ def _finalize(conn: psycopg.Connection, record: dict) -> dict:
     record.pop("output_path", None)
     if template is None:
         record["note"] = f"Chưa có bộ ràng buộc cho mẫu {company_template}"
+    else:
+        record.pop("note", None)            # ghi chú cũ từ lần chạy trước khi có bộ ràng buộc cho mẫu này
 
     out_path = raw_data_dir() / "extracted" / ticker / f"{document_id}_{sha256[:8]}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)

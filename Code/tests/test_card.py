@@ -27,3 +27,32 @@ def test_losses_are_described_in_words_not_percent():
 
 def test_missing_values_give_no_text():
     assert change_text(None, D(1), True) == ""
+
+
+class _Facts:
+    """Thay Facts: chỉ trả các số quý cho cờ (đơn vị tỷ)."""
+
+    def __init__(self, template, **vals):
+        self.template, self.vals = template, vals
+
+    def metric(self, statement, metric, column):
+        from services.metrics.card import Value
+        v = self.vals.get(f"{metric}.{column}")
+        return Value(None if v is None else D(v) * B)
+
+
+def test_other_income_flag_on_bank_debt_recovery():
+    from services.metrics.card import flag_other_income
+    # VCB quý 2/2026: LNTT +6.386 tỷ, lãi thuần hoạt động khác +2.906 tỷ (46% mức tăng)
+    vcb = _Facts("TCTD", **{"other_profit.q_cur": "4058.556", "other_profit.q_prev_year": "1152.928",
+                            "pbt.q_cur": "17419.725", "pbt.q_prev_year": "11033.915"})
+    flag = flag_other_income(vcb)
+    assert flag is not None and "46%" in flag.detail and "hoạt động khác" in flag.detail
+    # lãi khác tăng ít so với mức tăng LNTT: không gắn cờ
+    small = _Facts("TT200", **{"other_profit.q_cur": "12", "other_profit.q_prev_year": "10",
+                               "pbt.q_cur": "200", "pbt.q_prev_year": "100"})
+    assert flag_other_income(small) is None
+    # LNTT giảm: không gắn cờ
+    down = _Facts("TT200", **{"other_profit.q_cur": "50", "other_profit.q_prev_year": "0",
+                              "pbt.q_cur": "90", "pbt.q_prev_year": "100"})
+    assert flag_other_income(down) is None

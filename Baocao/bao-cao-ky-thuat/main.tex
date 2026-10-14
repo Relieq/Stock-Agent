@@ -1272,7 +1272,9 @@ khác.}\label{fig:trangthaiketqua}
 \end{figure}
 
 Bốn BCTC quý 4/2025 \enquote{đã duyệt tay} (BSR, SSB, VPL, VHM) là trường hợp chính BCTC tự cộng lệch. Lần đọc lại phóng
-to vẫn ra đúng số cũ, nên người duyệt ghi rõ lý do rồi duyệt. Bản lỗi duy nhất (TCX quý 4/2025) là một công ty chứng khoán
+to vẫn ra đúng số cũ, nên người duyệt ghi rõ lý do rồi duyệt. Ví dụ ở cột quý 4/2024 của BCTC VHM, mã 30 in
+17.067.869, trong khi các dòng 20 đến 26 cộng ra 16.067.869 (cùng công thức này khớp ở ba cột còn lại của bảng) và mã
+50 cũng khớp với 16.067.869; nhiều khả năng doanh nghiệp in nhầm một chữ số ở mã 30. Bản lỗi duy nhất (TCX quý 4/2025) là một công ty chứng khoán
 có cấu trúc trang khác thường.
 
 \section{Độ đúng theo từng ô}\label{sec:theoo}
@@ -1285,10 +1287,10 @@ một ràng buộc. Bảng~\ref{tab:theoo} chia toàn bộ 35.075 ô số của 
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 \textbf{Loại} & \textbf{Số ô} & \textbf{Tỷ lệ} \\ \midrule
-Đúng ngay lần đọc đầu, ràng buộc xác nhận & 31.067 & 88,6\% \\
+Đúng ngay lần đọc đầu, ràng buộc xác nhận & 31.066 & 88,6\% \\
 Thuộc báo cáo phải chép lại trang, sau đó ràng buộc xác nhận & 1.456 & 4,2\% \\
 Đọc lại riêng ô (định vị ô sai, đối chiếu kỳ) mới đúng & 32 & 0,1\% \\
-Người duyệt sửa sau khi đối chiếu ảnh gốc & 79 & 0,2\% \\
+Người duyệt sửa sau khi đối chiếu ảnh gốc & 80 & 0,2\% \\
 Chưa nằm trong ràng buộc nào & 2.441 & 7,0\% \\
 \bottomrule
 \end{tabularx}
@@ -1364,7 +1366,7 @@ VN100 & khoảng 100 & 10--12 & 60--72 \\
 
 \section{Định vị ô đọc sai}\label{sec:evalrepair}
 \subsection{Bộ đề và cách thử}
-Trong các lần chạy, hệ thống đã gặp \textbf{86 ô số bị đọc sai} ở 16 BCTC mà ta biết cả số sai lẫn số đúng: hoặc người
+Trong các lần chạy, hệ thống đã gặp \textbf{87 ô số bị đọc sai} ở 16 BCTC mà ta biết cả số sai lẫn số đúng: hoặc người
 duyệt đã sửa tay sau khi xem ảnh gốc, hoặc lần đọc lại đã ra số đúng và BCTC sau đó đạt kiểm chứng. Thí nghiệm như sau:
 lấy từng BCTC, \textbf{đặt lại số sai vào đúng ô cũ}, chạy bước định vị (chỉ dùng phép tính trên các ràng buộc, không gọi
 mô hình), rồi so đề xuất với số đúng.
@@ -1392,20 +1394,20 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[font=\small\sffamily]
-  \node[box=40mm] (all) at (0,0) {86 ô đã biết là đọc sai\\(16 BCTC)};
+  \node[box=40mm] (all) at (0,0) {87 ô đã biết là đọc sai\\(16 BCTC)};
   \node[box=34mm,draw=soigray,fill=lightgray] (out) at (5.6,0) {8 ô ngoài tầm\\(không phép cộng nào lệch)};
-  \node[box=40mm] (in) at (0,-2.0) {78 ô trong tầm};
-  \node[gbox=34mm] (ok) at (-4.4,-4.4) {\textbf{13 ô} (17\%)\\đúng ngay, chỉ bằng phép tính};
+  \node[box=40mm] (in) at (0,-2.0) {79 ô trong tầm};
+  \node[gbox=34mm] (ok) at (-4.4,-4.4) {\textbf{13 ô} (16\%)\\đúng ngay, chỉ bằng phép tính};
   \node[gbox=34mm] (grp) at (0,-4.4) {\textbf{32 ô} (41\%)\\thu hẹp về nhóm, máy tự đọc lại để chọn};
-  \node[rbox=34mm] (miss) at (4.4,-4.4) {\textbf{33 ô} (42\%)\\sót, chuyển sang chép lại trang, duyệt tay};
+  \node[rbox=34mm] (miss) at (4.4,-4.4) {\textbf{34 ô} (43\%)\\sót, chuyển sang chép lại trang, duyệt tay};
   \draw[arr] (all) -- (out); \draw[arr] (all) -- (in);
   \draw[arr] (in) -- (ok); \draw[arr] (in) -- (grp); \draw[arr] (in) -- (miss);
   \draw[soigreen,very thick,decorate] ($(ok.south west)+(0,-0.25)$) -- ($(grp.south east)+(0,-0.25)$)
-     node[midway,below=1mm,font=\small\sffamily\bfseries,color=soigreen] {45/78 ô (58\%) tự định vị được};
+     node[midway,below=1mm,font=\small\sffamily\bfseries,color=soigreen] {45/79 ô (57\%) tự định vị được};
 \end{tikzpicture}
-\caption{Kết quả định vị ô đọc sai trên bộ đề 86 ô. Trong 42 nhóm cần đọc lại có tổng cộng 172 ô, khoảng 4 ô mỗi nhóm;
+\caption{Kết quả định vị ô đọc sai trên bộ đề 87 ô. Trong 42 nhóm cần đọc lại có tổng cộng 172 ô, khoảng 4 ô mỗi nhóm;
 đọc lại vài ô tốn khoảng 0,003 USD mỗi BCTC. Nếu bỏ BCTC bán niên của GVR (file 72 dpi, xem mục dưới), tỷ lệ tự
-định vị được là 29/45 ô (64\%).}\label{fig:evalrepair}
+định vị được là 29/46 ô (63\%).}\label{fig:evalrepair}
 \end{figure}
 
 \subsection{Phân tích các ca ngoài tầm, ca sót và đề xuất sai}
@@ -1414,14 +1416,14 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
         Người duyệt tìm ra chúng nhờ màu bằng chứng trên trang tài liệu (\enquote{cần xem lại}, \enquote{chưa kiểm được}).
         Các chỉ tiêu dùng trên thẻ KQKD đều nằm trong phép cộng bắt buộc, nên đọc sai thì phép cộng sẽ lệch và hệ thống
         không công bố.
-  \item \textbf{33 ô sót} phần lớn rơi vào trường hợp \textbf{nhiều ô sai cùng lúc trong cùng một phép cộng}, trái với giả
+  \item \textbf{34 ô sót} phần lớn rơi vào trường hợp \textbf{nhiều ô sai cùng lúc trong cùng một phép cộng}, trái với giả
         thiết của bước định vị là mỗi phép cộng chỉ có một ô sai (hoặc hai ô lệch cùng một lượng):
   \begin{itemize}
     \item 17 ô của BCTC bán niên 2026 của GVR. File chỉ có độ phân giải 72 dpi, nên mô hình đọc sai nhiều chữ số trên cùng
           một trang. Ví dụ ba dòng nợ ngắn hạn (mã 312, 316, 319) cùng sai trong phép cộng của mã 310; nguyên giá và hao
           mòn tài sản cố định cùng sai trong phép cộng của mã 221. Khi đó không có cách thay một ô nào làm phép cộng khớp
           lại. Người duyệt sửa các ô này sau khi đối chiếu ảnh phóng to.
-    \item 8 ô nằm trong \textbf{cùng một cột} (số liệu cùng kỳ năm trước) của BCTC quý 4/2025 của VHM: cả cột bị đọc sai
+    \item 9 ô nằm trong \textbf{cùng một cột} (số liệu cùng kỳ năm trước) của BCTC quý 4/2025 của VHM: cả cột bị đọc sai
           nhiều chỗ một lúc. Nguyên nhân sau này tìm ra là các trang KQKD của BCTC đó bị vẽ lộn ngược
           (mục~\ref{sec:evalanh}).
     \item 8 ô của BCTC quý 1 và quý 2/2026 của VHM, trong đó 2 ô mô hình chép số của một dòng khác (số khác hẳn, không

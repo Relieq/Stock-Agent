@@ -38,7 +38,7 @@ Dạ em xin báo cáo tiến độ tuần 3 và 4 để thầy nắm ạ:
 **Kết quả** ([mã nguồn](../Code/README.md), [báo cáo kỹ thuật](bao-cao-ky-thuat/main.pdf)):
 - **120 BCTC đã đọc**: 119 BCTC của 30 mã VN30 qua 4 kỳ (quý 4/2025, quý 1/2026, quý 2/2026, bán niên 2026) và 1 BCTC của HUT đọc thử theo yêu cầu người dùng. **119/120 đạt kiểm chứng** (115 tự động, 4 người duyệt sau khi đối chiếu ảnh), không còn BCTC nào chờ duyệt. Bản còn lại là BCTC quý 4/2025 của một công ty chứng khoán (TCX) có cấu trúc trang khác thường. Ngoài ra có 1 file trùng với một công bố khác, hệ thống tự nhận ra và không đọc lại.
 - **Độ đúng theo từng ô** (khoảng 35.000 ô số): 88,6% đúng ngay lần đọc đầu và được ràng buộc xác nhận; 4,3% thuộc các ô hệ thống tự đọc lại hoặc trang phải chép lại rồi mới khớp; 0,2% em sửa tay sau khi đối chiếu ảnh; 7,0% chưa có ràng buộc nào kiểm được (khoảng 900 ô trong số này là dòng chi tiết của công ty chứng khoán).
-- **Tự định vị ô đọc sai:** trên 86 ô đã biết là đọc sai, bước định vị tự tìm ra 45/78 ô trong tầm (58%); các ca sót chủ yếu là file mờ có nhiều ô sai cùng lúc trong một phép cộng (GVR bán niên, file 72 dpi).
+- **Tự định vị ô đọc sai:** trên 87 ô đã biết là đọc sai, bước định vị tự tìm ra 45/79 ô trong tầm (57%); các ca sót chủ yếu là file mờ có nhiều ô sai cùng lúc trong một phép cộng (GVR bán niên, file 72 dpi).
 - **Đối chiếu với nguồn ngoài** (CafeF, chỉ dùng nội bộ để kiểm tra, không hiển thị): doanh thu thuần, lợi nhuận gộp, LNST khớp 208/211 số.
 - **Chi phí:** trung bình khoảng 0,12 USD cho một BCTC (trung vị 0,08 USD). Tổng chi phí gọi mô hình từ đầu đến nay khoảng 13,5 USD, phần lớn là chi phí thử nghiệm khi phát triển.
 - **Phát hiện:**

@@ -19,7 +19,7 @@ from services.extraction.validate import ExtractedStatement
 _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
     "BS": [
         # Tài sản: các mục cấp La Mã
-        ("b.cash", [r"^tiền mặt(, vàng( bạc, đá quý)?)?$"]),
+        ("b.cash", [r"^tiền mặt(, vàng( bạc, đá quý)?)?$", r"^tiền mặt và vàng$"]),   # STB bán niên 2026
         ("b.sbv", [r"^tiền gửi tại (ngân hàng nhà nước|ngân hàng trung ương|nhnn)( việt nam)?( nhnn| nhnnvn)?$"]),
         ("b.interbank", [r"^tiền(, vàng)? gửi (tại )?và (cho vay|cấp tín dụng cho) (các )?(tổ chức tín dụng|tctd)( tctd)? khác( tctd)?$",
                           r"^tiền(, vàng)? gửi tại các (tổ chức tín dụng|tctd) khác và cho vay các (tổ chức tín dụng|tctd) khác$",
@@ -37,7 +37,9 @@ _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
         ("b.ta", [r"^tổng (cộng )?tài sản( có)?$"]),
         # Nợ phải trả
         ("b.gov", [r"^các khoản nợ chính phủ và (ngân hàng nhà nước|ngân hàng trung ương|nhnnvn|nhnn)( việt nam)?( nhnn)?$"]),
-        ("b.interbank_liab", [r"^tiền gửi và (tiền )?vay (của )?các (tổ chức tài chính( tctc)?, (các )?)?(tổ chức tín dụng|tctd)( tctd)? khác$"]),
+        ("b.interbank_liab", [r"^tiền gửi và (tiền )?vay (của )?các (tổ chức tài chính( tctc)?, (các )?)?(tổ chức tín dụng|tctd)( tctd)? khác$",
+                              # VPB bán niên 2026
+                              r"^tiền gửi và (tiền )?vay (của )?các (tổ chức tín dụng|tctd), (các )?tổ chức tài chính khác$"]),
         ("b.cust_dep", [r"^tiền gửi của khách hàng$"]),
         # Tên dài xuống dòng, mô hình có khi chỉ chép dòng đầu (STB quý 4/2025: "... và các khoản nợ")
         ("b.deriv_liab", [r"^các công cụ tài chính phái sinh và các (khoản nợ|công nợ)( tài chính khác)?$"]),
@@ -69,8 +71,8 @@ _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
         ("b.ppop", [r"trước (chi phí )?dự phòng rủi.?ro( tín dụng)?$"]),
         ("b.prov", [r"^(hoàn nhập/ ?)?chi phí(/hoàn nhập)? dự phòng rủi.?ro( tín dụng)?$"]),
         ("b.pbt", [r"^(tổng )?lợi nhuận trước thuế$"]),
-        ("b.cit_cur", [r"thuế (thu nhập doanh nghiệp|tndn)( tndn)? hiện hành( tạm tính)?$"]),
-        ("b.cit_def", [r"thuế (thu nhập doanh nghiệp|tndn)( tndn)? hoãn lại$"]),
+        ("b.cit_cur", [r"thuế (thu nhập doanh nghiệp|tndn|thu nhập)( tndn)? hiện hành( tạm tính)?$"]),
+        ("b.cit_def", [r"thuế (thu nhập doanh nghiệp|tndn|thu nhập)( tndn)? hoãn lại$"]),   # MBB: "thuế thu nhập hoãn lại"
         ("b.cit", [r"^(tổng )?chi phí thuế (thu nhập doanh nghiệp|tndn)( tndn)?( trong kỳ| tạm tính)?$"]),
         ("b.npat", [r"^lợi nhuận sau thuế( thu nhập doanh nghiệp| tndn)?$"]),
         ("b.mi", [r"^lợi ích (của )?cổ đông (không kiểm soát|thiểu số)$",
@@ -146,6 +148,7 @@ def repair_wrapped_labels(st: ExtractedStatement) -> int:
 # các khoản trong vốn của tổ chức tín dụng và lợi nhuận chưa phân phối (MBB không in số thứ tự nên dựa vào tên)
 _LEAF_STT = re.compile(r"^(?:[a-z]|[-–+•])\.?$")
 _LEAF_LABEL = re.compile(r"^(nguyen gia|hao mon|gia tri hao mon|khau hao|von dieu le|thang du von|co phieu quy|co phieu uu dai|"
+                         r"von dau tu xay dung co ban|"
                          r"von khac$|loi nhuan (de lai |luy ke )?(nam|ky) (truoc|nay)|loi nhuan (nam|ky) nay|"
                          r"loi nhuan chua phan phoi (luy ke|nam|ky))")
 # Dòng con đứng SAU dòng cha (khoản mục tài sản, nợ: dòng cha in trước, các dòng con thụt vào bên dưới)

@@ -195,7 +195,9 @@ BCTC là dữ liệu công khai nên chỉ có **một kho chung**: mỗi BCTC c
 | **20–26/10** | Web: bảng mùa, trang mã, theo dõi, hàng duyệt, đăng nhập bằng email. ~~Triển khai lên VPS~~ (12/10: phát triển tiếp trên máy, chỉ triển khai khi sản phẩm hoàn thiện; BCTC quý 3 vẫn được canh/đọc trên máy hoặc chạy bù sau) | Kỹ thuật | Chạy trên điện thoại, có HTTPS |
 | | Mời 5–10 người; phỏng vấn 5 người theo mục 1.5 | Bạn | |
 | **27/10–08/11** | Email cho danh sách theo dõi; tóm tắt giải trình (nếu kịp); vận hành qua đỉnh 30/10; đo các chỉ số mục 5; chạy "ChatGPT test" với 20 câu hỏi về KQKD quý 3 | Cả hai | Có số liệu cho báo cáo tuần |
-| 09/11–06/12 | Theo kế hoạch học kỳ: agent phân tích và báo cáo so sánh, VN100; cờ v2 và sàng lọc tăng trưởng v1 | | |
+| 09/11–29/11 | Theo kế hoạch học kỳ (sửa 14/10: Project III kết thúc 31/12): phát hiện bất thường trong KQKD (cờ v2), agent tìm nguyên nhân trong thuyết minh và công văn giải trình (bản đầu), VN100 | | |
+| 30/11–20/12 | Đánh giá độ chính xác trên bộ dữ liệu vàng, so với hệ thống khóa trước; triển khai lên VPS cho người dùng thử | | |
+| 21/12–31/12 | Hoàn thiện báo cáo final, slide, video demo | | Nộp Project III |
 
 **Nếu trễ thì cắt theo thứ tự:**
 

@@ -418,7 +418,7 @@ Nhu cầu tìm "KQKD quý…", "lợi nhuận quý…" dồn vào vài tuần m�
 | Đợt sóng | Thời gian (theo hạn công bố) | Cơ hội |
 |---|---|---|
 | BCTC Q3/2026 | ~10/10 → 30/10/2026 (đỉnh ~20/10 và ~30/10) | Launch MVP |
-| BCTC Q4/2026 | ~10/1 → 30/1/2027 (đỉnh ~20/1 và ~30/1), trước Tết Đinh Mùi (6/2/2027) | Chạy ở quy mô VN100; lấy số liệu cho báo cáo P3 |
+| BCTC Q4/2026 | ~10/1 → 30/1/2027 (đỉnh ~20/1 và ~30/1), trước Tết Đinh Mùi (6/2/2027) | Chạy ở quy mô VN100; mùa đầu tiên của giai đoạn ĐATN (Project III kết thúc 31/12/2026) |
 | BCTC năm 2026 đã kiểm toán | trước 31/3/2027 | Chênh lệch sau kiểm toán, ý kiến kiểm toán |
 | Mùa ĐHCĐ 2027 | 3–4/2027 | Kế hoạch năm 2027, cổ tức |
 | BCTC Q1/2027 | ~10/4 → 30/4/2027 | Cuộc thi dự báo lợi nhuận |
@@ -794,15 +794,15 @@ Có bốn hướng:
 
 ### 8.3 Lộ trình theo tuần (HK 2026.1)
 
-> Hãy điều chỉnh theo lịch thật của trường (hạn nộp và bảo vệ Project 3).
+> Đã chỉnh theo lịch trường (14/10/2026): Project 3 kết thúc 31/12/2026; mùa BCTC quý 4/2026 chuyển sang giai đoạn ĐATN.
 
 | Tuần | Thời gian | Mục tiêu | Kết quả bàn giao |
 |---|---|---|---|
 | 1–2 | 28/9 – 11/10 | **MVP v0 (bản tối giản) kịp nhóm công bố sớm** | CSDL; watcher Vietstock; trích xuất VLM **đủ các cột so sánh**; kiểm tra cân đối (280 = 440 theo TT99, 270 = 440 theo TT200) và các dòng tổng chính của KQKD; backfill 4 quý cho VN30 + ngân hàng (giai đoạn này có cả hai mẫu TT200 và TT99); script sinh thẻ KQKD; web tĩnh tối giản; Facebook page; cài analytics |
 | 3–6 | 12/10 – 8/11 | **Chạy LIVE mùa BCTC Q3/2026** (đỉnh ~20/10 và ~30/10) | Đăng thẻ KQKD trong ≤ 30 phút (có duyệt tay); BXH mỗi tối; % kế hoạch năm (nhập tay cho VN30); Zalo Bot tra mã; thu phản hồi; đo Time-to-Insight. **"ChatGPT test" v1**: gồm các câu tra số, so sánh, toàn thị trường, và câu "độ mới" hỏi ngay sau khi doanh nghiệp công bố |
-| 7–10 | 9/11 – 6/12 | **AI Analyst v1 + VN100** | Báo cáo theo yêu cầu (soi 1 mã, so sánh nhiều mã, tổng quan nhóm ngân hàng); biểu đồ; xuất PDF/ảnh; link chia sẻ; bộ kiểm chứng số trong văn bản; nhãn "nội dung do AI tạo". Tính năng nào trượt "ChatGPT test" thì hạ ưu tiên |
-| 11–14 | 7/12 – 3/1 | **Tin cậy + phân phối + đánh giá** | Kiểm tra theo cây mã số và chéo kỳ; trang duyệt tay; trang SEO cho mọi mã đã phủ; watchlist và cảnh báo qua Zalo Bot/email; chuẩn hóa API (OpenAPI) để sau này thêm MCP dễ dàng; 5–10 cuộc phỏng vấn người dùng về nhu cầu quản lý danh mục; 1–2 loại sự kiện công bố thông tin nếu kịp; đánh giá trên vnpdf và golden set |
-| 15–18 | 4/1 – 31/1 | **Mùa Q4/2026 + viết báo cáo** (đỉnh ~20/1 và ~30/1) | Đóng băng tính năng; vận hành mùa Q4 tự động hơn; tổng hợp số liệu người dùng; viết báo cáo; chuẩn bị demo |
+| 7–9 | 9/11 – 29/11 | **Phát hiện bất thường + agent tìm nguyên nhân (bản đầu) + VN100** | Cờ v2 cho KQKD; agent đọc thuyết minh và công văn giải trình, trích dẫn tới trang gốc; bộ kiểm chứng số trong văn bản; nhãn "nội dung do AI tạo"; đọc quý 3 cho VN100. Tính năng nào trượt "ChatGPT test" thì hạ ưu tiên |
+| 10–12 | 30/11 – 20/12 | **Đánh giá + triển khai** | Đánh giá trên golden set và vnpdf, so với hệ thống khóa trước; triển khai lên VPS cho người dùng thử; trang SEO cho mọi mã đã phủ; 5–10 cuộc phỏng vấn người dùng |
+| 13–14 | 21/12 – 31/12 | **Viết báo cáo + demo** | Đóng băng tính năng; hoàn thiện báo cáo (bản tiếng Anh), slide, video demo; nộp Project 3 |
 
 ```mermaid
 gantt
@@ -813,11 +813,10 @@ gantt
     MVP v0 tối giản              :a1, 2026-09-28, 14d
     section Mùa BCTC
     LIVE mùa Q3/2026             :crit, a2, 2026-10-12, 28d
-    Mùa Q4/2026                  :crit, a5, 2027-01-10, 21d
     section Tính năng
-    AI Analyst v1 + VN100        :a3, 2026-11-09, 28d
-    Tin cậy + phân phối + đánh giá :a4, 2026-12-07, 28d
-    Viết báo cáo + demo          :a6, 2027-01-04, 28d
+    Phát hiện bất thường + VN100 :a3, 2026-11-09, 21d
+    Đánh giá + triển khai        :a4, 2026-11-30, 21d
+    Viết báo cáo + demo          :a6, 2026-12-21, 11d
 ```
 
 > **Mẹo cho 2 tuần đầu:**

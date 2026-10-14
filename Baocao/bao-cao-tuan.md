@@ -22,8 +22,6 @@
 
 Dạ em xin báo cáo tiến độ tuần 3 và 4 để thầy nắm ạ:
 
-**Trao đổi với thầy:** em chưa nhận được góp ý về hướng ĐATN đề xuất ở báo cáo tuần 2; trong lúc chờ, em làm tiếp phần Project 3 theo kế hoạch.
-
 **Tiến độ:** phần đọc và kiểm chứng BCTC đã chạy được trên dữ liệu thật, kịp trước mùa BCTC quý 3:
 - **Đọc BCTC bằng mô hình nhìn ảnh.** 52/58 file quý 2/2026 của VN30 là bản scan hoặc có lớp chữ hỏng, nên em dùng mô hình nhìn ảnh qua API. Mô hình chỉ tìm trang và chép nguyên văn từng ô; việc đọc số, đổi đơn vị và kiểm tra đều do code làm.
 - **Kiểm chứng bằng ràng buộc kế toán** cho từng mẫu: Thông tư 200, Thông tư 99 (mẫu mới từ 2026), ngân hàng, công ty chứng khoán. Ngân hàng không in mã số nên em gán mã theo tên dòng; dòng không có mã thì kiểm theo vị trí (dòng tổng = tổng các dòng ngay trên nó).
@@ -55,8 +53,6 @@ Dạ em xin báo cáo tiến độ tuần 3 và 4 để thầy nắm ạ:
 - Chạy thật trong mùa BCTC quý 3/2026 (từ khoảng 20/10), đọc theo đợt; sau mùa thì đối chiếu với nguồn ngoài.
 - Đo lại độ đúng và chi phí trên dữ liệu quý 3, cập nhật báo cáo kỹ thuật.
 - Bắt đầu phần phát hiện bất thường theo hướng ĐATN đã đề xuất.
-
-**Câu hỏi cho thầy:** thầy thấy hướng ĐATN em đề xuất ở báo cáo tuần 2 (agent phát hiện và giải thích bất thường trong KQKD, ứng dụng sàng lọc doanh nghiệp tăng trưởng) có phù hợp không ạ?
 
 ---
 

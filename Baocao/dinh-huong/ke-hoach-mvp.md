@@ -254,6 +254,38 @@ và duyệt tay. Chỉ xem lại khi đọc toàn thị trường (khoảng 10.0
 theo giờ (RTX 4090 khoảng 0,34 USD/giờ) mới rẻ hơn, sau khi đo độ chính xác trên mẫu rộng. Lưu ý khi chạy PaddleOCR-VL
 bằng transformers: phải bật `use_cache=True` (cấu hình gốc tắt), nếu không chậm khoảng 35 lần.
 
+**Đo cách chuẩn bị ảnh cho bước đọc lại (14/10/2026).** Phát hiện: code không gửi tham số `detail`, nên gpt-5.4-mini dùng
+mức `high`, thu ảnh về cạnh dài tối đa 2048 điểm ảnh và 2.500 ô 32×32. Ảnh "đọc lại ở độ phân giải cao" (cạnh dài 3000)
+và "chép lại trang" (2600) thực tế chỉ còn khoảng 1340×1908, đúng bằng ảnh lần chép đầu. Thử trên 86 ô đã biết là đọc
+sai và 86 ô đối chứng (ô đúng, lấy ngẫu nhiên trên cùng trang), 30 trang của 16 BCTC; mỗi trang một lần gọi, ô sai và ô
+đối chứng trộn lẫn, không đưa số mong đợi:
+
+| Cách | Ô sai đọc ra đúng | Ô đối chứng vẫn đúng | Chi phí |
+|---|---|---|---|
+| V0: như cũ (cạnh dài 3000, API tự thu nhỏ) | 39/86 (45%) | 71/86 (83%) | 0,13 USD |
+| V1: V0 + `detail: original` | 49/86 (57%) | 55/86 (64%) | 0,24 USD |
+| V2: vẽ đúng độ phân giải scan gốc, phóng một lần bằng Lanczos tới 288 dpi (tối đa gấp 3 ảnh gốc), `original` | 63/86 (73%) | 75/86 (87%) | 0,24 USD |
+| V3: V2 + cân bằng tương phản theo vùng (CLAHE) + làm nét | 59/86 (69%) | 72/86 (84%) | 0,24 USD |
+
+- V2 so với V0, so từng ô: 28 ô sai được đọc đúng thêm, 4 ô ngược lại (kiểm định dấu, p < 0,0001); ô đối chứng 9 tốt
+  lên, 5 kém đi (không khác biệt có ý nghĩa).
+- V1 làm hỏng ô đúng (22 kém đi, 6 tốt lên, p = 0,004): MuPDF phóng ảnh scan 72 dpi kiểu nhân bản điểm ảnh, chữ số răng
+  cưa; trước đây API thu nhỏ nên vô tình làm mịn lại. Điều quyết định là phóng đúng cách một lần từ ảnh gốc.
+- V3 không hơn V2 (chênh lệch không có ý nghĩa), bỏ. Không thử chuyển trắng đen và tăng độ phân giải bằng GAN vì tài liệu
+  cho thấy rủi ro: chuyển trắng đen có thể làm kém đi trên scan chất lượng thấp, GAN có thể vẽ thêm nét giả (3 thành 8).
+- Lợi ích dồn vào scan ≤ 100 dpi (ô sai đọc đúng 25/68 lên 49/68); scan nét hơn không đổi (14/18).
+- Áp dụng: mọi bước đọc lại, đọc theo dải, chép lại trang dùng V2; lần chép đầu dùng V2 cho trang scan ≤ 100 dpi. Mỗi
+  lần gọi tốn khoảng gấp đôi token (bước đọc lại chỉ chiếm khoảng 3% chi phí mỗi BCTC); chép đầu một trang 72 dpi tốn thêm
+  khoảng 80%. Mùa quý 3 đo lại tỷ lệ đúng ngay lần đầu và chi phí cho các file mờ.
+- Mỗi cách chỉ chạy một lần, kết quả từng trang dao động nhiều; kết luận V2 hơn V0 chắc chắn, chênh lệch V2–V3 thì không.
+- Phát hiện khi xem ảnh: 3 trang (VHM quý 4/2025 trang 15, 16; VHM quý 1/2026 trang 87) bị lưu góc xoay 90 thay vì 270,
+  nên mọi cách đều vẽ lộn ngược (VHM quý 4/2025: cả KQKD đã được chép trên ảnh lộn ngược, đó là nguyên nhân "cả cột hỏng").
+  Đã sửa góc xoay (cả trang 17 của VHM quý 4/2025). Bỏ 3 trang này: V0 38/71 ô sai đúng (54%), ô đối chứng 64/71; V2
+  57/71 (80%), 67/71; V2 so với V0: 23 tốt lên, 4 kém đi (p < 0,001); scan ≤ 100 dpi 24/53 lên 43/53.
+- Kiểm lại trong quy trình thật (định vị ô sai → đọc lại → chỉ nhận khi khớp), trả các ô đã biết về số sai cũ, 4 BCTC
+  mờ (GVR bán niên, VHM quý 1/2026, HDB, LPB), 51 ô: cách cũ sửa đúng 11, cách mới 20; không ô nào bị nhận nhầm;
+  chi phí cách mới 0,12 USD, cách cũ 0,11 USD. (VHM quý 4/2025 không tính vì trang lộn ngược ở cả hai cách.)
+
 ### 6.2 Ngân sách đến 4/2027
 
 Tiền gọi mô hình tăng theo **số BCTC phải đọc**, không theo số người dùng (mỗi BCTC đọc một lần, phục vụ mọi người).

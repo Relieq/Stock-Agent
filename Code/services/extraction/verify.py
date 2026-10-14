@@ -21,7 +21,7 @@ from services.extraction import prompts
 from services.extraction.evidence import cells_of, document_evidence
 from services.extraction.numbers import parse_amount
 from services.extraction.pipeline import (
-    REREAD_LONG_SIDE,
+    ORIGINAL,
     _finalize,
     _gate_tally,
     _load_record,
@@ -29,7 +29,7 @@ from services.extraction.pipeline import (
     open_record_pdf,
     track_usage,
 )
-from services.extraction.sources import render_page
+from services.extraction.sources import render_sharp
 from services.llm import VisionClient
 
 Cell = tuple[str, str, str]          # (báo cáo, khóa ô, cột)
@@ -88,14 +88,15 @@ def verify_document(conn: psycopg.Connection, document_id: int, cells: set[Cell]
     added: list[dict] = []
     with track_usage(record, client):
         for (st, page), items in by_page.items():
-            image = render_page(doc, page, REREAD_LONG_SIDE, _rotation(record, page))
+            image = render_sharp(doc, page, _rotation(record, page))
             ids = {f"o{n}": item for n, item in enumerate(items, 1)}
             rows = record["raw"][st]["rows"]
             # Mã số lấy theo khóa ô (đã qua bước sửa đảo cột), không theo bản chép gốc
             asked = [(cid, None if key.startswith(("~", "b.")) else key, rows[i].get("label") or label, col)
                      for cid, (key, i, col, label) in ids.items()]
             result = client.json_from_images(prompts.verify_prompt(st, asked), [(f"Trang {page}", image)],
-                                             prompts.REREAD_SCHEMA, "reread_cells", step="verify_cells")
+                                             prompts.REREAD_SCHEMA, "reread_cells", step="verify_cells",
+                                             detail=ORIGINAL)
             for ans in result.get("cells", []):
                 hit = ids.get((ans.get("code") or "").strip())
                 if hit is None:

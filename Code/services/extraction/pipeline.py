@@ -27,7 +27,7 @@ import psycopg
 from services.extraction import prompts
 from services.extraction.bank import canonicalize
 from services.extraction.numbers import normalize_code, parse_amount
-from services.extraction.sources import candidates, open_pdf, render_page, render_strips
+from services.extraction.sources import candidates, is_low_dpi, open_pdf, render_page, render_sharp, render_strips
 from services.extraction.repair import agrees, cross_proposals, localize, proposal_dict
 from services.extraction.rules import RULESETS
 from services.extraction.validate import (
@@ -46,6 +46,18 @@ PIPELINE_VER = "0.1.0"
 LOCATE_MAX_PAGES = 30
 LOCATE_LONG_SIDE = 900
 EXTRACT_LONG_SIDE = 2000
+
+
+def _extract_image(doc, page: int, rotation: int) -> bytes:
+    """Ảnh để chép cả trang: scan mờ (<= 100 dpi) dùng ảnh nét ngay từ lần đầu (sources.render_sharp), còn lại giữ ảnh
+    cạnh dài 2000 như cũ (scan nét hơn không đọc tốt hơn khi dùng ảnh nét, đo 14/10/2026)."""
+    if is_low_dpi(doc, [page]):
+        return render_sharp(doc, page, rotation)
+    return render_page(doc, page, EXTRACT_LONG_SIDE, rotation)
+
+
+def _extract_detail(doc, pages) -> str | None:
+    return "original" if is_low_dpi(doc, pages) else None
 
 
 def _locate(client: VisionClient, doc, max_pages: int) -> list[dict]:
@@ -141,8 +153,9 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
         pages = st_pages.get(st)
         if not pages:
             continue
-        images = [(f"Trang {p}", render_page(doc, p, EXTRACT_LONG_SIDE, _rotation(record, p))) for p in pages]
-        raw = client.json_from_images(prompts.extract_prompt(st), images, prompts.extract_schema(st), f"statement_{st}")
+        images = [(f"Trang {p}", _extract_image(doc, p, _rotation(record, p))) for p in pages]
+        raw = client.json_from_images(prompts.extract_prompt(st), images, prompts.extract_schema(st), f"statement_{st}",
+                                      detail=_extract_detail(doc, pages))
         record["raw"][st] = raw
     record["company_template"] = company_template
 
@@ -153,9 +166,9 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
 
 
 REREAD_ROUNDS = 1
-REREAD_LONG_SIDE = 3000
-ZOOM_LONG_SIDE = 4200       # đọc lại theo dải: mỗi dải ~40% chiều cao trang ở độ phân giải này
-REEXTRACT_LONG_SIDE = 2600
+# Các bước đọc lại và chép lại dùng ảnh nét (sources.render_sharp) kèm detail="original": trước đây vẽ trang cạnh dài
+# 3000/2600 nhưng API thu về khoảng 1340x1908, đúng bằng ảnh lần chép đầu, nên đọc lại hay lặp đúng lỗi cũ.
+ORIGINAL = "original"
 
 
 def _escalate(record: dict, client: VisionClient, doc, conn: psycopg.Connection | None = None) -> None:
@@ -208,11 +221,11 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
             by_page.setdefault((st, int(page)), []).append(q)
     reread: dict[tuple[str, int, str], str | None] = {}
     for (st, page), qs in by_page.items():
-        image = render_page(doc, page, REREAD_LONG_SIDE, _rotation(record, page))
+        image = render_sharp(doc, page, _rotation(record, page))
         ids = {f"o{n}": q for n, q in enumerate(qs, 1)}
         asked = [(cid, None if q.code.startswith(("~", "b.")) else q.code, q.label, q.column_kind) for cid, q in ids.items()]
         result = client.json_from_images(prompts.verify_prompt(st, asked), [(f"Trang {page}", image)],
-                                         prompts.REREAD_SCHEMA, "reread_cells", step="repair_cells")
+                                         prompts.REREAD_SCHEMA, "reread_cells", step="repair_cells", detail=ORIGINAL)
         for ans in result.get("cells", []):
             q = ids.get((ans.get("code") or "").strip())
             if q is not None:
@@ -239,10 +252,11 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
     for (st, page), qs in zoom_pages.items():
         ids = {f"o{n}": q for n, q in enumerate(qs, 1)}
         asked = [(cid, None if q.code.startswith(("~", "b.")) else q.code, q.label, q.column_kind) for cid, q in ids.items()]
-        for strip in render_strips(doc, page, ZOOM_LONG_SIDE, _rotation(record, page)):
+        for strip in render_strips(doc, page, _rotation(record, page)):
             result = client.json_from_images(
                 prompts.verify_prompt(st, asked) + "\nẢnh chỉ là một dải của trang: ô nào không có trong ảnh thì trả null.",
-                [(f"Trang {page} (một phần)", strip)], prompts.REREAD_SCHEMA, "reread_cells", step="repair_zoom")
+                [(f"Trang {page} (một phần)", strip)], prompts.REREAD_SCHEMA, "reread_cells", step="repair_zoom",
+                detail=ORIGINAL)
             for ans in result.get("cells", []):
                 q = ids.get((ans.get("code") or "").strip())
                 if q is not None and ans.get("value"):
@@ -300,9 +314,10 @@ def _extend_balance_sheet(record: dict, client: VisionClient, doc) -> bool:
     page = max(int(p) for p in chosen["statement_pages"]["BS"]) + 1
     if page > doc.page_count or page in used:
         return False
-    image = render_page(doc, page, EXTRACT_LONG_SIDE, _rotation(record, page))
+    image = _extract_image(doc, page, _rotation(record, page))
     extra = client.json_from_images(prompts.extract_prompt("BS"), [(f"Trang {page}", image)],
-                                    prompts.extract_schema("BS"), "statement_BS", step="extend_BS")
+                                    prompts.extract_schema("BS"), "statement_BS", step="extend_BS",
+                                    detail=_extract_detail(doc, [page]))
     before = record["raw"]["BS"]
     record["raw"]["BS"] = before | {"rows": before.get("rows", []) + extra.get("rows", [])}
     _, _, _, _, checks = _check(record)
@@ -363,10 +378,10 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
 
         def read(page: int, rotation: int) -> dict:
             if (page, rotation) not in cache:
-                image = render_page(doc, page, REEXTRACT_LONG_SIDE, rotation)
+                image = render_sharp(doc, page, rotation)
                 cache[(page, rotation)] = client.json_from_images(
                     prompts.extract_prompt(st), [(f"Trang {page}", image)], prompts.extract_schema(st),
-                    f"statement_{st}", step=f"reextract_{st}")
+                    f"statement_{st}", step=f"reextract_{st}", detail=ORIGINAL)
             return cache[(page, rotation)]
 
         # Lần 1 giữ hướng trang như bước định vị; chưa ổn thì xoay thêm 180 độ TỪNG trang một (VHM quý 1/2026: chỉ
@@ -766,9 +781,9 @@ def _reread_failed(record: dict, client: VisionClient, doc) -> bool:
     changed = False
     log = record.setdefault("rereads", [])
     for (st, page), cells in by_page.items():
-        image = render_page(doc, page, REREAD_LONG_SIDE, _rotation(record, page))
+        image = render_sharp(doc, page, _rotation(record, page))
         result = client.json_from_images(prompts.reread_prompt(st, cells), [(f"Trang {page}", image)],
-                                         prompts.REREAD_SCHEMA, "reread_cells")
+                                         prompts.REREAD_SCHEMA, "reread_cells", detail=ORIGINAL)
         for cell in result.get("cells", []):
             code, col, value = normalize_code(cell.get("code")), cell.get("column_kind"), cell.get("value")
             row = next((r for r in record["raw"][st]["rows"] if normalize_code(r.get("code")) == code), None)

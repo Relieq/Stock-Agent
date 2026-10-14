@@ -9,6 +9,7 @@ Thực tế quý 2/2026 của VN30 (58 file):
 from __future__ import annotations
 
 import io
+import math
 import re
 import unicodedata
 import zipfile
@@ -16,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pymupdf
+from PIL import Image
 
 # Tên file trong zip cần bỏ qua
 _SKIP_MEMBER = re.compile(
@@ -89,20 +91,63 @@ def render_page(doc: pymupdf.Document, page: int, long_side: int, rotate: int = 
     return pix.tobytes("png")
 
 
+# Ảnh "nét" cho các bước đọc lại (đo 14/10/2026 trên 86 ô đã biết là đọc sai: đọc lại ra đúng 73% so với 45% khi vẽ
+# trang cạnh dài 3000 rồi để API tự thu nhỏ; ô đang đúng không bị đọc hỏng thêm; lợi ích dồn vào scan <= 100 dpi).
+# Vẽ trang đúng độ phân giải ảnh scan gốc (1 điểm ảnh trang = 1 điểm ảnh scan, không để MuPDF phóng kiểu nhân bản điểm
+# ảnh làm chữ số răng cưa), rồi phóng một lần bằng Lanczos tới cỡ chữ số cao khoảng 28 điểm ảnh. Gửi kèm
+# detail="original" để API không thu nhỏ lại (mức mặc định của gpt-5.4-mini thu cạnh dài về 2048 và 2.500 ô 32x32).
+SHARP_DPI = 288             # chữ số khoảng 7pt -> khoảng 28 điểm ảnh
+SHARP_MAX_UPSCALE = 3.0     # phóng quá 3 lần ảnh gốc không thêm thông tin
+SHARP_PATCH_BUDGET = 10000  # giới hạn của detail="original" (ô 32x32)
+LOW_DPI = 100               # scan từ mức này trở xuống: dùng ảnh nét ngay từ lần chép đầu
+
+
+def native_dpi(doc: pymupdf.Document, page: int) -> float | None:
+    """Độ phân giải của ảnh scan chiếm gần hết trang; None nếu trang vẽ bằng chữ và nét (PDF xuất từ phần mềm)."""
+    p = doc[page - 1]
+    area = p.rect.width * p.rect.height
+    best = None
+    for img in p.get_images(full=True):
+        try:
+            bbox = p.get_image_bbox(img)
+        except (ValueError, RuntimeError):
+            continue
+        if bbox.is_empty or bbox.is_infinite or bbox.width * bbox.height < 0.6 * area:
+            continue
+        best = max(best or 0.0, img[2] / bbox.width * 72)
+    return best
+
+
+def render_sharp(doc: pymupdf.Document, page: int, rotate: int = 0, dpi: float = SHARP_DPI,
+                 clip: tuple[float, float] | None = None) -> bytes:
+    """Ảnh PNG xám của trang (hoặc dải ngang `clip` = (trên, dưới) theo tỉ lệ chiều cao, tính trên ảnh đã xoay) ở độ
+    phân giải `dpi`, không quá 3 lần ảnh scan gốc và vừa giới hạn ô của detail="original"."""
+    p = doc[page - 1]
+    nd = native_dpi(doc, page)
+    frac = clip[1] - clip[0] if clip else 1.0
+    target = dpi if nd is None else min(dpi, nd * SHARP_MAX_UPSCALE)
+    target = min(target, 72 * math.sqrt(SHARP_PATCH_BUDGET * 0.95 * 1024 / (p.rect.width * p.rect.height * frac)))
+    base = target if nd is None else min(nd, target)
+    pix = p.get_pixmap(matrix=pymupdf.Matrix(base / 72, base / 72).prerotate(rotate), colorspace=pymupdf.csGRAY)
+    img = Image.frombuffer("L", (pix.width, pix.height), pix.samples, "raw", "L", pix.stride, 1)
+    if clip:
+        img = img.crop((0, round(img.height * clip[0]), img.width, round(img.height * clip[1])))
+    if target > base * 1.01:
+        img = img.resize((round(img.width * target / base), round(img.height * target / base)), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def is_low_dpi(doc: pymupdf.Document, pages) -> bool:
+    """Có trang nào là scan từ LOW_DPI trở xuống (GVR bán niên 2026: 72 dpi)."""
+    return any((nd := native_dpi(doc, int(pg))) is not None and nd <= LOW_DPI for pg in pages)
+
+
 STRIPS = ((0.0, 0.4), (0.3, 0.7), (0.6, 1.0))
 
 
-def render_strips(doc: pymupdf.Document, page: int, long_side: int, rotate: int = 0) -> list[bytes]:
-    """Trang (đã xoay đúng chiều) cắt thành các dải ngang chồng lên nhau, mỗi dải ảnh rộng như trang ở `long_side` nên
-    chữ số to gấp vài lần so với ảnh cả trang. Dùng khi đọc lại cả trang vẫn lặp một lỗi đọc nhầm. Cắt trên ảnh đã xoay
-    (vùng cắt của pymupdf tính theo tọa độ trang chưa xoay)."""
-    full = render_page(doc, page, long_side, rotate)
-    tmp = pymupdf.open()
-    pix = pymupdf.Pixmap(full)
-    canvas = tmp.new_page(width=pix.width, height=pix.height)
-    canvas.insert_image(canvas.rect, pixmap=pix)
-    out = []
-    for top, bottom in STRIPS:
-        clip = pymupdf.Rect(0, pix.height * top, pix.width, pix.height * bottom)
-        out.append(canvas.get_pixmap(clip=clip, colorspace=pymupdf.csGRAY).tobytes("png"))
-    return out
+def render_strips(doc: pymupdf.Document, page: int, rotate: int = 0, dpi: float = SHARP_DPI * 1.5) -> list[bytes]:
+    """Trang (đã xoay đúng chiều) cắt thành các dải ngang chồng lên nhau, mỗi dải là một ảnh nét (render_sharp) ở độ
+    phân giải cao hơn ảnh cả trang. Dùng khi đọc lại cả trang vẫn lặp một lỗi đọc nhầm."""
+    return [render_sharp(doc, page, rotate, dpi, clip=strip) for strip in STRIPS]

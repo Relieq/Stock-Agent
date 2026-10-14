@@ -1065,7 +1065,7 @@ theo nguyên lý định vị lỗi của Fellegi--Holt~\cite{fellegi1976}. Soi 
   \node[act=56mm, below=of s] (a) {Định vị: đề xuất ô và số mới thỏa ràng buộc (code)};
   \node[act=56mm, below=of a] (b) {Đọc lại riêng ô đó, không đưa số mong đợi (mô hình)};
   \node[dnode, below=6mm of b] (d1) {};
-  \node[act=48mm, below=10mm of d1] (z) {Đọc phóng to theo dải 4200 px (mô hình)};
+  \node[act=48mm, below=10mm of d1] (z) {Đọc lại trên các dải ngang của trang, ảnh nét hơn (mô hình)};
   \node[dnode, below=6mm of z] (d2) {};
   \node[act=48mm, below=10mm of d2] (fm) {Ghi nhận nghi BCTC tự in lệch};
   \node[stop, below=of fm] (x2) {};
@@ -1092,6 +1092,24 @@ Nếu nói với mô hình \enquote{ô này phải là 4.831}, mô hình có xu 
 lập. Soi chỉ hỏi \enquote{ô ở dòng X, cột Y ghi số gì}, rồi so câu trả lời với đề xuất bằng code. Phép so bỏ qua khác
 biệt về dấu phân cách và dấu ngoặc.
 \end{ghichu}
+
+\subsection{Chuẩn bị ảnh cho bước đọc lại}\label{sec:anhnet}
+Đọc lại chỉ có ích khi mô hình nhìn rõ hơn lần đầu. Hai điều quyết định độ rõ của ảnh mà mô hình thực sự nhìn thấy:
+\begin{itemize}
+  \item \textbf{API có thu nhỏ ảnh hay không.} Ở mức mặc định, API của mô hình thu ảnh về cạnh dài tối đa 2048 điểm ảnh
+        và khoảng 2,5 triệu điểm ảnh~\cite{openaivision}. Vẽ trang to hơn mức này rồi gửi đi không giúp gì, vì API thu
+        về đúng cỡ ảnh lần chép đầu. Soi gửi các ảnh đọc lại ở mức \code{original}, giữ nguyên tới khoảng 10 triệu điểm ảnh.
+  \item \textbf{Phóng ảnh scan như thế nào.} Ảnh scan 72 dpi (như BCTC bán niên của GVR) chỉ có chữ số cao khoảng 7 điểm
+        ảnh. Khi vẽ trang ở độ phân giải cao, thư viện vẽ PDF phóng ảnh scan bằng cách nhân bản điểm ảnh, nên chữ số bị
+        răng cưa và dễ nhầm 3 với 8. Soi vẽ trang đúng độ phân giải của ảnh scan gốc (một điểm ảnh trang ứng với một điểm
+        ảnh scan), rồi phóng một lần bằng nội suy Lanczos tới khoảng 288 dpi, để chữ số cao khoảng 28 điểm ảnh. Mức phóng
+        không vượt quá 3 lần ảnh gốc, vì phóng thêm không tạo ra thông tin mới.
+\end{itemize}
+Soi không chuyển ảnh sang trắng đen và không dùng mô hình tăng độ phân giải: trên bản scan chất lượng thấp, các bước xử lý ảnh
+truyền thống (ảnh xám, chuyển trắng đen) không cải thiện mà có khi còn làm OCR kém đi~\cite{ocrpipelines}, còn mô hình
+tăng độ phân giải có thể tạo ra chi tiết không có thật trong vùng chữ~\cite{textsr}. Với chữ số tài chính, một nét giả là
+đủ biến chữ số này thành chữ số khác. Với file scan từ 100 dpi trở xuống, cách vẽ này được dùng ngay từ lần chép đầu, vì ô đọc đúng từ đầu
+thì không cần đọc lại. Kết quả đo ở mục~\ref{sec:evalanh}.
 
 \subsection{Mở rộng sang ràng buộc giữa các BCTC}
 Một số lỗi không làm lệch phép cộng nào trong chính BCTC. Ví dụ đọc nhầm một dòng chi tiết không nằm trong ràng buộc bắt
@@ -1404,7 +1422,8 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
           mòn tài sản cố định cùng sai trong phép cộng của mã 221. Khi đó không có cách thay một ô nào làm phép cộng khớp
           lại. Người duyệt sửa các ô này sau khi đối chiếu ảnh phóng to.
     \item 8 ô nằm trong \textbf{cùng một cột} (số liệu cùng kỳ năm trước) của BCTC quý 4/2025 của VHM: cả cột bị đọc sai
-          nhiều chỗ một lúc. Loại lỗi \enquote{cả cột hỏng} này được xử lý ở bậc chép lại cả trang.
+          nhiều chỗ một lúc. Nguyên nhân sau này tìm ra là các trang KQKD của BCTC đó bị vẽ lộn ngược
+          (mục~\ref{sec:evalanh}).
     \item 8 ô của BCTC quý 1 và quý 2/2026 của VHM, trong đó 2 ô mô hình chép số của một dòng khác (số khác hẳn, không
           phải nhầm 1--2 chữ số).
   \end{itemize}
@@ -1414,6 +1433,43 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
         đối chiếu với ảnh gốc. Ví dụ BCTC bán niên của HDB có một ô BCĐKT đọc sai được sửa đúng nhờ đề xuất của bước định
         vị; bước đọc phóng to theo dải sửa được một ô của VHM mà lần đọc lại thường vẫn nhầm.
 \end{itemize}
+
+\section{Chuẩn bị ảnh cho bước đọc lại}\label{sec:evalanh}
+Thí nghiệm dùng lại các ô đã biết là đọc sai của mục~\ref{sec:evalrepair}, cộng thêm số ô đối chứng bằng nhau: các ô
+đúng lấy ngẫu nhiên trên cùng trang, để đo xem cách vẽ mới có làm hỏng ô đang đúng hay không. Mỗi trang được hỏi một lần
+cho mỗi cách vẽ. Ô sai và ô đối chứng được trộn lẫn, và mô hình không được biết số mong đợi. Ba trang bị loại vì bản ghi
+lưu sai góc xoay nên cả hai cách đều vẽ trang lộn ngược (mục dưới); còn lại 27 trang của 16 BCTC.
+
+\begin{table}[H]
+\centering\small
+\caption{Đọc lại 71 ô sai và 71 ô đối chứng (27 trang của 16 BCTC, gpt-5.4-mini)}\label{tab:anhnet}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrr@{}}
+\toprule
+\textbf{Cách vẽ ảnh} & \textbf{Ô sai đọc ra đúng} & \textbf{Ô đối chứng vẫn đúng} \\ \midrule
+Cũ: vẽ trang cạnh dài 3000 điểm ảnh, API tự thu nhỏ & 38/71 (54\%) & 64/71 (90\%) \\
+Mới: vẽ theo độ phân giải scan gốc, phóng Lanczos, mức \code{original} (mục~\ref{sec:anhnet}) & \textbf{57/71 (80\%)} & \textbf{67/71 (94\%)} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+So từng ô: cách mới đọc đúng 23 ô sai mà cách cũ đọc sai, chỉ 4 ô theo chiều ngược lại (kiểm định dấu, $p < 0{,}001$).
+Ở ô đối chứng, cách mới đúng thêm 6 ô và sai thêm 3 ô; khác biệt này không có ý nghĩa thống kê, tức là cách mới không làm
+hỏng ô đang đúng. Lợi ích dồn vào file scan từ 100 dpi trở xuống: ô sai đọc ra đúng tăng từ 24/53 lên 43/53; với file
+scan nét hơn, kết quả không đổi (14/18). Mỗi lần gọi tốn khoảng gấp đôi token, nhưng bước đọc lại chỉ chiếm khoảng 3\%
+chi phí đọc một BCTC (Bảng~\ref{tab:chiphi}). Mỗi cách chỉ chạy một lần, nên kết quả từng trang còn dao động; khác biệt
+tổng thể giữa hai cách thì đủ lớn để kết luận.
+
+Kiểm lại trong quy trình thật: trả các ô đã biết về số sai cũ trên 4 BCTC mờ (GVR bán niên, VHM quý 1/2026, HDB, LPB;
+51 ô), rồi chạy bước \enquote{định vị $\rightarrow$ đọc lại $\rightarrow$ chỉ nhận khi khớp}. Cách cũ tự sửa đúng 11 ô,
+cách mới 20 ô; cả hai cách đều không nhận nhầm ô nào, chi phí gần như nhau (0,11 và 0,12 USD cho cả 4 BCTC).
+
+\begin{ghichu}{Phát hiện phụ: trang lộn ngược}
+Khi xem ảnh của thí nghiệm, ba trang KQKD của BCTC quý 4/2025 của VHM hiện ra lộn ngược: bước định vị trang ghi góc xoay
+90 độ trong khi đúng phải là 270 độ. Cả KQKD của BCTC này vì vậy đã được chép trên ảnh lộn ngược, và đây là nguyên nhân
+của lỗi \enquote{cả cột hỏng} ở mục~\ref{sec:evalrepair}. Góc xoay của các trang này đã được sửa. Với BCTC
+đọc từ nay, trang lộn ngược làm ràng buộc lệch, nên ở bậc chép lại hệ thống sẽ thử xoay từng trang 180 độ
+(mục~\ref{sec:leothang}).
+\end{ghichu}
 
 \section{Đối chiếu với nguồn dữ liệu công khai}\label{sec:doichieu}
 Sau mỗi mùa BCTC, một chương trình đối chiếu so các chỉ tiêu trên thẻ với bảng KQKD theo quý của một trang dữ liệu

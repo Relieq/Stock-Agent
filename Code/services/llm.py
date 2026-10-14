@@ -120,16 +120,17 @@ class VisionClient:
         return {k: asdict(v) for k, v in self.steps.items()}
 
     def json_from_images(self, prompt: str, images: list[tuple[str, bytes]], schema: dict, schema_name: str,
-                         step: str | None = None) -> dict:
+                         step: str | None = None, detail: str | None = None) -> dict:
         """Gửi lời nhắc kèm các ảnh PNG (mỗi ảnh có nhãn), nhận về JSON theo schema. `step` để tính chi phí theo
-        bước (mặc định là schema_name)."""
+        bước (mặc định là schema_name). `detail="original"`: API OpenAI không thu nhỏ ảnh (mặc định của gpt-5.4-mini
+        thu cạnh dài về 2048 điểm ảnh); nhà cung cấp khác không nhận tham số này nên bỏ qua."""
         content: list[dict] = [{"type": "text", "text": prompt}]
         for label, png in images:
+            image_url = {"url": "data:image/png;base64," + base64.b64encode(png).decode()}
+            if detail and self.cfg.provider == "openai":
+                image_url["detail"] = detail
             content.append({"type": "text", "text": label})
-            content.append({
-                "type": "image_url",
-                "image_url": {"url": "data:image/png;base64," + base64.b64encode(png).decode()},
-            })
+            content.append({"type": "image_url", "image_url": image_url})
         # Một số mô hình (ví dụ dòng suy luận) không nhận temperature; chỉ gửi các tham số được cấu hình
         extra: dict = {}
         if os.environ.get("LLM_TEMPERATURE"):

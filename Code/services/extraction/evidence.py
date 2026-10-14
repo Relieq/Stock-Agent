@@ -335,6 +335,7 @@ def neighbours(conn, document_id: int) -> list[tuple[int, str, str]]:
             """SELECT id FROM documents
                WHERE ticker = %s AND scope = %s AND fiscal_year = %s AND doc_type = %s AND fiscal_period = %s
                  AND content_kind = 'full' AND processed_at IS NOT NULL AND NOT is_amended AND owner_user_id IS NULL
+                 AND duplicate_of IS NULL
                ORDER BY source_listed_at DESC LIMIT 1""",
             (ticker, scope, y, t, p)).fetchone()
         if hit:

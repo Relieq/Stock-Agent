@@ -75,7 +75,7 @@ def quarter_document(conn: psycopg.Connection, ticker: str, year: int, period: s
         """SELECT id FROM documents
            WHERE ticker = %s AND fiscal_year = %s AND fiscal_period = %s AND doc_type = 'fs_quarter'
              AND content_kind = 'full' AND scope IN ('consolidated', 'standalone') AND NOT is_amended
-             AND owner_user_id IS NULL
+             AND owner_user_id IS NULL AND duplicate_of IS NULL
            ORDER BY (processed_at IS NOT NULL) DESC, (scope = 'consolidated') DESC, source_listed_at DESC LIMIT 1""",
         (ticker, year, period)).fetchone()
     return row[0] if row else None

@@ -96,6 +96,19 @@ def _safe_filename(url: str) -> str:
     return re.sub(r"[^\w.\-]", "_", name) or "file"
 
 
+def mark_duplicate(conn: psycopg.Connection, doc_id: int, sha256: str) -> int | None:
+    """Công bố mà file trùng hệt file của một công bố khác (cùng mã băm) thì trỏ về công bố có trước, trạng thái
+    'duplicate', không đọc lại. Trả về id công bố gốc nếu trùng."""
+    row = conn.execute(
+        """SELECT d.id FROM document_files f JOIN documents d ON d.id = f.document_id
+           WHERE f.sha256 = %s AND d.id <> %s AND d.duplicate_of IS NULL
+           ORDER BY d.source_listed_at NULLS LAST, d.id LIMIT 1""", (sha256, doc_id)).fetchone()
+    if row is None:
+        return None
+    conn.execute("UPDATE documents SET status = 'duplicate', duplicate_of = %s WHERE id = %s", (row[0], doc_id))
+    return row[0]
+
+
 def download_pending(
     conn: psycopg.Connection,
     client: VietstockClient,
@@ -148,6 +161,7 @@ def download_pending(
                 (doc_id, sha256, len(data), rel.as_posix(), url),
             )
             conn.execute("UPDATE documents SET status = 'downloaded' WHERE id = %s AND status = 'discovered'", (doc_id,))
+            mark_duplicate(conn, doc_id, sha256)
         stats["downloaded"] += 1
         stats["bytes"] += len(data)
         print(f"  {ticker} {source_doc_id}: {len(data) / 1e6:.1f} MB")

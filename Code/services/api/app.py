@@ -62,6 +62,7 @@ STATUS = {
     "discovered": ("Chưa tải", "muted"),
     "extracting": ("Đang đọc", "muted"),
     "skipped": ("Bỏ qua", "muted"),
+    "duplicate": ("Trùng file đã có", "muted"),
 }
 SCOPE = {"consolidated": "Hợp nhất", "separate": "Riêng", "standalone": "Duy nhất"}
 COMPANY_KIND = {"corporate": "DN thường", "bank": "Ngân hàng", "securities": "CTCK", "insurance": "Bảo hiểm"}

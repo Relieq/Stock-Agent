@@ -18,6 +18,48 @@
 
 ---
 
+## Báo cáo ngày 14/10/2026 (Tuần 3–4)
+
+Dạ em xin báo cáo tiến độ tuần 3 và 4 để thầy nắm ạ:
+
+**Trao đổi với thầy:** em chưa nhận được góp ý về hướng ĐATN đề xuất ở báo cáo tuần 2; trong lúc chờ, em làm tiếp phần Project 3 theo kế hoạch.
+
+**Tiến độ:** phần đọc và kiểm chứng BCTC đã chạy được trên dữ liệu thật, kịp trước mùa BCTC quý 3:
+- **Đọc BCTC bằng mô hình nhìn ảnh.** 52/58 file quý 2/2026 của VN30 là bản scan hoặc có lớp chữ hỏng, nên em dùng mô hình nhìn ảnh qua API. Mô hình chỉ tìm trang và chép nguyên văn từng ô; việc đọc số, đổi đơn vị và kiểm tra đều do code làm.
+- **Kiểm chứng bằng ràng buộc kế toán** cho từng mẫu: Thông tư 200, Thông tư 99 (mẫu mới từ 2026), ngân hàng, công ty chứng khoán. Ngân hàng không in mã số nên em gán mã theo tên dòng; dòng không có mã thì kiểm theo vị trí (dòng tổng = tổng các dòng ngay trên nó).
+- **Tự tìm và sửa ô đọc sai.** Khi một ràng buộc lệch, hệ thống thử thay từng ô bằng giá trị làm ràng buộc khớp, chọn phương án sửa được nhiều ràng buộc nhất mà không làm hỏng ràng buộc nào, rồi chỉ đọc lại đúng ô đó ở ảnh phóng to. Số mới chỉ được nhận khi lần đọc lại trùng với số đề xuất.
+- **Ảnh nét cho bước đọc lại.** Em phát hiện API tự thu nhỏ ảnh gửi đi (cạnh dài tối đa 2048 điểm ảnh), nên ảnh "đọc lại ở độ phân giải cao" thực ra chỉ to bằng ảnh lần đầu. Sau khi tìm hiểu các cách xử lý ảnh cho OCR và thử 4 cách trên 71 ô đã biết là đọc sai (kèm 71 ô đúng để kiểm tra không làm hỏng), em chọn cách: vẽ trang đúng độ phân giải ảnh scan gốc, phóng một lần bằng nội suy Lanczos và gửi ảnh không bị thu nhỏ. Số ô sai được đọc lại đúng tăng từ 54% lên 80%; ô đang đúng không bị hỏng thêm; lợi ích dồn vào file scan từ 100 dpi trở xuống.
+- **Đối chiếu giữa các BCTC:** số đầu năm của quý này so với quý trước, quý = lũy kế trừ lũy kế quý trước, quý 2 so với bán niên đã soát xét, quý 4 so với BCTC năm. Mỗi ô trên web được tô màu theo mức bằng chứng.
+- **Thẻ KQKD và cờ cảnh báo** do code tính từ số đã kiểm chứng, mỗi số dẫn về trang gốc. Các cờ hiện có: lợi nhuận phần lớn ngoài hoạt động chính, lợi nhuận tăng nhờ thu nhập khác, số kỳ trước bị sửa giữa các BCTC.
+- **Web cho người dùng** chạy bằng Docker: xếp hạng mùa BCTC, lịch công bố, theo dõi mã và nhận email khi có BCTC mới, gửi yêu cầu đọc BCTC, trang quản trị người dùng và chi phí.
+- **Bộ canh BCTC** tự tìm BCTC mới trên Vietstock, đọc và gửi email cho người theo dõi.
+- **Báo cáo kỹ thuật sơ bộ** theo mẫu Project III (LaTeX, bản tiếng Việt, 57 trang): phân tích yêu cầu, sơ đồ UML, thiết kế CSDL, thuật toán, đánh giá.
+
+**Kết quả** ([mã nguồn](../Code/README.md), [báo cáo kỹ thuật](bao-cao-ky-thuat/main.pdf)):
+- **120 BCTC đã đọc**: 119 BCTC của 30 mã VN30 qua 4 kỳ (quý 4/2025, quý 1/2026, quý 2/2026, bán niên 2026) và 1 BCTC của HUT đọc thử theo yêu cầu người dùng. **119/120 đạt kiểm chứng** (115 tự động, 4 người duyệt sau khi đối chiếu ảnh), không còn BCTC nào chờ duyệt. Bản còn lại là BCTC quý 4/2025 của một công ty chứng khoán (TCX) có cấu trúc trang khác thường. Ngoài ra có 1 file trùng với một công bố khác, hệ thống tự nhận ra và không đọc lại.
+- **Độ đúng theo từng ô** (khoảng 35.000 ô số): 88,6% đúng ngay lần đọc đầu và được ràng buộc xác nhận; 4,3% thuộc các ô hệ thống tự đọc lại hoặc trang phải chép lại rồi mới khớp; 0,2% em sửa tay sau khi đối chiếu ảnh; 7,0% chưa có ràng buộc nào kiểm được (khoảng 900 ô trong số này là dòng chi tiết của công ty chứng khoán).
+- **Tự định vị ô đọc sai:** trên 86 ô đã biết là đọc sai, bước định vị tự tìm ra 45/78 ô trong tầm (58%); các ca sót chủ yếu là file mờ có nhiều ô sai cùng lúc trong một phép cộng (GVR bán niên, file 72 dpi).
+- **Đối chiếu với nguồn ngoài** (CafeF, chỉ dùng nội bộ để kiểm tra, không hiển thị): doanh thu thuần, lợi nhuận gộp, LNST khớp 208/211 số.
+- **Chi phí:** trung bình khoảng 0,12 USD cho một BCTC (trung vị 0,08 USD). Tổng chi phí gọi mô hình từ đầu đến nay khoảng 13,5 USD, phần lớn là chi phí thử nghiệm khi phát triển.
+- **Phát hiện:**
+  - Nhiều BCTC không theo đúng mẫu: in mã tổng tài sản cũ 270 dù theo Thông tư 99, bỏ trống mã ở một số dòng, có trang scan bị lộn ngược.
+  - Bán niên đã soát xét thường khác quý 2 công ty tự lập. Ví dụ GVR: LNST công ty mẹ lũy kế 6 tháng bản quý 2 ghi 4.539 tỷ, bản soát xét ghi 4.414 tỷ. Hệ thống hiện cờ cho các trường hợp này.
+  - File mờ (72 dpi) trên Vietstock cũng chính là file trên trang của công ty, nên không thể tìm bản nét hơn. Với các file này em đối chiếu ảnh và sửa tay (có ghi lại người sửa, số cũ và số mới), và dùng ảnh nét ở trên ngay từ lần chép đầu.
+  - Khi xem ảnh thử nghiệm, em phát hiện 3 trang KQKD của VHM quý 4/2025 bị vẽ lộn ngược (lưu sai góc xoay), là nguyên nhân thật của lỗi "cả cột bị đọc sai" ở BCTC này. Em đã sửa góc xoay và đối chiếu lại: 2 ô sửa tay trước đây (làm trên ảnh lộn ngược) sai một chữ số, đã sửa lại; ô lệch còn lại là do chính BCTC in sai một chữ số.
+
+**Vướng mắc:**
+- Công ty chứng khoán mới kiểm được các dòng tổng; dòng chi tiết để lại sau khi thẻ hỗ trợ nhóm này.
+- Thời điểm công bố chính thức vẫn lấy theo giờ Vietstock tải lên; cần lấy từ HOSE/HNX để backtest đúng.
+
+**Kế hoạch tuần tới:**
+- Chạy thật trong mùa BCTC quý 3/2026 (từ khoảng 20/10), đọc theo đợt; sau mùa thì đối chiếu với nguồn ngoài.
+- Đo lại độ đúng và chi phí trên dữ liệu quý 3, cập nhật báo cáo kỹ thuật.
+- Bắt đầu phần phát hiện bất thường theo hướng ĐATN đã đề xuất.
+
+**Câu hỏi cho thầy:** thầy thấy hướng ĐATN em đề xuất ở báo cáo tuần 2 (agent phát hiện và giải thích bất thường trong KQKD, ứng dụng sàng lọc doanh nghiệp tăng trưởng) có phù hợp không ạ?
+
+---
+
 ## Báo cáo ngày 03/10/2026 (Tuần 2)
 
 > Đã cập nhật kết quả phần CSDL và thu thập (mục **Kết quả**).

@@ -61,7 +61,7 @@ _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
         ("b.ntrading", [r"thuần từ (hoạt động )?mua bán chứng khoán kinh doanh$"]),
         ("b.ninv", [r"thuần từ (hoạt động )?mua bán chứng khoán đầu tư$"]),
         ("b.oi", [r"^thu nhập từ (các )?hoạt động khác$"]),
-        ("b.oe", [r"^chi phí (cho )?(các )?hoạt động khác$"]),
+        ("b.oe", [r"^chi phí (từ |cho )?(các )?hoạt động khác$"]),   # BID bán niên 2026: "Chi phí từ hoạt động khác"
         ("b.nother", [r"thuần từ (các )?hoạt động (kinh doanh )?khác$"]),
         ("b.equity_inc", [r"^thu nhập(/ ?lỗ)? từ góp vốn,? mua cổ phần$"]),
         ("b.toi", [r"^tổng thu nhập (từ )?hoạt động( kinh doanh)?$"]),
@@ -73,10 +73,11 @@ _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
         ("b.cit_def", [r"thuế (thu nhập doanh nghiệp|tndn)( tndn)? hoãn lại$"]),
         ("b.cit", [r"^(tổng )?chi phí thuế (thu nhập doanh nghiệp|tndn)( tndn)?( trong kỳ| tạm tính)?$"]),
         ("b.npat", [r"^lợi nhuận sau thuế( thu nhập doanh nghiệp| tndn)?$"]),
-        ("b.mi", [r"^lợi ích (của )?cổ đông (không kiểm soát|thiểu số)$"]),
-        ("b.npat_parent", [r"(phân bổ cho|của|cho) (các )?cổ đông (của )?(ngân hàng|công ty mẹ)$",
-                           r"chủ sở hữu (của )?ngân hàng$",
-                           r"^lợi nhuận (còn lại|sau thuế|thuần) (của )?(cổ đông )?(của )?ngân hàng$"]),
+        ("b.mi", [r"^lợi ích (của )?cổ đông (không kiểm soát|thiểu số)$",
+                  r"^phân bổ (lãi|lỗ|lãi/lỗ)? ?cho cổ đông (không kiểm soát|thiểu số)$"]),   # BID bán niên 2026
+        ("b.npat_parent", [r"(phân bổ cho|của|cho) (các )?cổ đông (của )?(ngân hàng|công ty mẹ)( mẹ)?$",
+                           r"chủ sở hữu (của )?ngân hàng( mẹ)?$",
+                           r"^lợi nhuận (còn lại|sau thuế|thuần) (của )?(cổ đông )?(của )?ngân hàng( mẹ)?$"]),
     ],
     "CF": [
         ("b.cfo", [r"^(lưu chuyển )?tiền thuần .*hoạt động (kinh doanh|kd)$"]),
@@ -96,8 +97,13 @@ _LAST_MATCH = {"b.cfo"}
 _STT_PREFIX = re.compile(r"^(?:[ivxlc]+|\d+|[a-z])[.)]\s+")
 
 
+# Chú thích chuyển trang in kèm tên dòng (VCB bán niên 2026: "TỔNG LỢI NHUẬN TRƯỚC THUẾ (MANG SANG TRANG SAU)")
+_CARRIED = re.compile(r"\(?\s*mang sang (trang sau|từ trang trước)\s*\)?")
+
+
 def clean_label(label: str) -> str:
     t = unicodedata.normalize("NFC", label or "").casefold()
+    t = _CARRIED.sub(" ", t)
     t = re.sub(r"[()“”\"'*]", " ", t)
     t = re.sub(r"\s+", " ", t).replace(" ,", ",").strip(" .:;-–")
     return _STT_PREFIX.sub("", t)

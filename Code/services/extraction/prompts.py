@@ -176,7 +176,8 @@ _COLUMN_HELP = {
     "BS": "end_period = số cuối kỳ (tại ngày kết thúc kỳ báo cáo); begin_year = số đầu năm (thường là 01/01).",
     "IS": ("q_cur = quý này năm nay; q_prev_year = quý này năm trước; ytd_cur = lũy kế từ đầu năm đến cuối quý này "
            "(năm nay); ytd_prev_year = lũy kế cùng kỳ năm trước. BCTC bán niên/năm chỉ có cột lũy kế thì để các cột "
-           "quý là null."),
+           "quý là null; cột ghi \"Kỳ này\" / \"Kỳ trước\" (hoặc \"6 tháng\", \"Năm nay\" / \"Năm trước\") của BCTC "
+           "bán niên, năm chính là ytd_cur / ytd_prev_year."),
     "CF": "ytd_cur = lũy kế từ đầu năm đến cuối kỳ này (năm nay); ytd_prev_year = lũy kế cùng kỳ năm trước.",
 }
 

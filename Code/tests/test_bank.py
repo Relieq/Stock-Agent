@@ -210,3 +210,20 @@ def test_detail_lines_are_checked_against_their_parent_line():
     groups = {c.rule_id: c.passed for c in validate(statements, "TCTD") if "_grp_" in c.rule_id}
     assert groups == {"BS_grp_b.loans": True, "BS_grp_b.fixed_assets": True, "BS_grp_b.fixed_assets.1": True,
                       "BS_grp_b.fixed_assets.2": True}
+
+
+def test_label_variants_seen_in_h1_2026():
+    # BID: "Chi phí từ hoạt động khác" (trước đây khớp nhầm "Chi phí hoạt động khác" trong chi phí hoạt động),
+    # "Phân bổ (lãi) cho cổ đông không kiểm soát", "Lợi nhuận thuần của Ngân hàng mẹ"; VCB: chú thích chuyển trang
+    rows = [
+        (None, "Thu nhập từ hoạt động khác", "6.315.750"),
+        (None, "Chi phí từ hoạt động khác", "(1.397.097)"),
+        (None, "Lãi thuần từ hoạt động khác", "4.918.653"),
+        (None, "Chi phí hoạt động khác", "(5.493.888)"),
+        (None, "TỔNG LỢI NHUẬN TRƯỚC THUẾ (MANG SANG TRANG SAU)", "18.904.589"),
+        (None, "Phân bổ (lãi) cho cổ đông không kiểm soát", "(226.620)"),
+        (None, "Lợi nhuận thuần của Ngân hàng mẹ", "14.947.090"),
+    ]
+    extracted = [_st("IS", rows, "ytd_cur")]
+    canonicalize(extracted)
+    assert [it.code for it in extracted[0].items] == ["b.oi", "b.oe", "b.nother", None, "b.pbt", "b.mi", "b.npat_parent"]

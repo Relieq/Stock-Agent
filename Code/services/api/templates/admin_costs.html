@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Chi phí · Soi{% endblock %}
+{% block body %}
+{% macro row(name, t) %}<tr><td>{{ name }}</td><td class="num">{{ t.calls }}</td>
+  <td class="num">{{ "{:,}".format(t.input_tokens) }}</td><td class="num">{{ "{:,}".format(t.output_tokens) }}</td>
+  <td class="num">{{ "%.2f" | format(t.usd) }}</td></tr>{% endmacro %}
+<h1>Chi phí gọi mô hình</h1>
+<p class="muted small">Tính từ số token đã ghi trong từng bản ghi đọc BCTC, theo bảng giá trong <code>services/llm.py</code>.
+  Mỗi BCTC tính vào ngày bắt đầu đọc, kể cả các lần đọc lại về sau. Đơn vị: USD.</p>
+
+<h2>Tháng {{ rep.month[5:] }}/{{ rep.month[:4] }}</h2>
+<p><b>{{ "%.2f" | format(rep.this_month.usd) }} USD</b> tổng · {{ rep.this_month.calls }} lần gọi mô hình</p>
+<p>Đọc theo yêu cầu người dùng (tính vào trần): <b>{{ "%.2f" | format(capped) }} USD</b> trên trần {{ "%.0f" | format(budget) }} USD
+  ({{ "%.0f" | format(share) }}%)</p>
+<div style="background:#e8ebef;border-radius:4px;height:12px;max-width:520px">
+  <div style="width:{{ share }}%;height:12px;border-radius:4px;background:{{ '#be3232' if share >= 90 else ('#d68c14' if share >= 70 else '#2e8c57') }}"></div>
+</div>
+<p class="muted small">Chạm trần thì yêu cầu đọc mới của người dùng nằm chờ sang tháng sau. Đọc theo lịch cho các mã đang theo dõi không tính vào trần. Trần đặt bằng
+  <code>LLM_MONTHLY_BUDGET_USD</code> trong <code>Code/.env</code>.</p>
+
+<h2>Theo ngày (tháng này)</h2>
+{% if days %}
+<table class="list"><thead><tr><th>Ngày</th><th class="num">Lần gọi</th><th class="num">Token vào</th><th class="num">Token ra</th><th class="num">USD</th></tr></thead>
+<tbody>{% for d, t in days %}{{ row(d[8:] ~ "/" ~ d[5:7], t) }}{% endfor %}</tbody></table>
+{% else %}<p class="muted">Tháng này chưa đọc BCTC nào.</p>{% endif %}
+
+<h2>Theo bước</h2>
+<table class="list"><thead><tr><th>Bước (tháng này)</th><th class="num">Lần gọi</th><th class="num">Token vào</th><th class="num">Token ra</th><th class="num">USD</th></tr></thead>
+<tbody>{% for s, t in steps %}{{ row(s, t) }}{% else %}<tr><td colspan="5" class="muted">Chưa có.</td></tr>{% endfor %}</tbody></table>
+<details><summary class="small">Từ trước tới nay</summary>
+<table class="list"><thead><tr><th>Bước</th><th class="num">Lần gọi</th><th class="num">Token vào</th><th class="num">Token ra</th><th class="num">USD</th></tr></thead>
+<tbody>{% for s, t in steps_all %}{{ row(s, t) }}{% endfor %}{{ row("Tổng (" ~ rep.docs|length ~ " BCTC)", rep.total) }}</tbody></table>
+</details>
+
+<h2>Theo tháng</h2>
+<table class="list"><thead><tr><th>Tháng</th><th class="num">Lần gọi</th><th class="num">Token vào</th><th class="num">Token ra</th><th class="num">USD</th></tr></thead>
+<tbody>{% for m, t in months %}{{ row(m[5:] ~ "/" ~ m[:4], t) }}{% endfor %}</tbody></table>
+
+<h2>Người dùng yêu cầu (tháng này)</h2>
+{% if users %}
+<table class="list"><thead><tr><th>Email</th><th class="num">Yêu cầu</th><th class="num">Phải đọc mới</th><th class="num">USD</th></tr></thead>
+<tbody>{% for u in users %}<tr><td>{{ u.email }}</td><td class="num">{{ u.requests }}</td><td class="num">{{ u.new_reads }}</td>
+  <td class="num">{{ "%.2f" | format(u.usd) }}</td></tr>{% endfor %}</tbody></table>
+{% else %}<p class="muted">Tháng này chưa có yêu cầu nào.</p>{% endif %}
+
+<h2>BCTC tốn nhiều nhất</h2>
+<table class="list"><thead><tr><th>Tài liệu</th><th>Ngày đọc</th><th class="num">Lần gọi</th><th class="num">Token vào</th><th class="num">Token ra</th><th class="num">USD</th></tr></thead>
+<tbody>{% for d in docs %}<tr><td><a href="/tai-lieu/{{ d.document_id }}">{{ d.ticker }} {{ names.get(d.document_id, "") }}</a></td>
+  <td class="small">{{ d.day[8:] }}/{{ d.day[5:7] }}/{{ d.day[:4] }}</td><td class="num">{{ d.tally.calls }}</td>
+  <td class="num">{{ "{:,}".format(d.tally.input_tokens) }}</td><td class="num">{{ "{:,}".format(d.tally.output_tokens) }}</td>
+  <td class="num">{{ "%.3f" | format(d.tally.usd) }}</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

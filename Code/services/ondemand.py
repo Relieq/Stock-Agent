@@ -5,17 +5,16 @@ SHA-256 (dấu vân tay của file: cùng nội dung thì cùng mã); trùng fil
 bản chính thức trên Vietstock; không tìm được bản chính thức mới đọc file tải lên, và chỉ người tải lên xem được.
 
 Giới hạn chi phí: mỗi người `users.daily_quota` yêu cầu mới mỗi ngày (yêu cầu trả ngay từ kho không tính); tổng chi
-phí gọi mô hình trong tháng không vượt `LLM_MONTHLY_BUDGET_USD` (mặc định 5), vượt thì yêu cầu nằm chờ tháng sau.
+phí đọc BCTC theo yêu cầu người dùng trong tháng không vượt `LLM_MONTHLY_BUDGET_USD` (mặc định 5), vượt thì yêu cầu
+nằm chờ tháng sau. Đọc theo lịch cho các mã đang theo dõi không tính vào trần này.
 Bộ canh xử lý hàng chờ mỗi lượt (services/watcher).
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg
@@ -28,7 +27,7 @@ from services.extraction.pipeline import LOCATE_LONG_SIDE, extract_document
 from services.extraction.sources import candidates, open_pdf, render_page
 from services.ingestion.registry import discover, download_pending, raw_data_dir
 from services.ingestion.vietstock import BASE_URL, VietstockClient
-from services.llm import VisionClient, cost_usd
+from services.llm import VisionClient
 from services.metrics.service import quarter_document
 from services.notify import send_email
 from services.users import User, site_url
@@ -45,16 +44,10 @@ def monthly_budget() -> float:
     return float(os.environ.get("LLM_MONTHLY_BUDGET_USD") or 5)
 
 
-def month_spend() -> float:
-    """Chi phí gọi mô hình của các bản ghi trích xuất bắt đầu trong tháng này (USD, theo bảng giá llm.PRICES)."""
-    month = datetime.now(timezone.utc).strftime("%Y-%m")
-    total = 0.0
-    for f in (raw_data_dir() / "extracted").glob("*/*.json"):
-        r = json.loads(f.read_text(encoding="utf-8"))
-        if str(r.get("started_at", "")).startswith(month):
-            u = r.get("usage") or {}
-            total += cost_usd(r.get("model"), u.get("input_tokens", 0), u.get("output_tokens", 0)) or 0
-    return total
+def month_spend(conn: psycopg.Connection) -> float:
+    """Chi phí tính vào trần tháng: các BCTC đọc theo yêu cầu người dùng trong tháng (services/costs.py)."""
+    from services.costs import requested_spend
+    return requested_spend(conn)
 
 
 def used_today(conn: psycopg.Connection, user_id: int, kind: str | None = None) -> int:
@@ -240,7 +233,7 @@ def process_queue(conn: psycopg.Connection, vision: VisionClient | None, limit: 
     queued = conn.execute(
         """SELECT id, user_id, kind, ticker, fiscal_year, fiscal_period, upload_sha256, upload_key
            FROM processing_requests WHERE status = 'queued' ORDER BY created_at LIMIT %s""", (limit,)).fetchall()
-    if queued and month_spend() >= monthly_budget():
+    if queued and month_spend(conn) >= monthly_budget():
         return [f"{len(queued)} yêu cầu đang chờ: đã chạm trần chi phí tháng {monthly_budget():.0f} USD"]
     vs = VietstockClient()
     for rid, user_id, kind, ticker, year, period, sha, key in queued:

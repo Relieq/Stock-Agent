@@ -123,7 +123,7 @@ def requests_page(request: Request, tb: str | None = None):
                FROM processing_requests r LEFT JOIN documents d ON d.id = r.document_id
                WHERE r.user_id = %s ORDER BY r.created_at DESC LIMIT 50""", (user.id,)).fetchall()
         used = used_today(conn, user.id)
-    spend = month_spend()
+        spend = month_spend(conn)
     return templates().TemplateResponse(request, "requests.html", {
         "rows": rows, "used": used, "quota": user.daily_quota, "tb": tb,
         "over_budget": spend >= monthly_budget()})
@@ -165,6 +165,41 @@ def admin_users(request: Request, tb: str | None = None):
     with connect() as conn:
         users = list_users(conn)
     return templates().TemplateResponse(request, "admin_users.html", {"users": users, "tb": tb})
+
+
+@router.get("/quan-tri/chi-phi")
+def admin_costs(request: Request):
+    """Chi phí gọi mô hình: tháng này so với trần, theo ngày, theo bước, theo tài liệu, theo người yêu cầu."""
+    require_admin(request)
+    from services.costs import report
+    rep = report()
+    doc_cost = {d.document_id: d.tally.usd for d in rep.docs}
+    with connect() as conn:
+        rows = conn.execute(
+            """SELECT u.email, count(*) AS requests,
+                      count(*) FILTER (WHERE r.note IS DISTINCT FROM 'có sẵn trong kho') AS new_reads,
+                      array_agg(DISTINCT r.document_id) FILTER (WHERE r.document_id IS NOT NULL
+                                                              AND r.note IS DISTINCT FROM 'có sẵn trong kho')
+               FROM processing_requests r JOIN users u ON u.id = r.user_id
+               WHERE r.created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh'
+               GROUP BY u.email ORDER BY 2 DESC""").fetchall()
+        names = dict(conn.execute(
+            """SELECT id, fiscal_period || '/' || fiscal_year || ' · ' || CASE scope WHEN 'consolidated' THEN 'hợp nhất'
+                      WHEN 'separate' THEN 'riêng' WHEN 'standalone' THEN 'duy nhất' ELSE scope END
+               FROM documents WHERE id = ANY(%s)""", ([d.document_id for d in rep.docs[:15]],)).fetchall())
+    users = [{"email": e, "requests": n, "new_reads": k, "usd": sum(doc_cost.get(d, 0) for d in (docs or []))}
+             for e, n, k, docs in rows]
+    days = sorted(((d, t) for d, t in rep.by_day.items() if d.startswith(rep.month)), reverse=True)
+    budget = monthly_budget()
+    with connect() as conn:
+        from services.costs import requested_spend
+        capped = requested_spend(conn, rep)
+    return templates().TemplateResponse(request, "admin_costs.html", {
+        "rep": rep, "budget": budget, "capped": capped, "share": min(100, capped / budget * 100) if budget else 0,
+        "days": days, "months": sorted(rep.by_month.items(), reverse=True)[:6],
+        "steps": sorted(rep.by_step_month.items(), key=lambda x: -x[1].usd),
+        "steps_all": sorted(rep.by_step.items(), key=lambda x: -x[1].usd),
+        "docs": rep.docs[:15], "names": names, "users": users})
 
 
 @router.post("/quan-tri/moi")

@@ -222,34 +222,15 @@ def cmd_approve(args) -> None:
 
 
 def cmd_cost(args) -> None:
-    """Chi phí gọi mô hình đã ghi trong các bản ghi trích xuất. Mỗi tài liệu chỉ giữ bản ghi mới nhất, nên các lần
-    chạy bị ghi đè không được tính; bản ghi cũ chưa có số liệu theo bước."""
-    import json
-    from services.ingestion.registry import raw_data_dir
-    steps: dict[str, list[float]] = {}
-    total = [0, 0, 0, 0.0]
-    docs = 0
-    for f in (raw_data_dir() / "extracted").glob("*/*.json"):
-        r = json.loads(f.read_text(encoding="utf-8"))
-        u = r.get("usage") or {}
-        docs += 1
-        total[0] += u.get("calls", 0); total[1] += u.get("input_tokens", 0); total[2] += u.get("output_tokens", 0)
-        total[3] += cost_usd(r.get("model"), u.get("input_tokens", 0), u.get("output_tokens", 0)) or 0
-        known = 0
-        for step, su in (r.get("usage_by_step") or {}).items():
-            a = steps.setdefault(step, [0, 0, 0, 0.0])
-            a[0] += su["calls"]; a[1] += su["input_tokens"]; a[2] += su["output_tokens"]
-            a[3] += cost_usd(r.get("model"), su["input_tokens"], su["output_tokens"]) or 0
-            known += su["calls"]
-        if u.get("calls", 0) > known:
-            a = steps.setdefault("(chưa ghi theo bước)", [0, 0, 0, 0.0])
-            k = {key: u.get(key, 0) - sum(s.get(key, 0) for s in (r.get("usage_by_step") or {}).values())
-                 for key in ("calls", "input_tokens", "output_tokens")}
-            a[0] += k["calls"]; a[1] += k["input_tokens"]; a[2] += k["output_tokens"]
-            a[3] += cost_usd(r.get("model"), k["input_tokens"], k["output_tokens"]) or 0
-    print(f"{docs} bản ghi; {total[0]} lần gọi, {total[1]:,} token vào, {total[2]:,} token ra, khoảng {total[3]:.2f} USD")
-    for step, (calls, ti, to, usd) in sorted(steps.items(), key=lambda x: -x[1][3]):
-        print(f"  {step:<24} {calls:>5} lần gọi {ti:>12,} vào {to:>11,} ra  {usd:>7.2f} USD")
+    """Chi phí gọi mô hình đã ghi trong các bản ghi trích xuất (services/costs.py). Mỗi tài liệu chỉ giữ bản ghi mới
+    nhất, nên các lần chạy bị ghi đè không được tính; bản ghi cũ chưa có số liệu theo bước."""
+    from services.costs import report
+    rep = report()
+    t = rep.total
+    print(f"{len(rep.docs)} bản ghi; {t.calls} lần gọi, {t.input_tokens:,} token vào, {t.output_tokens:,} token ra, "
+          f"khoảng {t.usd:.2f} USD")
+    for step, s in sorted(rep.by_step.items(), key=lambda x: -x[1].usd):
+        print(f"  {step:<24} {s.calls:>5} lần gọi {s.input_tokens:>12,} vào {s.output_tokens:>11,} ra  {s.usd:>7.2f} USD")
 
 
 def main(argv: list[str] | None = None) -> None:

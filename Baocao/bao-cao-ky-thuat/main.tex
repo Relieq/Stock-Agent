@@ -1346,15 +1346,10 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
   \begin{itemize}
     \item 8 ô nằm trong \textbf{cùng một cột} (số liệu cùng kỳ năm trước) của BCTC quý 4/2025 của VHM: cả cột bị đọc
           sai nhiều chỗ một lúc, nhiều lỗi cộng dồn trong cùng một chuỗi phép cộng nên không có cách thay một ô nào làm
-          các phép cộng khớp lại.
+          các phép cộng khớp lại. Loại lỗi \enquote{cả cột hỏng} này được xử lý ở bậc chép lại cả trang.
     \item 2 ô của BCTC quý 1/2026 của VHM: mô hình chép số của một dòng khác (số khác hẳn, không phải nhầm 1--2 chữ số),
           nên nằm ngoài giả thiết \enquote{đọc nhầm ít chữ số} của bước định vị.
   \end{itemize}
-  \item \textbf{Đã thử mở rộng sang thay hai ô cùng lúc} (đúng tinh thần Fellegi--Holt: tìm tập ô nhỏ nhất cần sửa; với
-        hai ô, lượng thay đổi của mỗi ô được giải từ hai phép cộng đang lệch). Kết quả \textbf{không bắt thêm ô nào}: cột
-        hỏng của VHM có nhiều hơn hai ô sai trong cùng một chuỗi, còn hai ô kia không phải lỗi nhầm chữ số. Vì vậy cách
-        này không được đưa vào hệ thống. Hướng phù hợp hơn cho loại lỗi \enquote{cả cột hỏng} là nhận ra nó (cột đó lệch
-        ở mọi phép cộng) và chép lại cả trang, việc mà bậc leo thang tiếp theo đã làm.
   \item \textbf{2 đề xuất sai} (đều ở cột hỏng của VHM nói trên) bị bước đọc lại loại, vì ảnh không xác nhận số đề xuất.
         Trong các lần chạy thật, mọi số được nhận qua bước \enquote{định vị $\rightarrow$ đọc lại xác nhận} đều đúng khi
         đối chiếu với ảnh gốc. Ví dụ BCTC bán niên của HDB có một ô BCĐKT đọc sai được sửa đúng nhờ đề xuất của bước định

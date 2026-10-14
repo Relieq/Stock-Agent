@@ -1153,10 +1153,10 @@ Nhận diện file người dùng tải lên & -- & 3.000 \\
 \begin{tabularx}{\linewidth}{@{}p{4.2cm}XX@{}}
 \toprule
 & \textbf{Khóa trước} & \textbf{Soi} \\ \midrule
-Token vào mỗi báo cáo & 272.054 & 58.470 \\
-Token ra mỗi báo cáo & 41.106 & 16.034 \\
-Chi phí mỗi báo cáo & 0,04 USD & 0,116 USD (trung vị 0,084) \\
-Ghi chú & Một báo cáo, gửi toàn bộ văn bản OCR cho nhiều bước & Trung bình 30 BCTC quý 4/2025, quy trình hiện tại, đã gồm mọi lần đọc lại \\
+Token vào mỗi báo cáo & 272.054 & 59.112 \\
+Token ra mỗi báo cáo & 41.106 & 16.218 \\
+Chi phí mỗi báo cáo & 0,04 USD & 0,117 USD (trung vị 0,084) \\
+Ghi chú & Một báo cáo, gửi toàn bộ văn bản OCR cho nhiều bước & Trung bình 29 BCTC quý 4/2025, quy trình hiện tại, đã gồm mọi lần đọc lại \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -1289,21 +1289,22 @@ chép lại trang, đọc lại ô. Vì vậy chi phí trong mục này là \tex
 Chi phí \textbf{phát triển} (các lần chạy thử rồi bị ghi đè khi sửa code, các thử nghiệm riêng) \textbf{không} nằm trong
 các con số dưới đây; tổng tiền thực trả cho nhà cung cấp mô hình trong giai đoạn phát triển cao hơn.
 
-Số liệu đáng tin nhất cho chi phí vận hành là \textbf{30 BCTC quý 4/2025}: đây là đợt đọc đầu tiên chạy bằng quy trình
-hiện tại (có định vị ô sai, đọc phóng to) và có ghi chi phí theo từng bước. 90 BCTC đọc trước đó bằng quy trình cũ
-cho kết quả tương tự (trung bình 0,095 USD) nên dùng để đối chiếu.
+Số liệu đáng tin nhất cho chi phí vận hành là \textbf{29 BCTC quý 4/2025} (bản lỗi của TCX không có bản ghi chi phí):
+đây là đợt đọc đầu tiên chạy trọn bằng quy trình hiện tại (có định vị ô sai, đọc phóng to) và có ghi chi phí theo từng
+bước. 90 BCTC các kỳ còn lại được đọc bằng quy trình cũ, sau đó được đọc lại một phần bằng quy trình hiện tại; chi phí
+của chúng (trung bình 0,108 USD) dùng để đối chiếu.
 
 \begin{table}[H]
 \centering\small
-\caption{Chi phí trung bình mỗi BCTC theo bước, quy trình hiện tại (30 BCTC quý 4/2025, mô hình gpt-5.4-mini)}\label{tab:chiphi}
+\caption{Chi phí trung bình mỗi BCTC theo bước, quy trình hiện tại (29 BCTC quý 4/2025, mô hình gpt-5.4-mini)}\label{tab:chiphi}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
 \textbf{Bước} & \textbf{Lần gọi} & \textbf{Token vào} & \textbf{Token ra} & \textbf{USD} \\ \midrule
-Định vị trang & 1,2 & 23.871 & 771 & 0,021 \\
-Chép BCĐKT, KQKD, LCTT & 3,0 & 22.521 & 9.511 & 0,060 \\
-Chép lại trang còn lệch & 2,6 & 9.773 & 5.470 & 0,032 \\
-Đọc lại ô (định vị ô sai, đối chiếu kỳ) & 0,7 & 2.304 & 283 & 0,003 \\ \midrule
-\textbf{Tổng mỗi BCTC} & \textbf{7,5} & \textbf{58.470} & \textbf{16.034} & \textbf{0,116} \\
+Định vị trang & 1,2 & 23.917 & 770 & 0,021 \\
+Chép BCĐKT, KQKD, LCTT & 3,0 & 22.702 & 9.498 & 0,060 \\
+Chép lại trang còn lệch & 2,7 & 10.110 & 5.658 & 0,033 \\
+Đọc lại ô (định vị ô sai, đối chiếu kỳ) & 0,7 & 2.383 & 292 & 0,003 \\ \midrule
+\textbf{Tổng mỗi BCTC} & \textbf{7,6} & \textbf{59.112} & \textbf{16.218} & \textbf{0,117} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1314,11 +1315,11 @@ Chép lại trang còn lệch & 2,6 & 9.773 & 5.470 & 0,032 \\
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
 & \textbf{Số BCTC} & \textbf{Trung bình} & \textbf{Trung vị} & \textbf{90\% dưới} \\ \midrule
-Quy trình hiện tại (quý 4/2025) & 30 & 0,116 & 0,084 & 0,173 \\
+Quy trình hiện tại (quý 4/2025) & 29 & 0,117 & 0,084 & 0,173 \\
 \quad Ngân hàng & 13 & 0,096 & & \\
-\quad Doanh nghiệp thường & 16 & 0,132 & & \\
+\quad Doanh nghiệp thường & 15 & 0,136 & & \\
 \quad Công ty chứng khoán & 1 & 0,121 & & \\
-Quy trình cũ (Q1, Q2, bán niên 2026) & 90 & 0,095 & 0,082 & 0,122 \\
+Các kỳ còn lại (Q1, Q2, bán niên 2026) & 90 & 0,108 & 0,083 & 0,136 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1345,7 +1346,7 @@ VN100 & khoảng 100 & 10--12 & 60--72 \\
 
 \section{Định vị ô đọc sai}\label{sec:evalrepair}
 \subsection{Bộ đề và cách thử}
-Trong các lần chạy, hệ thống đã gặp \textbf{41 ô số bị đọc sai} ở 16 BCTC mà ta biết cả số sai lẫn số đúng: hoặc người
+Trong các lần chạy, hệ thống đã gặp \textbf{86 ô số bị đọc sai} ở 16 BCTC mà ta biết cả số sai lẫn số đúng: hoặc người
 duyệt đã sửa tay sau khi xem ảnh gốc, hoặc lần đọc lại đã ra số đúng và BCTC sau đó đạt kiểm chứng. Thí nghiệm như sau:
 lấy từng BCTC, \textbf{đặt lại số sai vào đúng ô cũ}, chạy bước định vị (chỉ dùng phép tính trên các ràng buộc, không gọi
 mô hình), rồi so đề xuất với số đúng.
@@ -1373,36 +1374,42 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[font=\small\sffamily]
-  \node[box=40mm] (all) at (0,0) {41 ô đã biết là đọc sai\\(16 BCTC)};
-  \node[box=34mm,draw=soigray,fill=lightgray] (out) at (5.6,0) {7 ô ngoài tầm\\(không phép cộng nào lệch)};
-  \node[box=40mm] (in) at (0,-2.0) {34 ô trong tầm};
-  \node[gbox=34mm] (ok) at (-4.4,-4.4) {\textbf{9 ô} (26\%)\\đúng ngay, chỉ bằng phép tính};
-  \node[gbox=34mm] (grp) at (0,-4.4) {\textbf{15 ô} (44\%)\\thu hẹp về nhóm, máy tự đọc lại để chọn};
-  \node[rbox=34mm] (miss) at (4.4,-4.4) {\textbf{10 ô} (29\%)\\sót, chuyển sang chép lại trang, duyệt tay};
+  \node[box=40mm] (all) at (0,0) {86 ô đã biết là đọc sai\\(16 BCTC)};
+  \node[box=34mm,draw=soigray,fill=lightgray] (out) at (5.6,0) {8 ô ngoài tầm\\(không phép cộng nào lệch)};
+  \node[box=40mm] (in) at (0,-2.0) {78 ô trong tầm};
+  \node[gbox=34mm] (ok) at (-4.4,-4.4) {\textbf{13 ô} (17\%)\\đúng ngay, chỉ bằng phép tính};
+  \node[gbox=34mm] (grp) at (0,-4.4) {\textbf{32 ô} (41\%)\\thu hẹp về nhóm, máy tự đọc lại để chọn};
+  \node[rbox=34mm] (miss) at (4.4,-4.4) {\textbf{33 ô} (42\%)\\sót, chuyển sang chép lại trang, duyệt tay};
   \draw[arr] (all) -- (out); \draw[arr] (all) -- (in);
   \draw[arr] (in) -- (ok); \draw[arr] (in) -- (grp); \draw[arr] (in) -- (miss);
   \draw[soigreen,very thick,decorate] ($(ok.south west)+(0,-0.25)$) -- ($(grp.south east)+(0,-0.25)$)
-     node[midway,below=1mm,font=\small\sffamily\bfseries,color=soigreen] {24/34 ô (71\%) tự định vị được};
+     node[midway,below=1mm,font=\small\sffamily\bfseries,color=soigreen] {45/78 ô (58\%) tự định vị được};
 \end{tikzpicture}
-\caption{Kết quả định vị ô đọc sai trên bộ đề 41 ô. Trong 15 nhóm cần đọc lại có tổng cộng 52 ô, khoảng 3--4 ô mỗi nhóm;
-đọc lại vài ô tốn khoảng 0,003 USD mỗi BCTC.}\label{fig:evalrepair}
+\caption{Kết quả định vị ô đọc sai trên bộ đề 86 ô. Trong 42 nhóm cần đọc lại có tổng cộng 172 ô, khoảng 4 ô mỗi nhóm;
+đọc lại vài ô tốn khoảng 0,003 USD mỗi BCTC. Nếu bỏ BCTC bán niên của GVR (file 72 dpi, xem mục dưới), tỷ lệ tự
+định vị được là 29/45 ô (64\%).}\label{fig:evalrepair}
 \end{figure}
 
 \subsection{Phân tích các ca ngoài tầm, ca sót và đề xuất sai}
 \begin{itemize}
-  \item \textbf{7 ô ngoài tầm} là các dòng chi tiết không thuộc phép cộng bắt buộc nào, hoặc chỉ lệch so với BCTC kỳ khác.
+  \item \textbf{8 ô ngoài tầm} là các dòng chi tiết không thuộc phép cộng bắt buộc nào, hoặc chỉ lệch so với BCTC kỳ khác.
         Người duyệt tìm ra chúng nhờ màu bằng chứng trên trang tài liệu (\enquote{cần xem lại}, \enquote{chưa kiểm được}).
         Các chỉ tiêu dùng trên thẻ KQKD đều nằm trong phép cộng bắt buộc, nên đọc sai thì phép cộng sẽ lệch và hệ thống
         không công bố.
-  \item \textbf{10 ô sót} thuộc hai trường hợp:
+  \item \textbf{33 ô sót} phần lớn rơi vào trường hợp \textbf{nhiều ô sai cùng lúc trong cùng một phép cộng}, trái với giả
+        thiết của bước định vị là mỗi phép cộng chỉ có một ô sai (hoặc hai ô lệch cùng một lượng):
   \begin{itemize}
-    \item 8 ô nằm trong \textbf{cùng một cột} (số liệu cùng kỳ năm trước) của BCTC quý 4/2025 của VHM: cả cột bị đọc
-          sai nhiều chỗ một lúc, nhiều lỗi cộng dồn trong cùng một chuỗi phép cộng nên không có cách thay một ô nào làm
-          các phép cộng khớp lại. Loại lỗi \enquote{cả cột hỏng} này được xử lý ở bậc chép lại cả trang.
-    \item 2 ô của BCTC quý 1/2026 của VHM: mô hình chép số của một dòng khác (số khác hẳn, không phải nhầm 1--2 chữ số),
-          nên nằm ngoài giả thiết \enquote{đọc nhầm ít chữ số} của bước định vị.
+    \item 17 ô của BCTC bán niên 2026 của GVR. File chỉ có độ phân giải 72 dpi, nên mô hình đọc sai nhiều chữ số trên cùng
+          một trang. Ví dụ ba dòng nợ ngắn hạn (mã 312, 316, 319) cùng sai trong phép cộng của mã 310; nguyên giá và hao
+          mòn tài sản cố định cùng sai trong phép cộng của mã 221. Khi đó không có cách thay một ô nào làm phép cộng khớp
+          lại. Người duyệt sửa các ô này sau khi đối chiếu ảnh phóng to.
+    \item 8 ô nằm trong \textbf{cùng một cột} (số liệu cùng kỳ năm trước) của BCTC quý 4/2025 của VHM: cả cột bị đọc sai
+          nhiều chỗ một lúc. Loại lỗi \enquote{cả cột hỏng} này được xử lý ở bậc chép lại cả trang.
+    \item 8 ô của BCTC quý 1 và quý 2/2026 của VHM, trong đó 2 ô mô hình chép số của một dòng khác (số khác hẳn, không
+          phải nhầm 1--2 chữ số).
   \end{itemize}
-  \item \textbf{2 đề xuất sai} (đều ở cột hỏng của VHM nói trên) bị bước đọc lại loại, vì ảnh không xác nhận số đề xuất.
+  \item \textbf{5 đề xuất sai} đều ở các BCTC của VHM có nhiều ô sai cùng lúc nói trên. Không đề xuất sai nào được nhận
+        trong các lần chạy thật, vì số đề xuất chỉ được nhận khi lần đọc lại ảnh ra đúng số đó.
         Trong các lần chạy thật, mọi số được nhận qua bước \enquote{định vị $\rightarrow$ đọc lại xác nhận} đều đúng khi
         đối chiếu với ảnh gốc. Ví dụ BCTC bán niên của HDB có một ô BCĐKT đọc sai được sửa đúng nhờ đề xuất của bước định
         vị; bước đọc phóng to theo dải sửa được một ô của VHM mà lần đọc lại thường vẫn nhầm.

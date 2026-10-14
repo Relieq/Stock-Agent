@@ -304,6 +304,10 @@ CREATE TABLE events (
 - **Doanh nghiệp thường:** doanh thu thuần, LN gộp, biên LN gộp, biên LN ròng, LNST của cổ đông công ty mẹ; tăng trưởng YoY, QoQ và lũy kế; TTM; ROE/ROA (TTM, trên bình quân); nợ vay/VCSH; dòng tiền kinh doanh/LNST; vòng quay phải thu và tồn kho; % hoàn thành kế hoạch năm.
 - **Ngân hàng:** thu nhập lãi thuần, thu nhập ngoài lãi và tỷ trọng của nó, CIR, chi phí dự phòng, LN trước dự phòng, tăng trưởng cho vay và tiền gửi khách hàng (so với đầu năm), LDR (xấp xỉ). Nợ xấu và tỷ lệ bao phủ nợ xấu lấy từ thuyết minh (để ĐATN).
 - Mỗi chỉ số có định nghĩa, công thức và phiên bản. Người dùng xem được mục "cách tính", nhờ vậy kết quả minh bạch.
+- **Chỉ dùng ô đã có bằng chứng (quy tắc từ 14/10/2026).** Mọi chỉ số, thẻ, bảng xếp hạng và câu trả lời của agent chỉ
+  lấy những ô có bằng chứng (khớp phép cộng trong BCTC hoặc khớp giữa các kỳ, xem mục 4.3). Ô "chưa kiểm được" (ví
+  dụ dòng "trong đó: chi phí lãi vay", chỉ tiêu ngoài bảng) thì trả lời "chưa có số đã kiểm chứng", không tính. Ngày
+  14/10/2026, sau khi thêm ràng buộc chi tiết cho TT99 và ngân hàng, ô chưa kiểm được còn 8,2% (trước đó 17,5%).
 
 ## 7. AI Analyst Agent
 

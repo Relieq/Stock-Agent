@@ -54,6 +54,8 @@
   {% endif %}
   {% if record.manual_fixes %}<div class="small">Đã sửa tay {{ record.manual_fixes | length }} ô:
     {% for m in record.manual_fixes %}{{ m.statement }} "{{ m.label }}" {{ m.column_kind }}: {{ m.before }} → {{ m.after }} ({{ m.by }}){% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
+  {% if record.manual_code_fixes %}<div class="small">Đã sửa tay {{ record.manual_code_fixes | length }} mã số:
+    {% for m in record.manual_code_fixes %}{{ m.statement }} "{{ m.label }}": mã {{ m.before }} → {{ m.after }} ({{ m.by }}){% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
   {% if d.duplicate_codes %}<div class="warnbox">Mã số in trùng trên chính BCTC: {{ d.duplicate_codes }}</div>{% endif %}
 </section>
 

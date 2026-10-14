@@ -172,9 +172,20 @@ def decide(conn: psycopg.Connection, document_id: int, record: dict) -> None:
 def apply_manual_fix(conn: psycopg.Connection, document_id: int, statement: str, row: int, column_kind: str,
                      value: str, by: str, note: str = "") -> dict:
     """Sửa tay một ô sau khi người xem đối chiếu ảnh gốc. Ghi lại ai sửa, lúc nào, số cũ và số mới
-    (record["manual_fixes"]); đây cũng là dữ liệu vàng để đo độ chính xác."""
+    (record["manual_fixes"]); đây cũng là dữ liệu vàng để đo độ chính xác.
+
+    column_kind "code" sửa mã số của dòng thay vì một ô số (GVR bán niên 2026: mô hình đọc 420a/420b thành 421/421a);
+    ghi riêng vào record["manual_code_fixes"] để không lẫn vào dữ liệu vàng của các ô số (eval/repair.py)."""
     record = _load_record(conn, document_id)
     r = record["raw"][statement]["rows"][row]
+    if column_kind == "code":
+        entry = {"statement": statement, "row": row, "label": r.get("label"), "column_kind": "code",
+                 "before": r.get("code"), "after": value, "by": by, "note": note,
+                 "at": datetime.now(timezone.utc).isoformat()}
+        r["code"] = value
+        record.setdefault("manual_code_fixes", []).append(entry)
+        _finalize(conn, record)
+        return entry
     entry = {"statement": statement, "row": row, "label": r.get("label"), "column_kind": column_kind,
              "before": r["values"].get(column_kind), "after": value, "by": by, "note": note,
              "at": datetime.now(timezone.utc).isoformat()}

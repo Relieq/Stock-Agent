@@ -158,6 +158,24 @@ def _evaluate_rules(ruleset: RuleSet, statements: dict[str, Statement]) -> list[
                 rhs += sign * (abs(v) if c in r.abs_codes else v)
             checks.append(Check(r.id, col, abs(lhs - rhs) <= tolerance, lhs, rhs, tolerance, r.gate, missing))
 
+    extras = dict(ruleset.group_extra)
+    for name in ruleset.group_statements:
+        st = statements.get(name)
+        if st is None:
+            continue
+        for parent in sorted(st.values):
+            kids = [c for c in st.values if c.startswith(parent + ".") and "." not in c[len(parent) + 1:]]
+            if not kids:
+                continue
+            tolerance = st.multiplier * (len(kids) + 2)
+            gate = any(parent == g or parent.startswith(g + ".") for g in ruleset.group_gate)
+            for col, lhs in st.values[parent].items():
+                rhs = sum((st.values[c].get(col, Decimal(0)) for c in kids), Decimal(0))
+                options = [rhs] + [rhs + st.values[e].get(col, Decimal(0)) for e in extras.get(parent, ()) if e in st.values]
+                best = min(options, key=lambda v: abs(lhs - v))
+                checks.append(Check(f"{name}_grp_{parent}", col, abs(lhs - best) <= tolerance, lhs, best, tolerance,
+                                    gate, []))
+
     for x in ruleset.cross_rules:
         (ls, lc, lcol), (rs, rc, rcol) = x.left, x.right
         lv = statements.get(ls, Statement(ls, Decimal(1))).values.get(lc, {}).get(lcol)
@@ -200,6 +218,18 @@ def detect_template(statements: dict[str, Statement]) -> str | None:
 
 def validate(statements: dict[str, Statement], template: str) -> list[Check]:
     return _evaluate_rules(RULESETS[template], statements)
+
+
+def group_rule_codes(rule_id: str, codes_of: dict[str, set[str]], template: str | None) -> tuple[str, list[str]] | None:
+    """Ô tham gia một phép kiểm nhóm "dòng cha = tổng dòng con" (mã rule "{báo cáo}_grp_{dòng cha}"): dòng cha, các dòng
+    con trực tiếp và số hạng phụ (group_extra). None nếu không phải phép kiểm nhóm."""
+    statement, sep, parent = rule_id.partition("_grp_")
+    if not sep or statement not in codes_of:
+        return None
+    codes = codes_of[statement]
+    kids = [c for c in codes if c.startswith(parent + ".") and "." not in c[len(parent) + 1:]]
+    extra = dict(RULESETS[template].group_extra).get(parent, ()) if template in RULESETS else ()
+    return statement, [parent, *kids, *(e for e in extra if e in codes)]
 
 
 def summarize(checks: list[Check]) -> dict[str, int]:

@@ -105,7 +105,7 @@ def test_label_variants_seen_in_q2_2026():
         (None, "Tiền gửi tại Ngân hàng Trung ương", "20"),                          # BID
         (None, "Tiền, vàng gửi tại và cho vay TCTD khác", "30"),                    # BID
         (None, "Các khoản nợ Chính phủ và Ngân hàng Trung ương", "40"),             # BID
-        (None, "Các khoản nợ Chính phủ và NHNNVN", "40"),                           # LPB (dòng sau: không nhận mã)
+        (None, "Các khoản nợ Chính phủ và NHNNVN", "40"),                           # LPB (dòng sau, cùng số: không nhận mã)
         (None, "Các công cụ tài chính phái sinh và các công nợ tài chính khác", "5"),  # BID
     ]
     extracted = [_st("BS", rows, "end_period")]
@@ -134,7 +134,8 @@ def test_operating_cash_flow_takes_the_last_matching_total():
     ]
     extracted = [_st("CF", rows, "ytd_cur")]
     canonicalize(extracted)
-    assert [it.code for it in extracted[0].items] == [None, None, "b.cfo", "b.cfi"]
+    # Hai dòng phía trên là thành phần của khúc kinh doanh: 50 + (30) = 20 (bank.assign_children)
+    assert [it.code for it in extracted[0].items] == ["b.cfo.1", "b.cfo.2", "b.cfo", "b.cfi"]
 
 
 def test_minority_interest_sign_does_not_follow_expense_convention():
@@ -181,3 +182,31 @@ def test_label_variants_seen_in_q1_2026():
     st = _st("IS", rows, "ytd_cur")
     canonicalize([st])
     assert [it.code for it in st.items] == ["b.equity_inc", "b.cit_cur", "b.cit"]
+
+
+def test_detail_lines_are_checked_against_their_parent_line():
+    # VCB quý 2/2026 (triệu đồng): dòng con theo vị trí, dòng cháu theo số thứ tự a/b hoặc tên nguyên giá/hao mòn
+    rows = [
+        ("VI", "Cho vay khách hàng", "1.728.183.370"),
+        ("1", "Cho vay khách hàng", "1.758.168.065"),
+        ("2", "Dự phòng rủi ro cho vay khách hàng", "(29.984.695)"),
+        ("IX", "Tài sản cố định", "17.937.947"),
+        ("1", "Tài sản cố định hữu hình", "10.376.429"),
+        ("a", "Nguyên giá", "22.603.916"),
+        ("b", "Hao mòn tài sản cố định", "(12.227.487)"),
+        ("3", "Tài sản cố định vô hình", "7.561.518"),
+        (None, "Nguyên giá", "10.478.167"),
+        (None, "Khấu hao tài sản cố định", "(2.916.649)"),
+        ("X", "Tài sản Có khác", "1"),
+    ]
+    st = _st("BS", [(None, label, v) for _, label, v in rows], "end_period")
+    for it, (stt, _, _) in zip(st.items, rows):
+        it.stt = stt
+    canonicalize([st])
+    assert [it.code for it in st.items] == [
+        "b.loans", "b.loans.1", "b.loans.2", "b.fixed_assets", "b.fixed_assets.1", "b.fixed_assets.1.1",
+        "b.fixed_assets.1.2", "b.fixed_assets.2", "b.fixed_assets.2.1", "b.fixed_assets.2.2", "b.other_assets"]
+    statements, _ = normalize([st])
+    groups = {c.rule_id: c.passed for c in validate(statements, "TCTD") if "_grp_" in c.rule_id}
+    assert groups == {"BS_grp_b.loans": True, "BS_grp_b.fixed_assets": True, "BS_grp_b.fixed_assets.1": True,
+                      "BS_grp_b.fixed_assets.2": True}

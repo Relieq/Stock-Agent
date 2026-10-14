@@ -463,7 +463,10 @@ def _label_split_codes(extracted, statements) -> list[dict]:
                 out.append({"statement": "IS", "code": code, "label": hit.label, "rule": "label"})
     cf = statements.get("CF")
     ex = next((e for e in extracted if e.statement == "CF"), None)
-    if cf is not None and ex is not None and "08" in cf.values and "01" not in cf.values:
+    # Chỉ khi các dòng điều chỉnh 02-07 đã có mã: nếu chúng cũng mất mã (VPL quý 4/2025) thì gán riêng 01 làm phép kiểm
+    # 08 = 01 + ... + 07 chạy với gần hết số hạng vắng mặt và báo lệch giả
+    if (cf is not None and ex is not None and "08" in cf.values and "01" not in cf.values
+            and any(c in cf.values for c in ("02", "03", "04", "05", "06", "07"))):
         hit = next((it for it in ex.items if normalize_code(it.code) is None
                     and _CF_PBT_LABEL.search(unicodedata.normalize("NFC", it.label or "").strip().casefold())
                     and any(v not in (None, "", "-") for v in it.values_raw.values())), None)

@@ -25,6 +25,7 @@ from services.extraction.bank import clean_label, fold
 from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.pipeline import _check_cached
 from services.extraction.rules import RULESETS
+from services.extraction.validate import group_rule_codes
 
 EPS = re.compile(r"(lai|lo).*tren (mot )?co phieu")
 RESTATED = re.compile(r"trình bày lại|điều chỉnh lại|restated", re.IGNORECASE)
@@ -88,6 +89,9 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
 
     rules = {r.id: r for r in RULESETS[template].rules} if template else {}
     crosses = {x.id: x for x in RULESETS[template].cross_rules} if template else {}
+    codes_of: dict[str, set[str]] = {}
+    for st_name, code in values:
+        codes_of.setdefault(st_name, set()).add(code)
     for c in checks:
         if c.rule_id in rules:
             r = rules[c.rule_id]
@@ -96,6 +100,8 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
         elif c.rule_id in crosses:
             (ls, lc, lcol), (rs, rc, rcol) = crosses[c.rule_id].left, crosses[c.rule_id].right
             touched = [(ls, lc, lcol), (rs, rc, rcol)]
+        elif (grp := group_rule_codes(c.rule_id, codes_of, template)) is not None:
+            touched = [(grp[0], code, c.column_kind) for code in grp[1] if (grp[0], code) in values]
         else:
             continue
         target = cells.sum_evidence if c.passed else (cells.sum_conflicts if c.gate else None)

@@ -24,7 +24,7 @@ from decimal import Decimal
 
 from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.rules import RULESETS
-from services.extraction.validate import Check, ExtractedStatement, Statement, validate
+from services.extraction.validate import Check, ExtractedStatement, Statement, group_rule_codes, validate
 
 MAX_DIGITS_CHANGED = 2          # đọc nhầm điển hình: 1-2 chữ số
 MAX_ROUNDS = 40                 # số ô tối đa sửa trên một tài liệu
@@ -85,7 +85,11 @@ def _cells_of(check: Check, template: str, statements: dict[str, Statement]) -> 
                 if st is not None and check.column_kind in st.values.get(c, {})]
     cross = next((x for x in rs.cross_rules if x.id == check.rule_id), None)
     if cross is None:
-        return []
+        grp = group_rule_codes(check.rule_id, {name: set(st.values) for name, st in statements.items()}, template)
+        if grp is None:
+            return []
+        st = statements[grp[0]]
+        return [(grp[0], c, check.column_kind) for c in grp[1] if check.column_kind in st.values.get(c, {})]
     return [(s, c, col) for s, c, col in (cross.left, cross.right) if col in statements.get(s, Statement(s, Decimal(1))).values.get(c, {})]
 
 

@@ -136,6 +136,115 @@ def repair_wrapped_labels(st: ExtractedStatement) -> int:
     return fixed
 
 
+# Dòng con cấp dưới (cháu) của một dòng con: số thứ tự chữ cái hoặc gạch đầu dòng, hoặc tên kiểu nguyên giá/hao mòn,
+# các khoản trong vốn của tổ chức tín dụng và lợi nhuận chưa phân phối (MBB không in số thứ tự nên dựa vào tên)
+_LEAF_STT = re.compile(r"^(?:[a-z]|[-–+•])\.?$")
+_LEAF_LABEL = re.compile(r"^(nguyen gia|hao mon|gia tri hao mon|khau hao|von dieu le|thang du von|co phieu quy|co phieu uu dai|"
+                         r"von khac$|loi nhuan (de lai )?(nam|ky) (truoc|nay)|loi nhuan (nam|ky) nay|"
+                         r"loi nhuan chua phan phoi (luy ke|nam|ky))")
+# Dòng con đứng SAU dòng cha (khoản mục tài sản, nợ: dòng cha in trước, các dòng con thụt vào bên dưới)
+_PARENTS_ABOVE = {"BS": ("b.interbank", "b.trading_sec", "b.loans", "b.debt_purchase", "b.inv_sec", "b.lt_invest",
+                         "b.fixed_assets", "b.inv_property", "b.other_assets", "b.gov", "b.interbank_liab",
+                         "b.other_liab")}
+# Dòng tổng đứng SAU các dòng thành phần: vốn chủ sở hữu (sau tổng nợ phải trả), các khúc của LCTT
+_TOTALS_BELOW = {"BS": (("b.te", "b.tl"),),
+                 "CF": (("b.cfo", None), ("b.cfi", "b.cfo"), ("b.cff", "b.cfi"))}
+
+
+def _is_leaf(it) -> bool:
+    label = fold(clean_label(it.label))
+    if _LEAF_LABEL.match(label):
+        return True
+    # STB, VIB đánh a/b cho chính dòng tài sản cố định hữu hình/vô hình (cấp con), nên số thứ tự chữ cái không đủ
+    return bool(_LEAF_STT.match(str(it.stt or "").strip().lower())) and not label.startswith("tai san co dinh")
+
+
+def _skip(it, total) -> bool:
+    """Dòng không phải thành phần: dòng "trong đó" (một phần của dòng trên), hoặc dòng tiêu đề in lại đúng số của
+    dòng tổng (ACB, LPB, SSB in "Vốn chủ sở hữu" ngay trên các khoản vốn với số bằng tổng vốn chủ sở hữu)."""
+    if fold(clean_label(it.label)).startswith("trong do"):
+        return True
+    return total is not None and it.values_raw and all(
+        v == total.values_raw.get(col) for col, v in it.values_raw.items() if v not in (None, "", "-"))
+
+
+def _number_children(parent: str, block: list, total=None) -> list:
+    """Đánh mã cho các dòng có số trong khối: dòng con cấp 1 là parent.1, parent.2...; dòng cháu (xem _is_leaf) đứng
+    sau một dòng con thì là parent.k.1, parent.k.2... Trả về các dòng đã đánh mã."""
+    out, k, m, last = [], 0, 0, None
+    valued = [it for it in block if it.code is None and _has_values(it) and not _skip(it, total)]
+    # Khối chỉ gồm nguyên giá/hao mòn ngay dưới dòng cha (bất động sản đầu tư): các dòng đều là con cấp 1
+    flat = bool(valued) and _is_leaf(valued[0])
+    for it in block:
+        if it.code is not None or not _has_values(it) or _skip(it, total):
+            continue
+        if not flat and last is not None and _is_leaf(it):
+            m += 1
+            it.code = f"{last}.{m}"
+        else:
+            k, m = k + 1, 0
+            it.code = last = f"{parent}.{k}"
+        out.append(it)
+    return out
+
+
+def assign_children(st: ExtractedStatement) -> int:
+    """Gán mã cho các dòng chi tiết theo vị trí so với dòng cha đã có mã chuẩn, để kiểm được "dòng cha = tổng các dòng
+    con" (rules.TCTD, nhóm group_statements). Chạy sau khi gán mã chuẩn cho các dòng cha. Trả về số dòng được gán.
+
+    VCB quý 2/2026: "Cho vay khách hàng" 1.728.183.370 = cho vay 1.758.168.065 + dự phòng (29.984.695); "Tài sản cố
+    định" = hữu hình (nguyên giá + hao mòn) + vô hình (nguyên giá + hao mòn); tổng vốn chủ sở hữu = vốn của tổ chức tín
+    dụng (vốn điều lệ + thặng dư + vốn khác) + quỹ + chênh lệch tỷ giá + lợi nhuận chưa phân phối + lợi ích cổ đông
+    không kiểm soát. Dòng con không gán được (không có số, trùng mã) thì để trống như cũ."""
+    items = st.items
+    index = {it.code: i for i, it in enumerate(items) if it.code}
+    n = 0
+    for parent in _PARENTS_ABOVE.get(st.statement, ()):
+        if parent not in index:
+            continue
+        i = index[parent]
+        j = next((x for x in range(i + 1, len(items)) if items[x].code), len(items))
+        n += len(_number_children(parent, items[i + 1:j], items[i]))
+    for total, start in _TOTALS_BELOW.get(st.statement, ()):
+        if total not in index or (start is not None and start not in index):
+            continue
+        lo = index[start] + 1 if start is not None else 0
+        hi = index[total]
+        if lo >= hi:
+            continue
+        block = items[lo:hi]
+        # Khúc LCTT kinh doanh có dòng tổng tạm "trước những thay đổi về tài sản và vốn lưu động": đánh mã như mọi
+        # dòng con, các dòng phía trên nó thành con của nó (mã b.cfo.1.1, b.cfo.1.2...)
+        pre = next((x for x, it in enumerate(block) if it.code is None and _has_values(it)
+                    and re.search(r"truoc (nhung )?thay doi", fold(clean_label(it.label)))), None)
+        if total == "b.cfo" and pre is not None:
+            head = block[pre]
+            head.code = f"{total}.1"
+            for x, it in enumerate([it for it in block[:pre] if it.code is None and _has_values(it)], 1):
+                it.code = f"{head.code}.{x}"
+                n += 1
+            rest = [it for it in block[pre + 1:]]
+            k = 1
+            for it in rest:
+                if it.code is None and _has_values(it):
+                    k += 1
+                    it.code = f"{total}.{k}"
+                    n += 1
+            n += 1
+            continue
+        if st.statement == "CF":
+            # LCTT ngân hàng không thụt dòng con cấp dưới: mọi dòng có số trong khúc là thành phần của dòng tổng
+            k = 0
+            for it in block:
+                if it.code is None and _has_values(it):
+                    k += 1
+                    it.code = f"{total}.{k}"
+                    n += 1
+            continue
+        n += len(_number_children(total, block, items[hi]))
+    return n
+
+
 def canonicalize(extracted: list[ExtractedStatement], repair_labels: bool = False) -> dict[str, list[str]]:
     """Gán mã chuẩn (b.*) cho các dòng chưa có mã. Trả về {báo cáo: [mã chuẩn không tìm thấy]}."""
     missing: dict[str, list[str]] = {}
@@ -159,4 +268,5 @@ def canonicalize(extracted: list[ExtractedStatement], repair_labels: bool = Fals
                 hit.code = canonical
             else:
                 missing.setdefault(st.statement, []).append(canonical)
+        assign_children(st)
     return missing

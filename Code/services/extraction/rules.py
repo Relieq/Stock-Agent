@@ -50,6 +50,12 @@ class RuleSet:
     cross_rules: tuple[CrossRule, ...] = ()
     # Các khoản chi phí dùng để nhận ra quy ước dấu của KQKD (chi phí in số dương hay số âm trong ngoặc)
     expense_codes: tuple[str, ...] = ("11", "25", "26")
+    # Báo cáo có dòng con đánh mã theo vị trí (mã cha + ".k", xem bank.assign_children): mỗi dòng có dòng con thì
+    # kiểm "dòng cha = tổng các dòng con". group_extra: số hạng có mã chuẩn có thể nằm giữa các dòng con (lợi ích cổ
+    # đông không kiểm soát trong tổng vốn chủ sở hữu); khớp khi có hoặc không cộng số hạng đó.
+    group_statements: tuple[str, ...] = ()
+    group_gate: tuple[str, ...] = ()     # dòng cha (và mọi dòng con của nó) có phép kiểm nhóm là bắt buộc
+    group_extra: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 def rule(statement: str, lhs: str, *codes: str, id: str | None = None, **kw) -> Rule:
@@ -199,6 +205,13 @@ TCTD = RuleSet(
     template="TCTD",
     total_assets_code="b.ta",
     expense_codes=("b.ie", "b.fe", "b.opex"),
+    group_statements=("BS", "CF"),
+    # Bắt buộc từ 14/10/2026: khớp trên mọi BCTC ngân hàng đã đọc, trừ các ô đọc sai (eval/rule_fit.py). Khúc kinh
+    # doanh của LCTT (b.cfo) chưa bắt buộc: CTG, MBB, SHB in thêm dòng tổng tạm giữa khúc, chưa tách được.
+    group_gate=("b.interbank", "b.trading_sec", "b.loans", "b.debt_purchase", "b.inv_sec", "b.lt_invest",
+                "b.fixed_assets", "b.inv_property", "b.other_assets", "b.gov", "b.interbank_liab", "b.other_liab",
+                "b.te", "b.cfo.1", "b.cfi", "b.cff"),
+    group_extra=(("b.te", ("b.mi",)),),
     rules=(
         rule("BS", "b.ta", "b.cash", "b.sbv", "b.interbank", "b.trading_sec", "b.deriv_asset", "b.loans",
              "b.debt_purchase", "b.inv_sec", "b.lt_invest", "b.fixed_assets", "b.inv_property", "b.other_assets",

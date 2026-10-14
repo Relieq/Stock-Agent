@@ -26,11 +26,12 @@
     {% for k, v in n.items() if v %}<span class="ev-{{ k }} chip">{{ EVIDENCE[k] }} {{ v }} ({{ (100 * v / total) | round | int }}%)</span>{% endfor %}
   </div>{% endif %}
   {% if record.note %}<div class="warnbox">{{ record.note }}</div>{% endif %}
-  {% if record.stt_code_swapped or record.codes_inferred or record.labels_repaired or record.extensions or d.rereads %}
+  {% if record.stt_code_swapped or record.codes_inferred or record.cf_positional or record.labels_repaired or record.extensions or d.rereads %}
   <div class="infobox"><b>Hệ thống đã tự sửa</b> (ràng buộc kế toán xác nhận phương án sửa; nên đối chiếu ảnh):
     <ul>
     {% if record.stt_code_swapped %}<li>Mô hình chép đảo cột mã số và số thứ tự ở {{ record.stt_code_swapped | join(', ') }} (báo cáo@trang): đã đảo lại.</li>{% endif %}
     {% for c in record.codes_inferred or [] %}<li>Dòng "{{ c.label }}" bị chép thiếu mã số: gán mã {{ c.code }} vì số của dòng khớp đúng phần còn thiếu của ràng buộc {{ c.rule }} ở mọi cột.</li>{% endfor %}
+    {% if record.cf_positional %}<li>LCTT có {{ record.cf_positional | length }} dòng không in mã số: đặt mã theo vị trí (mờ) dưới dòng tổng gần nhất để kiểm "dòng tổng = tổng các dòng thành phần".</li>{% endif %}
     {% if record.labels_repaired %}<li>Tên chỉ tiêu dài xuống nhiều dòng làm tên bị lệch sang dòng dưới: đã gán lại tên theo đúng hàng số.</li>{% endif %}
     {% for e in record.extensions or [] %}{% if e.kept %}<li>Bước định vị trang bỏ sót trang {{ e.page }} của {{ e.statement }}: đã chép thêm.</li>{% endif %}{% endfor %}
     {% if d.rereads %}<li>Đọc lại {{ d.rereads | length }} ô ở độ phân giải cao hơn (xem tab Kiểm tra).</li>{% endif %}
@@ -78,7 +79,7 @@
       <tbody>
       {% for r in t.rows %}
       <tr data-page="{{ r.page or (t.pages[0] if t.pages else 1) }}" {% if r.flagged %}class="flag"{% endif %}>
-        {% if admin %}<td class="muted small">{{ r.index }}</td>{% endif %}<td>{{ r.stt or "" }}</td><td class="code">{{ r.code or "" }}</td><td>{{ r.label }}</td><td>{{ r.note or "" }}</td>
+        {% if admin %}<td class="muted small">{{ r.index }}</td>{% endif %}<td>{{ r.stt or "" }}</td>{% if r.code and "." in r.code %}<td class="code muted" title="BCTC không in mã dòng này: mã đặt theo vị trí dưới dòng tổng để kiểm phép cộng">{{ r.code }}</td>{% else %}<td class="code">{{ r.code or "" }}</td>{% endif %}<td>{{ r.label }}</td><td>{{ r.note or "" }}</td>
         {% for k, name in t.columns %}{% set ev = r.evidence.get(k) %}<td class="num{% if ev %} ev-{{ ev.status }}{% endif %}"
           {% if ev %}title="{{ EVIDENCE[ev.status] }}{% if ev.sum %}&#10;Cộng tổng: {{ ev.sum | join(', ') }}{% endif %}{% if ev.period %}&#10;Giữa các kỳ: {{ ev.period | join(', ') }}{% endif %}{% if ev.differs %}&#10;Khác: {{ ev.differs | join(', ') }}{% endif %}{% if ev.conflict %}&#10;Cần xem lại: {{ ev.conflict | join(', ') }}{% endif %}"{% endif %}>{{ r.values.get(k) or "" }}</td>{% endfor %}
         <td class="muted">{{ r.page or "" }}</td>

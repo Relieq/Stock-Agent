@@ -258,3 +258,44 @@ def test_balance_sheet_detail_line_split_in_two_rows_is_summed():
     assert statements["BS"].values["321"]["end_period"] == Decimal(1_300)
     assert statements["BS"].summed_codes == ["321"]
     assert statements["BS"].duplicate_codes == ["310"]
+
+
+def _cf(rows):
+    return ExtractedStatement("CF", "VND", [ExtractedItem(c, l, {"ytd_cur": v}) for c, l, v in rows])
+
+
+def test_cash_flow_without_codes_checked_by_position():
+    # MSN bán niên 2026: LCTT chép ra không có mã số; dòng tổng tạm không tên = 08 + biến động vốn lưu động
+    from services.extraction.pipeline import _cf_positional_codes
+    cf = _cf([
+        (None, "LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG KINH DOANH", None),
+        (None, "Lợi nhuận kế toán trước thuế", "100"),
+        (None, "Khấu hao", "20"),
+        (None, "Lãi từ hoạt động kinh doanh trước những thay đổi vốn lưu động", "120"),
+        (None, "Biến động phải thu", "(30)"),
+        (None, "Biến động hàng tồn kho", "10"),
+        (None, "", "100"),
+        (None, "Thuế thu nhập doanh nghiệp đã nộp", "(5)"),
+        (None, "Lưu chuyển tiền thuần từ hoạt động kinh doanh", "95"),
+        (None, "Tiền chi mua tài sản cố định", "(40)"),
+        (None, "Lưu chuyển tiền thuần từ hoạt động đầu tư", "(40)"),
+        (None, "Lưu chuyển tiền thuần trong kỳ", "55"),
+    ])
+    _cf_positional_codes([cf], ".")
+    assert [it.code for it in cf.items] == [None, "08.1", "08.2", "08", "20.1.1", "20.1.2", "20.1", "20.2", "20",
+                                            "30.1", "30", "50"]
+    statements, _ = normalize([cf])
+    groups = [c for c in validate(statements, "TT200") if "_grp_" in c.rule_id]
+    assert len(groups) == 4 and all(c.passed and c.gate for c in groups)
+    assert not [c for c in validate(statements, "TT200") if c.rule_id in ("CF_08", "CF_20")]
+
+
+def test_cash_flow_positional_codes_skip_direct_method_and_mixed_blocks():
+    from services.extraction.pipeline import _cf_positional_codes
+    direct = _cf([(None, "Tiền thu từ bán hàng", "100"), ("02", "Tiền chi trả cho người cung cấp", "(60)"),
+                  (None, "Lưu chuyển tiền thuần từ hoạt động kinh doanh", "40")])
+    assert _cf_positional_codes([direct], ".") == [] and direct.items[0].code is None
+    mixed = _cf([("08", "Lợi nhuận trước thay đổi vốn lưu động", "100"), ("09", "Biến động phải thu", "(30)"),
+                 (None, "Biến động khác", "5"), ("20", "Lưu chuyển tiền thuần từ hoạt động kinh doanh", "75")])
+    _cf_positional_codes([mixed], ".")
+    assert mixed.items[2].code is None

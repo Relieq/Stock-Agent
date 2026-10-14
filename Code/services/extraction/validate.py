@@ -136,6 +136,8 @@ def _evaluate_rules(ruleset: RuleSet, statements: dict[str, Statement]) -> list[
             continue
         if r.when_absent and r.when_absent in st.values:
             continue
+        if r.statement in ruleset.group_statements and any(c.startswith(r.lhs + ".") for c in st.values):
+            continue   # dòng thành phần mang mã theo vị trí: phép kiểm nhóm thay cho phép kiểm theo mã
         terms = list(r.rhs)
         if r.statement == "IS" and flip_is:
             # Chi phí đã mang dấu âm khi in: cộng thẳng thay vì trừ

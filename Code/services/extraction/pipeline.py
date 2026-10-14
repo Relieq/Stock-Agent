@@ -487,7 +487,106 @@ def _check(record: dict):
     if inferred:
         statements, sep = normalize(extracted)
         checks = validate(statements, template)
+    if template in ("TT200", "TT99") and (positional := _cf_positional_codes(extracted, sep)):
+        statements, sep = normalize(extracted)
+        checks = validate(statements, template)
+        record["cf_positional"] = positional
     return extracted, statements, sep, template, checks
+
+
+# Dòng tổng của LCTT gián tiếp theo tên dòng, dùng khi BCTC (hoặc bản chép) không có mã số (MSN quý 1/2026)
+_CF_TOTAL_LABELS = (
+    ("08", re.compile(r"(lợi nhuận|lãi)( thuần)? (từ )?hoạt động kinh doanh trước (những )?thay đổi vốn lưu động")),
+    ("20", re.compile(r"^(lưu chuyển )?tiền thuần (từ |thu từ |sử dụng vào |\(sử dụng vào\)/thu từ )?(các )?hoạt động kinh doanh")),
+    ("30", re.compile(r"^(lưu chuyển )?tiền thuần (từ |thu từ |sử dụng vào |\(sử dụng vào\)/thu từ )?(các )?hoạt động đầu tư")),
+    ("40", re.compile(r"^(lưu chuyển )?tiền thuần (từ |thu từ |sử dụng vào |\(sử dụng vào\)/thu từ )?(các )?hoạt động tài chính")),
+    ("50", re.compile(r"^(lưu chuyển )?tiền thuần (trong|tăng|giảm)")),
+    ("60", re.compile(r"^tiền và (các khoản )?tương đương tiền (đầu|tại ngày 0?1)")),
+    ("61", re.compile(r"ảnh hưởng .*tỷ giá")),
+    ("70", re.compile(r"^tiền và (các khoản )?tương đương tiền (cuối|tại ngày 3)")),
+)
+
+
+def _cf_positional_codes(extracted, sep: str) -> list[dict]:
+    """LCTT có dòng không mã số: gán mã dòng tổng theo tên (nếu dòng tổng cũng thiếu mã), rồi các dòng không mã nằm
+    giữa hai dòng tổng thành thành phần của dòng tổng phía dưới (mã "20.1", "20.2"...), để kiểm "dòng tổng = tổng các
+    dòng thành phần" (rules.TT200/TT99, group_statements). VPL quý 4/2025: dòng 01-07 không in mã; MSN bán niên 2026:
+    bản chép không có cột mã. BCTC in đủ mã thì không đổi gì. Chỉ áp cho phương pháp gián tiếp (có dòng 08)."""
+    ex = next((e for e in extracted if e.statement == "CF"), None)
+    if ex is None:
+        return []
+    def has_values(it):
+        return any(v not in (None, "", "-") for v in it.values_raw.values())
+    loose = [it for it in ex.items if normalize_code(it.code) is None and has_values(it)]
+    if not loose:
+        return []
+    def folded(it):
+        return unicodedata.normalize("NFC", it.label or "").strip().casefold()
+    out = []
+    present = {normalize_code(it.code) for it in ex.items}
+    if "08" not in present and not any(_CF_TOTAL_LABELS[0][1].search(folded(it)) for it in loose):
+        return out   # phương pháp trực tiếp (SAB): các dòng 01-07 đứng riêng, không gán theo vị trí
+    for code, pattern in _CF_TOTAL_LABELS:
+        if code in present:
+            continue
+        hits = [it for it in ex.items if normalize_code(it.code) is None and has_values(it)
+                and pattern.search(folded(it))]
+        if hits:
+            hit = hits[-1] if code == "20" else hits[0]
+            hit.code = code
+            present.add(code)
+            out.append({"code": code, "label": hit.label, "rule": "label"})
+    # Khúc nào lẫn dòng có số có mã và dòng không mã (trừ 01, đã tính qua group_extra) thì không gán: tổng các dòng
+    # không mã sẽ thiếu phần của dòng có mã
+    block, mixed = [], False
+    for it in ex.items:
+        code = normalize_code(it.code)
+        if code in ("08", "20", "30", "40"):
+            if not mixed:
+                out += _number_block(code, block, ex.items, sep)
+            block, mixed = [], False
+        elif code is None:
+            if has_values(it):
+                block.append(it)
+        elif code in ("50", "60", "61", "70"):
+            block, mixed = [], False
+        elif code != "01" and has_values(it):
+            mixed = True
+    return out
+
+
+def _number_block(total: str, block: list, items: list, sep: str) -> list[dict]:
+    """Đánh mã "{total}.k" cho các dòng thành phần. Dòng tổng tạm không tên (MSN: "Tiền từ hoạt động kinh doanh" =
+    08 + các biến động vốn lưu động, đứng trước tiền lãi vay đã trả) thành "{total}.1", các dòng trước nó thành
+    "{total}.1.j": nhận ra vì số của nó bằng tổng các dòng trước nó trong khúc (cộng 08 với khúc của 20) ở mọi cột."""
+    def amounts(it):
+        return {k: parse_amount(v, sep) for k, v in it.values_raw.items()}
+    extra = next((amounts(it) for it in items if total == "20" and normalize_code(it.code) == "08"), {})
+    subtotal = None
+    running = {k: v or Decimal(0) for k, v in extra.items()}
+    for i, it in enumerate(block):
+        vals = amounts(it)
+        filled = {k: v for k, v in vals.items() if v is not None}
+        if i >= 2 and filled and any(filled.values()) and all(
+                abs(v - running.get(k, Decimal(0))) <= i + 1 for k, v in filled.items()):
+            subtotal = i
+            break
+        for k, v in vals.items():
+            running[k] = running.get(k, Decimal(0)) + (v or Decimal(0))
+    out = []
+    def put(it, code):
+        it.code = code
+        out.append({"code": code, "label": it.label, "rule": "position"})
+    if subtotal is None:
+        for k, it in enumerate(block, 1):
+            put(it, f"{total}.{k}")
+        return out
+    for j, it in enumerate(block[:subtotal], 1):
+        put(it, f"{total}.1.{j}")
+    put(block[subtotal], f"{total}.1")
+    for k, it in enumerate(block[subtotal + 1:], 2):
+        put(it, f"{total}.{k}")
+    return out
 
 
 def _infer_missing_codes(extracted, statements, sep, template, checks) -> list[dict]:

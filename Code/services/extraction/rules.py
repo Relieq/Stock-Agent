@@ -132,11 +132,17 @@ _CASH_CROSS = (
     CrossRule("X_cash_begin", left=("BS", "110", "begin_year"), right=("CF", "60", "ytd_cur")),
 )
 
+# LCTT không in mã ở các dòng thành phần (pipeline._cf_positional_codes): dòng tổng = tổng các dòng thành phần nằm
+# ngay trên nó; dòng 20 cộng thêm dòng 08, dòng 08 cộng thêm dòng 01 nếu 01 có in mã
+_CF_GROUPS = dict(group_statements=("CF",), group_gate=("08", "20", "30", "40"),
+                  group_extra=(("08", ("01",)), ("20", ("08",)), ("20.1", ("08",))))
+
 TT200 = RuleSet(
     template="TT200",
     total_assets_code="270",
     rules=_TT200_BS + _TT200_IS + _CF,
     cross_rules=_CASH_CROSS,
+    **_CF_GROUPS,
 )
 
 # Dòng con BCĐKT theo TT99: cấu trúc mã quan sát trên 43 BCTC năm 2026 đã đọc (150/230: tài sản sinh học; 160: tài sản
@@ -197,6 +203,7 @@ TT99 = RuleSet(
     ),
     # Tiền đầu kỳ trên LCTT có thể khác số đầu năm trên BCĐKT thật (GAS lệch 15,5 triệu ở cả hai quý: ảnh hưởng tỷ giá)
     cross_rules=(_CASH_CROSS[0], replace(_CASH_CROSS[1], gate=False)),
+    **_CF_GROUPS,
 )
 
 # Ngân hàng (TCTD): mã chuẩn b.* gán theo tên chỉ tiêu ở services/extraction/bank.py

@@ -962,9 +962,20 @@ phương án làm số ràng buộc đạt nhiều nhất mà không làm mất 
   \item \textbf{Tự định vị ô sai bằng ràng buộc, rồi đọc lại riêng các ô đó} (mục~\ref{sec:loi}).
   \item Đọc lại các ô thuộc ràng buộc còn lệch ở độ phân giải cao hơn. Chỉ giữ lần đọc lại nếu số ràng buộc lệch giảm và
         số ràng buộc đạt không giảm.
-  \item Chép lại cả báo cáo, mỗi trang một lần gọi, để sửa lỗi bỏ sót dòng. Nếu chép lại vẫn lệch thì lần lượt xoay
-        từng trang 180 độ rồi chép lại, vì một số file scan có trang lộn ngược (VHM quý 1/2026). Bản mới chỉ được giữ khi hiệu số \enquote{ràng buộc đạt trừ ràng
-        buộc lệch} tốt hơn bản cũ, hoặc bằng nhưng có nhiều ràng buộc đạt hơn.
+  \item \textbf{Chép lại cả báo cáo} (BCĐKT, KQKD hoặc LCTT) khi báo cáo đó vẫn còn ràng buộc bắt buộc lệch, hoặc
+        BCĐKT, KQKD chưa có ràng buộc nào đạt. Bậc này nhắm vào các lỗi mà đọc lại từng ô không sửa được: bỏ sót dòng,
+        lệch hàng, chép nhầm cả cột, trang lộn ngược. Nó khác lần chép đầu ở ba điểm:
+        \begin{itemize}
+          \item Lần đầu gửi mọi trang của báo cáo trong một lần gọi; bậc này gửi \textbf{mỗi trang một lần gọi} rồi ghép
+                các dòng theo thứ tự trang. Mỗi lượt trả lời ngắn hơn nên mô hình ít bỏ sót dòng ở chỗ chuyển trang.
+          \item Luôn dùng ảnh nét ở mức \code{original} (mục~\ref{sec:anhnet}).
+          \item Nếu chép lại vẫn lệch, lần lượt xoay \textbf{từng trang một} thêm 180 độ rồi chép lại, vì một số file scan
+                có trang lộn ngược (VHM quý 1/2026).
+        \end{itemize}
+        Bản mới chỉ được giữ khi hiệu số \enquote{ràng buộc đạt trừ ràng buộc lệch} tốt hơn bản cũ (hoặc bằng nhưng có
+        nhiều ràng buộc đạt hơn) và số ràng buộc đạt không giảm. Chỉ so số ràng buộc lệch là chưa đủ: bản chép lại làm
+        mất mã số thì chạy được ít ràng buộc hơn nên trông như ít lệch hơn (KQKD quý 2/2026 của TCX: lệch từ 2 xuống 0,
+        nhưng số ràng buộc kiểm được giảm từ 28 xuống 12). Kết quả đo ở mục~\ref{sec:evalchep}.
   \item Vẫn lệch thì chuyển duyệt tay. Người duyệt xem ảnh trang cạnh bảng số, sửa từng ô. Mỗi lần sửa được ghi lại và
         trở thành \textbf{dữ liệu vàng} để đánh giá.
 \end{enumerate}
@@ -1435,6 +1446,35 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
         đối chiếu với ảnh gốc. Ví dụ BCTC bán niên của HDB có một ô BCĐKT đọc sai được sửa đúng nhờ đề xuất của bước định
         vị; bước đọc phóng to theo dải sửa được một ô của VHM mà lần đọc lại thường vẫn nhầm.
 \end{itemize}
+
+\section{Chép lại cả báo cáo}\label{sec:evalchep}
+Thống kê từ nhật ký lưu trong từng BCTC: mỗi lần chép lại ghi số ràng buộc đạt và lệch trước, sau, và bản mới có được giữ
+hay không.
+
+\begin{table}[H]
+\centering\small
+\caption{Bậc chép lại cả báo cáo trên 120 BCTC (khoảng 360 báo cáo BCĐKT, KQKD, LCTT)}\label{tab:chep}
+\begin{tabularx}{\linewidth}{@{}Xr@{}}
+\toprule
+\textbf{Chỉ tiêu} & \textbf{Số báo cáo} \\ \midrule
+Phải chép lại (vẫn lệch sau khi đã đọc lại từng ô) & 46 \\
+Bản chép lại tốt hơn nên được giữ & 16 (35\%) \\
+\quad trong đó hiện đạt mọi ràng buộc bắt buộc & 16/16 \\
+\quad trong đó nhờ xoay trang 180 độ & 4 \\
+Bản chép lại không tốt hơn, giữ bản cũ & 30 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Khi được giữ, bản chép lại sửa triệt để: cả 16 báo cáo đều hết lệch, gồm 1.456 ô số (4,2\% toàn bộ ô,
+Bảng~\ref{tab:theoo}). Bậc này sửa được những lỗi mà đọc lại từng ô không sửa được: BCĐKT quý 1/2026 của MBB có thêm 9
+dòng bị bỏ sót, LCTT bán niên của GVR thêm 7 dòng; KQKD bán niên của GVR, HDB, MCH trước đó không kiểm được ràng buộc
+nào; cả ba
+báo cáo của VHM quý 1/2026 và KQKD quý 4/2025 của HPG có trang lộn ngược. Mặt hạn chế là 30/46 lần chép lại không giúp
+gì; phần lớn các báo cáo đó về sau hết lệch nhờ đọc lại ô, sửa quy tắc hoặc sửa tay, còn 4 báo cáo là do chính BCTC in
+lệch. Bậc này chiếm khoảng 0,033 USD mỗi BCTC (Bảng~\ref{tab:chiphi}). Số ràng buộc \enquote{trước} được tính theo bộ
+quy tắc lúc chạy, còn trạng thái hiện tại đã gồm cả các lần sửa quy tắc về sau, nên không tách được 30 báo cáo kia hết
+lệch nhờ cách nào.
 
 \section{Chuẩn bị ảnh cho bước đọc lại}\label{sec:evalanh}
 Thí nghiệm dùng lại các ô đã biết là đọc sai của mục~\ref{sec:evalrepair}, cộng thêm số ô đối chứng bằng nhau: các ô

@@ -278,6 +278,11 @@ sai và 86 ô đối chứng (ô đúng, lấy ngẫu nhiên trên cùng trang),
   lần gọi tốn khoảng gấp đôi token (bước đọc lại chỉ chiếm khoảng 3% chi phí mỗi BCTC); chép đầu một trang 72 dpi tốn thêm
   khoảng 80%. Mùa quý 3 đo lại tỷ lệ đúng ngay lần đầu và chi phí cho các file mờ.
 - Mỗi cách chỉ chạy một lần, kết quả từng trang dao động nhiều; kết luận V2 hơn V0 chắc chắn, chênh lệch V2–V3 thì không.
+
+**Bậc chép lại cả báo cáo (đo 14/10/2026 từ nhật ký 120 BCTC).** 46 báo cáo phải chép lại, giữ bản mới 16 (cả 16 nay đạt
+mọi ràng buộc bắt buộc, 4 nhờ xoay 180 độ); 30 lần không giúp gì nhưng vẫn tốn tiền (bậc này khoảng 0,033 USD mỗi BCTC).
+Việc cho mùa quý 3: ghi lại đặc điểm của các lần không được giữ (số ràng buộc lệch, lệch ở một cột hay mọi cột, bước định vị
+ô sai có đề xuất không) để đặt điều kiện bỏ qua bậc này khi lỗi chỉ là nhầm vài chữ số.
 - Phát hiện khi xem ảnh: 3 trang (VHM quý 4/2025 trang 15, 16; VHM quý 1/2026 trang 87) bị lưu góc xoay 90 thay vì 270,
   nên mọi cách đều vẽ lộn ngược (VHM quý 4/2025: cả KQKD đã được chép trên ảnh lộn ngược, đó là nguyên nhân "cả cột hỏng").
   Đã sửa góc xoay (cả trang 17 của VHM quý 4/2025). Bỏ 3 trang này: V0 38/71 ô sai đúng (54%), ô đối chứng 64/71; V2

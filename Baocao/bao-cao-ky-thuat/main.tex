@@ -182,8 +182,8 @@ ràng buộc đòi hỏi. Chỉ số liệu đã qua kiểm chứng mới đư�
 báo và xếp hạng. Mỗi con số trên giao diện đều mở được đúng trang BCTC gốc.
 
 Đến ngày 13/10/2026, trên nhóm VN30, hệ thống đã đọc 120 BCTC (quý 4/2025, quý 1 và quý 2/2026, bán niên 2026). Trong
-đó 111 BCTC đạt kiểm chứng hoặc được duyệt tay; với BCTC quý, tỷ lệ này là 90/91. Chi phí gọi mô hình khoảng 0,10 USD
-mỗi BCTC. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
+đó 111 BCTC đạt kiểm chứng hoặc được duyệt tay; với BCTC quý, tỷ lệ này là 90/91. Chi phí gọi mô hình để đọc một BCTC trung bình
+khoảng 0,12 USD (trung vị 0,08 USD), chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
 trong chính BCTC. Các phần agent phân tích, chỉ số tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho
 người dùng thật được liệt kê ở Chương~\ref{chap:ketluan} dưới dạng đề mục, sẽ hoàn thiện ở các giai đoạn sau.
 \end{abstract}
@@ -625,7 +625,7 @@ F10 & Agent báo cáo so sánh theo câu hỏi của người dùng & Dự kiế
 \begin{itemize}
   \item \textbf{Đúng số:} chỉ công bố số đã qua ràng buộc bắt buộc hoặc đã được duyệt tay.
   \item \textbf{Truy vết:} mỗi số mở được trang BCTC gốc; mỗi lần sửa được ghi lại người sửa và lý do.
-  \item \textbf{Chi phí:} khoảng 0,10 USD mỗi BCTC; có trần chi phí theo ngày và theo tháng (mục~\ref{sec:token}).
+  \item \textbf{Chi phí:} trung bình khoảng 0,12 USD để đọc một BCTC; có trần chi phí theo ngày và theo tháng (mục~\ref{sec:token}).
   \item \textbf{Độ trễ:} có thẻ trong vài phút sau khi BCTC xuất hiện trên nguồn (sẽ đo trong mùa quý 3/2026).
   \item \textbf{Riêng tư:} tài liệu người dùng tải lên chỉ người đó thấy.
   \item \textbf{Pháp lý:} không đưa khuyến nghị đầu tư; nội dung do AI tạo được gắn nhãn.
@@ -1125,15 +1125,15 @@ Nhận diện file người dùng tải lên & -- & 3.000 \\
 \begin{tabularx}{\linewidth}{@{}p{4.2cm}XX@{}}
 \toprule
 & \textbf{Khóa trước} & \textbf{Soi} \\ \midrule
-Token vào mỗi báo cáo & 272.054 & khoảng 54.000 \\
-Token ra mỗi báo cáo & 41.106 & khoảng 13.000 \\
-Chi phí mỗi báo cáo & 0,04 USD & khoảng 0,10 USD \\
-Ghi chú & Một báo cáo, gửi toàn bộ văn bản OCR cho nhiều bước & Trung bình 120 BCTC, đã gồm mọi lần đọc lại \\
+Token vào mỗi báo cáo & 272.054 & 58.470 \\
+Token ra mỗi báo cáo & 41.106 & 16.034 \\
+Chi phí mỗi báo cáo & 0,04 USD & 0,116 USD (trung vị 0,084) \\
+Ghi chú & Một báo cáo, gửi toàn bộ văn bản OCR cho nhiều bước & Trung bình 30 BCTC quý 4/2025, quy trình hiện tại, đã gồm mọi lần đọc lại \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Soi dùng ít token hơn khoảng 5 lần, nhưng chi phí mỗi báo cáo cao hơn vì mô hình đọc ảnh đắt hơn mô hình khóa trước dùng
+Soi dùng ít token vào hơn khoảng 4,7 lần, nhưng chi phí mỗi báo cáo cao hơn vì mô hình đọc ảnh đắt hơn mô hình khóa trước dùng
 cho văn bản OCR, và vì Soi đọc lại để kiểm chứng. Đổi lại, Soi không cần GPU để chạy OCR và mỗi số đều đã được kiểm chứng.
 
 \section{Thẻ KQKD và giao diện}
@@ -1230,18 +1230,62 @@ to vẫn ra đúng số cũ, nên người duyệt ghi rõ lý do rồi duyệt.
 có cấu trúc trang khác thường.
 
 \section{Chi phí}
+\subsection{Cách tính}
+Mỗi BCTC có một bản ghi trích xuất, cộng dồn token của mọi lần gọi mô hình cho chính BCTC đó: định vị trang, chép bảng,
+chép lại trang, đọc lại ô. Vì vậy chi phí trong mục này là \textbf{chi phí đọc một BCTC} đúng như khi hệ thống chạy thật.
+Chi phí \textbf{phát triển} (các lần chạy thử rồi bị ghi đè khi sửa code, các thử nghiệm riêng) \textbf{không} nằm trong
+các con số dưới đây; tổng tiền thực trả cho nhà cung cấp mô hình trong giai đoạn phát triển cao hơn.
+
+Số liệu đáng tin nhất cho chi phí vận hành là \textbf{30 BCTC quý 4/2025}: đây là đợt đọc đầu tiên chạy bằng quy trình
+hiện tại (có định vị ô sai, đọc phóng to) và có ghi chi phí theo từng bước. 90 BCTC đọc trước đó bằng quy trình cũ
+cho kết quả tương tự (trung bình 0,095 USD) nên dùng để đối chiếu.
+
 \begin{table}[H]
 \centering\small
-\caption{Chi phí gọi mô hình cho 120 BCTC (tổng khoảng 11,98 USD, tức khoảng 0,10 USD mỗi BCTC)}\label{tab:chiphi}
-\begin{tabular}{@{}lrr@{}}
+\caption{Chi phí trung bình mỗi BCTC theo bước, quy trình hiện tại (30 BCTC quý 4/2025, mô hình gpt-5.4-mini)}\label{tab:chiphi}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{Bước} & \textbf{Số lần gọi} & \textbf{USD} \\ \midrule
-Định vị trang & 36 & 0,64 \\
-Chép BCĐKT, KQKD, LCTT (lần đầu, đã ghi theo bước) & 90 & 1,79 \\
-Chép lại báo cáo còn lệch & 78 & 0,97 \\
-Đọc lại ô (kiểm chứng chéo kỳ, ô lệch) & 79 & 0,28 \\
-Các lần chạy trước khi ghi chi phí theo bước & 474 & 8,32 \\ \midrule
-\textbf{Tổng} & \textbf{757} & \textbf{11,98} \\
+\textbf{Bước} & \textbf{Lần gọi} & \textbf{Token vào} & \textbf{Token ra} & \textbf{USD} \\ \midrule
+Định vị trang & 1,2 & 23.871 & 771 & 0,021 \\
+Chép BCĐKT, KQKD, LCTT & 3,0 & 22.521 & 9.511 & 0,060 \\
+Chép lại trang còn lệch & 2,6 & 9.773 & 5.470 & 0,032 \\
+Đọc lại ô (định vị ô sai, đối chiếu kỳ) & 0,7 & 2.304 & 283 & 0,003 \\ \midrule
+\textbf{Tổng mỗi BCTC} & \textbf{7,5} & \textbf{58.470} & \textbf{16.034} & \textbf{0,116} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Phân bố chi phí mỗi BCTC (USD)}\label{tab:phanbo}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+& \textbf{Số BCTC} & \textbf{Trung bình} & \textbf{Trung vị} & \textbf{90\% dưới} \\ \midrule
+Quy trình hiện tại (quý 4/2025) & 30 & 0,116 & 0,084 & 0,173 \\
+\quad Ngân hàng & 13 & 0,096 & & \\
+\quad Doanh nghiệp thường & 16 & 0,132 & & \\
+\quad Công ty chứng khoán & 1 & 0,121 & & \\
+Quy trình cũ (Q1, Q2, bán niên 2026) & 90 & 0,095 & 0,082 & 0,122 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Trung vị (0,084 USD) thấp hơn trung bình vì một số BCTC khó tốn gấp 2--3 lần: BCTC phải chép lại nhiều trang, hoặc BCTC tự
+in lệch nên hệ thống đọc lại nhiều lần trước khi chuyển duyệt tay. Bước \enquote{chép lại trang} chiếm khoảng 1/4 chi phí và
+sẽ giảm khi bộ quy tắc bắt được thêm các dạng BCTC đặc biệt (mỗi lỗi quy tắc đã sửa ở quý 4/2025 đều từng gây chép lại).
+
+\subsection{Ước tính chi phí vận hành}
+Với mỗi mã, mỗi kỳ Soi chỉ đọc một BCTC dùng cho thẻ (ưu tiên hợp nhất), không đọc mọi bản riêng lẻ. Một năm có 4 BCTC
+quý, 1 bán niên và 1 năm, tức khoảng 6 BCTC mỗi mã. Lấy 0,10--0,12 USD mỗi BCTC:
+
+\begin{table}[H]
+\centering\small
+\caption{Ước tính chi phí gọi mô hình khi vận hành (chưa gồm đọc theo yêu cầu người dùng, đã có trần riêng)}\label{tab:uoctinh}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Phạm vi} & \textbf{BCTC mỗi mùa quý} & \textbf{USD mỗi mùa quý} & \textbf{USD mỗi năm} \\ \midrule
+VN30 & khoảng 30 & 3--3,5 & 18--22 \\
+VN100 & khoảng 100 & 10--12 & 60--72 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1320,7 +1364,8 @@ nhầm dòng}. Vì vậy đối chiếu nguồn ngoài đã trở thành bước
 \section{Kết luận}
 Đến giữa tháng 10/2026, Soi đã có đủ chuỗi xử lý: thu thập BCTC, đọc bằng mô hình thị giác, kiểm chứng bằng ràng buộc kế
 toán, tự định vị và sửa ô đọc sai, tính thẻ KQKD có cờ cảnh báo, và giao diện web. Trên VN30, gần như toàn bộ BCTC quý đạt
-kiểm chứng với chi phí khoảng 0,10 USD mỗi BCTC. Đối chiếu với nguồn ngoài cho thấy số liệu khớp ở 208/211 ô, và cả 3 ô
+kiểm chứng với chi phí đọc trung bình khoảng 0,12 USD mỗi BCTC (khoảng 3--3,5 USD cho
+cả nhóm VN30 mỗi mùa BCTC quý). Đối chiếu với nguồn ngoài cho thấy số liệu khớp ở 208/211 ô, và cả 3 ô
 lệch đều có lời giải thích từ chính BCTC.
 
 Điểm khác biệt của hệ thống không nằm ở mô hình ngôn ngữ, vì ai cũng dùng được mô hình như nhau. Điểm khác biệt là

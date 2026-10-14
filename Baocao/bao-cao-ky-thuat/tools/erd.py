@@ -76,6 +76,11 @@ def edge(child: str, col: str, parent: str, nullable: bool, nth: int) -> str:
     """Bội số theo UML: phía bảng con 0..*, phía bảng cha 1 (0..1 nếu khóa ngoại cho phép rỗng). Nhiều khóa ngoại giữa
     cùng hai bảng thì uốn cong để không chồng nhau; tên cột khóa ngoại ghi ở giữa đường."""
     many, one = "0..*", ("0..1" if nullable else "1")
+    if child == parent:
+        # Khóa ngoại trỏ về chính bảng (documents.duplicate_of): vẽ vòng ở phần dưới cạnh trái, chỗ không có đường khác
+        return (f"\\draw[erdline] ($({child}.south west)+(0,0.5)$) -- node[erdmult,pos=0.5,below]{{{many}}} ++(-0.8,0) "
+                f"-- node[erdfk,midway,sloped,above]{{{esc(col)}}} ++(0,1.6) -- node[erdmult,pos=0.5,above]{{{one}}} "
+                f"($({child}.south west)+(0,2.1)$);")
     path = "--" if nth == 0 else f"to[bend {'left' if nth % 2 else 'right'}={18 * ((nth + 1) // 2)}]"
     return (f"\\draw[erdline] ({child}) {path} node[erdmult,pos=0.12]{{{many}}} node[erdmult,pos=0.88]{{{one}}} "
             f"node[erdfk,midway]{{{esc(col)}}} ({parent});")

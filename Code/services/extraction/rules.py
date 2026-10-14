@@ -5,8 +5,8 @@ Mỗi ràng buộc: lhs = tổng có dấu của các mã ở rhs, áp cho từn
   * `gate=False`: chưa đối chiếu với mẫu biểu gốc; chỉ ghi lại để theo dõi, không chặn.
 
 Mẫu TT200 (Thông tư 200/2014, B01/B02/B03-DN và bản hợp nhất theo TT202) viết theo mẫu biểu.
-Mẫu TT99 (Thông tư 99/2025) mới khai báo các dòng tổng đã đối chiếu trên BCTC thực tế; các dòng con bị
-đổi mã chưa đối chiếu với phụ lục của thông tư nên chưa đưa vào (xem architecture.md mục 4.2).
+Mẫu TT99 (Thông tư 99/2025): các dòng tổng và dòng con BCĐKT, LCTT gián tiếp khai báo theo cấu trúc mã quan sát trên
+BCTC năm 2026 và chỉ đưa vào nhóm bắt buộc sau khi khớp trên dữ liệu thật (eval/rule_fit.py).
 Mẫu ngân hàng (TCTD) không in mã số kiểu DN thường: ánh xạ theo tên chỉ tiêu ở bank.py.
 Mẫu công ty chứng khoán (CTCK) in mã số; mới khai báo các dòng tổng.
 """
@@ -132,6 +132,33 @@ TT200 = RuleSet(
     cross_rules=_CASH_CROSS,
 )
 
+# Dòng con BCĐKT theo TT99: cấu trúc mã quan sát trên 43 BCTC năm 2026 đã đọc (150/230: tài sản sinh học; 160: tài sản
+# ngắn hạn khác; 270: tài sản dài hạn khác; 279: lợi thế thương mại; 420: LNST chưa phân phối). Mỗi quy tắc chỉ đưa vào
+# nhóm bắt buộc sau khi khớp trên mọi BCTC có đủ số hạng, trừ các ô đọc sai (đo bằng eval/rule_fit.py, 14/10/2026).
+_TT99_BS_DETAIL = (
+    rule("BS", "120", *codes(121, 125)),
+    rule("BS", "130", *codes(131, 139)),
+    rule("BS", "140", "141", "142"),
+    rule("BS", "150", *codes(151, 154)),
+    rule("BS", "160", *codes(161, 169)),
+    rule("BS", "210", *codes(211, 219)),
+    rule("BS", "220", "221", "224", "227"),
+    rule("BS", "221", "222", "223"),
+    rule("BS", "224", "225", "226"),
+    rule("BS", "227", "228", "229"),
+    rule("BS", "240", "241", "242"),
+    rule("BS", "250", *codes(251, 259)),
+    rule("BS", "260", *codes(261, 269)),
+    rule("BS", "270", *codes(271, 279), when_present="280"),
+    rule("BS", "310", *codes(311, 329)),
+    rule("BS", "330", *codes(331, 349)),
+    rule("BS", "410", *codes(411, 429), when_present="410"),
+    rule("BS", "400", *codes(411, 429), "430", id="BS_400_items", when_absent="410"),
+    rule("BS", "411", "411a", "411b", when_present="411a"),
+    rule("BS", "420", "420a", "420b", when_present="420a"),
+    rule("BS", "421", "421a", "421b", when_present="421a"),
+)
+
 TT99 = RuleSet(
     template="TT99",
     total_assets_code="280",
@@ -141,23 +168,28 @@ TT99 = RuleSet(
         # Một số BCTC dùng cấu trúc TT99 nhưng vẫn in mã tổng tài sản là 270 (ví dụ HPG quý 2/2026)
         rule("BS", "270", "100", "200", id="BS_270_total", when_absent="280"),
         rule("BS", "270", "440", id="BS_270_total_eq_440", when_absent="280"),
-        # Dòng con theo cấu trúc quan sát trên BCTC quý 2/2026 (150: tài sản sinh học ngắn hạn, 160: tài sản ngắn
-        # hạn khác, 230: tài sản sinh học dài hạn); chưa đối chiếu phụ lục TT99 nên chưa bắt buộc
-        rule("BS", "100", "110", "120", "130", "140", "150", "160", gate=False),
-        rule("BS", "200", "210", "220", "230", "240", "250", "260", "270", gate=False, when_present="280"),
+        # Dòng con theo cấu trúc quan sát trên BCTC năm 2026 (150: tài sản sinh học ngắn hạn, 160: tài sản ngắn hạn
+        # khác, 230: tài sản sinh học dài hạn); bắt buộc từ 14/10/2026 sau khi khớp trên mọi BCTC trừ các ô đọc sai
+        rule("BS", "100", "110", "120", "130", "140", "150", "160"),
+        rule("BS", "200", "210", "220", "230", "240", "250", "260", "270", when_present="280"),
         rule("BS", "200", "210", "220", "230", "240", "250", "260", id="BS_200_total270", gate=False,
              when_absent="280"),
         rule("BS", "300", "310", "330"),
         rule("BS", "400", "410", "430"),
         rule("BS", "440", "300", "400"),
+        *_TT99_BS_DETAIL,
         *_IS_TOTALS,
         # 27: lãi/lỗ trong công ty liên doanh, liên kết (khớp đúng cả 4 cột trên BCTC hợp nhất FPT quý 2/2026).
-        # Chưa đối chiếu phụ lục TT99 nên chưa bắt buộc.
+        # Chưa bắt buộc: trượt có hệ thống ở GAS, HPG, SAB, GVR (cấu trúc dòng 21-27 khác nhau giữa các công ty).
         rule("IS", "30", "20", "21", "22", "-23", "-25", "-26", "27", gate=False),
-        *_no_gate(_CF),
-        *_no_gate((rule("BS", "110", "111", "112"),)),
+        # LCTT gián tiếp và các dòng tổng: bắt buộc từ 14/10/2026 (khớp trên mọi BCTC trừ ô đọc sai). Phương pháp trực
+        # tiếp chưa bắt buộc (SAB in mã khác mẫu).
+        *(r for r in _CF if r.id != "CF_20_direct"),
+        *_no_gate(r for r in _CF if r.id == "CF_20_direct"),
+        rule("BS", "110", "111", "112"),
     ),
-    cross_rules=tuple(replace(c, gate=False) for c in _CASH_CROSS),
+    # Tiền đầu kỳ trên LCTT có thể khác số đầu năm trên BCĐKT thật (GAS lệch 15,5 triệu ở cả hai quý: ảnh hưởng tỷ giá)
+    cross_rules=(_CASH_CROSS[0], replace(_CASH_CROSS[1], gate=False)),
 )
 
 # Ngân hàng (TCTD): mã chuẩn b.* gán theo tên chỉ tiêu ở services/extraction/bank.py

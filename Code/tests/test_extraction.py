@@ -243,3 +243,18 @@ def test_output_limits_per_step():
     assert output_limit("reextract_IS") == 16_000
     assert output_limit("repair_zoom") == 6_000
     assert output_limit("something_new") is None
+
+
+def test_balance_sheet_detail_line_split_in_two_rows_is_summed():
+    # VJC quý 2/2026: "Vay ngắn hạn" và "Phải trả thuê tài chính ngắn hạn" cùng in mã 321 (mẫu TT99: vay và nợ thuê
+    # tài chính ngắn hạn); dòng tổng in trùng mã thì vẫn báo trùng, không cộng
+    bs = ExtractedStatement("BS", "VND", [
+        ExtractedItem("310", "Nợ ngắn hạn", {"end_period": "1.300"}),
+        ExtractedItem("321", "Vay ngắn hạn", {"end_period": "1.000"}),
+        ExtractedItem("321", "Phải trả thuê tài chính ngắn hạn", {"end_period": "300"}),
+        ExtractedItem("310", "Nợ ngắn hạn (in lại)", {"end_period": "999"}),
+    ])
+    statements, _ = normalize([bs])
+    assert statements["BS"].values["321"]["end_period"] == Decimal(1_300)
+    assert statements["BS"].summed_codes == ["321"]
+    assert statements["BS"].duplicate_codes == ["310"]

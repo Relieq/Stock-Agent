@@ -61,6 +61,14 @@ class Check:
 CF_TOTALS = {"08", "20", "30", "40", "50", "60", "70"}
 
 
+# Mã BCĐKT là dòng tổng hoặc tổng con (vế trái của một ràng buộc) ở mẫu doanh nghiệp: in trùng thì không cộng
+BS_SUBTOTALS = {r.lhs for t in CORPORATE_TEMPLATES for r in RULESETS[t].rules if r.statement == "BS"}
+
+
+def _label(label: str | None) -> str:
+    return re.sub(r"[^\w]+", " ", (label or "").lower()).strip()
+
+
 def normalize(extracted: list[ExtractedStatement], default_unit: str | None = None) -> tuple[dict[str, Statement], str]:
     """Đổi chuỗi số về đồng. Dấu phân tách hàng nghìn suy ra chung cho cả tài liệu."""
     sep = infer_thousands_sep(v for st in extracted for it in st.items for v in it.values_raw.values())
@@ -71,6 +79,7 @@ def normalize(extracted: list[ExtractedStatement], default_unit: str | None = No
         mult = unit_multiplier(st.unit_raw) or unit_multiplier(default_unit) or doc_unit or Decimal(1)
         norm = out.setdefault(st.statement, Statement(st.statement, mult))
         seen: set[str] = set(norm.values)
+        first_label: dict[str, str] = {}
         for it in st.items:
             code = normalize_code(it.code)
             if code is None:
@@ -81,7 +90,12 @@ def normalize(extracted: list[ExtractedStatement], default_unit: str | None = No
                            for col, raw in it.values_raw.items())
                 if same:
                     continue
-                if st.statement == "CF" and code not in CF_TOTALS:
+                # LCTT: nhiều dòng chi tiết cùng mã thì cộng lại. BCĐKT: dòng chi tiết (không phải dòng tổng) tách hai dòng
+                # tên khác nhau cùng một mã (VJC quý 2/2026: "Vay ngắn hạn" và "Phải trả thuê tài chính ngắn hạn" đều in
+                # mã 321, đúng với dòng 321 "Vay và nợ thuê tài chính" của mẫu) thì cũng cộng lại.
+                bs_leaf = (st.statement == "BS" and code.isdigit() and code not in BS_SUBTOTALS
+                           and _label(it.label) != first_label.get(code))
+                if (st.statement == "CF" and code not in CF_TOTALS) or bs_leaf:
                     for col, raw in it.values_raw.items():
                         value = parse_amount(raw, sep)
                         if value is not None:
@@ -93,6 +107,7 @@ def normalize(extracted: list[ExtractedStatement], default_unit: str | None = No
                     norm.duplicate_codes.append(code)
                 continue
             seen.add(code)
+            first_label[code] = _label(it.label)
             for col, raw in it.values_raw.items():
                 value = parse_amount(raw, sep)
                 if value is not None:

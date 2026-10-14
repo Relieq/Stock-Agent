@@ -207,10 +207,11 @@ TCTD = RuleSet(
     expense_codes=("b.ie", "b.fe", "b.opex"),
     group_statements=("BS", "CF"),
     # Bắt buộc từ 14/10/2026: khớp trên mọi BCTC ngân hàng đã đọc, trừ các ô đọc sai (eval/rule_fit.py). Khúc kinh
-    # doanh của LCTT (b.cfo) chưa bắt buộc: CTG, MBB, SHB in thêm dòng tổng tạm giữa khúc, chưa tách được.
+    # doanh của LCTT (b.cfo) chưa bắt buộc: còn trượt ở vài BCTC chưa rõ đọc sai hay cấu trúc khác; các dòng tổng tạm
+    # trong khúc (b.cfo.1 trước thay đổi tài sản, b.cfo.2/.3 những thay đổi về tài sản/công nợ) thì bắt buộc.
     group_gate=("b.interbank", "b.trading_sec", "b.loans", "b.debt_purchase", "b.inv_sec", "b.lt_invest",
                 "b.fixed_assets", "b.inv_property", "b.other_assets", "b.gov", "b.interbank_liab", "b.other_liab",
-                "b.te", "b.cfo.1", "b.cfi", "b.cff"),
+                "b.te", "b.cfo.1", "b.cfo.2", "b.cfo.3", "b.cfi", "b.cff"),
     group_extra=(("b.te", ("b.mi",)),),
     rules=(
         rule("BS", "b.ta", "b.cash", "b.sbv", "b.interbank", "b.trading_sec", "b.deriv_asset", "b.loans",

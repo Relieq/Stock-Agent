@@ -140,7 +140,7 @@ def repair_wrapped_labels(st: ExtractedStatement) -> int:
 # các khoản trong vốn của tổ chức tín dụng và lợi nhuận chưa phân phối (MBB không in số thứ tự nên dựa vào tên)
 _LEAF_STT = re.compile(r"^(?:[a-z]|[-–+•])\.?$")
 _LEAF_LABEL = re.compile(r"^(nguyen gia|hao mon|gia tri hao mon|khau hao|von dieu le|thang du von|co phieu quy|co phieu uu dai|"
-                         r"von khac$|loi nhuan (de lai )?(nam|ky) (truoc|nay)|loi nhuan (nam|ky) nay|"
+                         r"von khac$|loi nhuan (de lai |luy ke )?(nam|ky) (truoc|nay)|loi nhuan (nam|ky) nay|"
                          r"loi nhuan chua phan phoi (luy ke|nam|ky))")
 # Dòng con đứng SAU dòng cha (khoản mục tài sản, nợ: dòng cha in trước, các dòng con thụt vào bên dưới)
 _PARENTS_ABOVE = {"BS": ("b.interbank", "b.trading_sec", "b.loans", "b.debt_purchase", "b.inv_sec", "b.lt_invest",
@@ -188,6 +188,40 @@ def _number_children(parent: str, block: list, total=None) -> list:
     return out
 
 
+_CHANGES_HEADER = re.compile(r"^nhung thay doi ve (tai san|cong no)")
+# Dòng thuộc nhóm "những thay đổi...": các dòng tăng/giảm, và dòng chi từ các quỹ (MBB, SHB tính vào nhóm công nợ)
+_CHANGE_LINE = re.compile(r"^(\(?tang\)?|\(?giam\)?|chi tu (cac )?quy)")
+
+
+def _number_flat(total: str, block: list, start: int = 0) -> int:
+    """LCTT ngân hàng: mọi dòng có số trong khúc là thành phần của dòng tổng (total.k)."""
+    k = start
+    for it in block:
+        if it.code is None and _has_values(it):
+            k += 1
+            it.code = f"{total}.{k}"
+    return k - start
+
+
+def _number_cfo_changes(total: str, block: list, start: int = 0) -> int:
+    """Khúc kinh doanh của LCTT ngân hàng. CTG, MBB, SHB in thêm dòng tổng tạm "Những thay đổi về tài sản hoạt động",
+    "Những thay đổi về công nợ hoạt động"; các dòng tăng/giảm ngay dưới là thành phần của dòng tổng tạm đó."""
+    k, n, head, m = start, 0, None, 0
+    for it in block:
+        if it.code is not None or not _has_values(it):
+            continue
+        label = fold(clean_label(it.label))
+        if head is not None and _CHANGE_LINE.match(label) and not _CHANGES_HEADER.match(label):
+            m += 1
+            it.code = f"{head}.{m}"
+        else:
+            k += 1
+            it.code = f"{total}.{k}"
+            head, m = (it.code, 0) if _CHANGES_HEADER.match(label) else (None, 0)
+        n += 1
+    return n
+
+
 def assign_children(st: ExtractedStatement) -> int:
     """Gán mã cho các dòng chi tiết theo vị trí so với dòng cha đã có mã chuẩn, để kiểm được "dòng cha = tổng các dòng
     con" (rules.TCTD, nhóm group_statements). Chạy sau khi gán mã chuẩn cho các dòng cha. Trả về số dòng được gán.
@@ -206,7 +240,18 @@ def assign_children(st: ExtractedStatement) -> int:
         j = next((x for x in range(i + 1, len(items)) if items[x].code), len(items))
         n += len(_number_children(parent, items[i + 1:j], items[i]))
     for total, start in _TOTALS_BELOW.get(st.statement, ()):
-        if total not in index or (start is not None and start not in index):
+        if total not in index:
+            continue
+        # Tổng vốn chủ sở hữu có ngân hàng in ở trên các khoản vốn (ACB, SHB: "Vốn chủ sở hữu" rồi mới đến vốn của tổ
+        # chức tín dụng, quỹ...), có ngân hàng in ở dưới (VCB): dòng ngay sau dòng tổng còn chưa có mã và có số thì
+        # coi là kiểu in ở trên, khối dòng con kéo tới dòng có mã tiếp theo (tổng nợ phải trả và vốn chủ sở hữu)
+        i = index[total]
+        after = next((x for x in range(i + 1, len(items)) if items[x].code or _has_values(items[x])), None)
+        if st.statement == "BS" and after is not None and items[after].code is None:
+            j = next((x for x in range(i + 1, len(items)) if items[x].code), len(items))
+            n += len(_number_children(total, items[i + 1:j], items[i]))
+            continue
+        if start is not None and start not in index:
             continue
         lo = index[start] + 1 if start is not None else 0
         hi = index[total]
@@ -215,31 +260,21 @@ def assign_children(st: ExtractedStatement) -> int:
         block = items[lo:hi]
         # Khúc LCTT kinh doanh có dòng tổng tạm "trước những thay đổi về tài sản và vốn lưu động": đánh mã như mọi
         # dòng con, các dòng phía trên nó thành con của nó (mã b.cfo.1.1, b.cfo.1.2...)
+        # BID quý 4/2025 in dòng tổng tạm này với đúng tên dòng tổng thật ("Lưu chuyển tiền thuần từ hoạt động kinh
+        # doanh"; _LAST_MATCH đã lấy dòng sau cùng làm b.cfo)
         pre = next((x for x, it in enumerate(block) if it.code is None and _has_values(it)
-                    and re.search(r"truoc (nhung )?thay doi", fold(clean_label(it.label)))), None)
+                    and re.search(r"truoc (nhung )?thay doi|^(luu chuyen )?tien thuan .*hoat dong (kinh doanh|kd)$",
+                                  fold(clean_label(it.label)))), None)
         if total == "b.cfo" and pre is not None:
             head = block[pre]
             head.code = f"{total}.1"
             for x, it in enumerate([it for it in block[:pre] if it.code is None and _has_values(it)], 1):
                 it.code = f"{head.code}.{x}"
                 n += 1
-            rest = [it for it in block[pre + 1:]]
-            k = 1
-            for it in rest:
-                if it.code is None and _has_values(it):
-                    k += 1
-                    it.code = f"{total}.{k}"
-                    n += 1
-            n += 1
+            n += 1 + _number_cfo_changes(total, block[pre + 1:], start=1)
             continue
         if st.statement == "CF":
-            # LCTT ngân hàng không thụt dòng con cấp dưới: mọi dòng có số trong khúc là thành phần của dòng tổng
-            k = 0
-            for it in block:
-                if it.code is None and _has_values(it):
-                    k += 1
-                    it.code = f"{total}.{k}"
-                    n += 1
+            n += _number_cfo_changes(total, block) if total == "b.cfo" else _number_flat(total, block)
             continue
         n += len(_number_children(total, block, items[hi]))
     return n

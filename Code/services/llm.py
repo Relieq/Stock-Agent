@@ -73,6 +73,22 @@ PRICES = {
 }
 
 
+# Trần token ra cho mỗi lần gọi, theo bước (tiền tố tên bước), để chặn câu trả lời dài bất thường. Đặt khoảng 3-4 lần
+# mức lớn nhất đo được trên 120 BCTC quý 4/2025 - bán niên 2026 (trung bình mỗi lần gọi: chép báo cáo <= 5.700, đọc lại
+# trang <= 4.150, định vị trang <= 1.300, đọc lại ô <= 1.200), vì token ra gồm cả phần suy luận. Bước lạ: không đặt trần.
+OUTPUT_LIMITS = (
+    ("statement_", 24_000),       # chép cả một báo cáo, có thể nhiều trang
+    ("reextract_", 16_000),       # chép lại một trang
+    ("page_classification", 6_000),
+    ("identify_upload", 3_000),
+    ("verify_cells", 6_000), ("reread_cells", 6_000), ("repair_", 6_000),
+)
+
+
+def output_limit(step: str) -> int | None:
+    return next((n for prefix, n in OUTPUT_LIMITS if step.startswith(prefix)), None)
+
+
 def cost_usd(model: str | None, input_tokens: int, output_tokens: int) -> float | None:
     price = PRICES.get(model or "")
     if price is None:
@@ -120,6 +136,8 @@ class VisionClient:
             extra["temperature"] = float(os.environ["LLM_TEMPERATURE"])
         if os.environ.get("LLM_REASONING_EFFORT"):
             extra["reasoning_effort"] = os.environ["LLM_REASONING_EFFORT"]
+        if (limit := output_limit(step or schema_name)) is not None:
+            extra["max_completion_tokens"] = limit
         started = time.monotonic()
         resp = self.client.chat.completions.create(
             model=self.cfg.model,

@@ -5,7 +5,7 @@ SHA-256 (dấu vân tay của file: cùng nội dung thì cùng mã); trùng fil
 bản chính thức trên Vietstock; không tìm được bản chính thức mới đọc file tải lên, và chỉ người tải lên xem được.
 
 Giới hạn chi phí: mỗi người `users.daily_quota` yêu cầu mới mỗi ngày (yêu cầu trả ngay từ kho không tính); tổng chi
-phí gọi mô hình trong tháng không vượt `LLM_MONTHLY_BUDGET_USD` (mặc định 20), vượt thì yêu cầu nằm chờ tháng sau.
+phí gọi mô hình trong tháng không vượt `LLM_MONTHLY_BUDGET_USD` (mặc định 5), vượt thì yêu cầu nằm chờ tháng sau.
 Bộ canh xử lý hàng chờ mỗi lượt (services/watcher).
 """
 

@@ -235,3 +235,11 @@ def test_parent_and_minority_rows_without_codes_get_61_62_from_labels():
     assert [d["code"] for d in _label_split_codes([is_], statements)] == ["61", "62"]
     statements, _ = normalize([is_])
     assert all(c.passed for c in validate(statements, "TT200") if c.rule_id == "IS_60_split")
+
+
+def test_output_limits_per_step():
+    from services.llm import output_limit
+    assert output_limit("statement_BS") == 24_000
+    assert output_limit("reextract_IS") == 16_000
+    assert output_limit("repair_zoom") == 6_000
+    assert output_limit("something_new") is None

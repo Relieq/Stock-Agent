@@ -338,8 +338,8 @@ def _gate_tally(record: dict) -> dict[str, tuple[int, int]]:
 def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> bool:
     """Chép lại theo từng trang các báo cáo có ràng buộc bắt buộc lệch hoặc chưa có ràng buộc nào đạt.
 
-    Lần 1 giữ hướng trang như bước định vị; vẫn chưa ổn thì lần 2 xoay thêm 180 độ (VHM quý 1/2026 in ngược trang
-    mà bước định vị không nhận ra). Giữ bản mới khi ít lệch hơn và không làm giảm số ràng buộc đạt.
+    Lần 1 giữ hướng trang như bước định vị; vẫn chưa ổn thì xoay thêm 180 độ từng trang (VHM quý 1/2026 in ngược
+    một trang mà bước định vị không nhận ra). Mỗi (trang, hướng) chỉ gọi mô hình một lần.
     """
     tally = _gate_tally(record)
     if not tally and not record.get("template_ver"):
@@ -356,19 +356,27 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
     improved = False
     for st in targets:
         pages = st_pages.get(st, [])
-        for extra_rotation in (0, 180):
+        if not pages:
+            continue
+        base = {page: _rotation(record, page) for page in pages}
+        cache: dict[tuple[int, int], dict] = {}
+
+        def read(page: int, rotation: int) -> dict:
+            if (page, rotation) not in cache:
+                image = render_page(doc, page, REEXTRACT_LONG_SIDE, rotation)
+                cache[(page, rotation)] = client.json_from_images(
+                    prompts.extract_prompt(st), [(f"Trang {page}", image)], prompts.extract_schema(st),
+                    f"statement_{st}", step=f"reextract_{st}")
+            return cache[(page, rotation)]
+
+        # Lần 1 giữ hướng trang như bước định vị; chưa ổn thì xoay thêm 180 độ TỪNG trang một (VHM quý 1/2026: chỉ
+        # trang 86 in ngược, trang 87 cùng báo cáo vẫn đúng chiều; xoay cả hai thì trang 87 hỏng theo)
+        variants = [(0, base)] + [(180, {**base, p: (base[p] + 180) % 360}) for p in pages]
+        for extra_rotation, rotations in variants:
             n_failed, passed_before = _gate_tally(record).get(st, (0, 0))
             if extra_rotation and n_failed == 0 and passed_before > 0:
                 break
-            rotations = {page: (_rotation(record, page) + extra_rotation) % 360 for page in pages}
-            parts = []
-            for page in pages:
-                image = render_page(doc, page, REEXTRACT_LONG_SIDE, rotations[page])
-                parts.append(client.json_from_images(prompts.extract_prompt(st), [(f"Trang {page}", image)],
-                                                     prompts.extract_schema(st), f"statement_{st}",
-                                                     step=f"reextract_{st}"))
-            if not parts:
-                break
+            parts = [read(page, rotations[page]) for page in pages]
             merged = {
                 "unit_text": next((x["unit_text"] for x in parts if x.get("unit_text")), None),
                 "columns": parts[0].get("columns", []),
@@ -377,9 +385,13 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
             before = record["raw"][st]
             record["raw"][st] = merged
             after_failed, passed_after = _gate_tally(record).get(st, (0, 0))
-            # Ít lệch hơn chưa đủ: bản chép lại có thể mất mã số hoặc mất dòng nên ít ràng buộc chạy được hơn
-            # (TCX quý 2/2026: lệch 2 -> 0 nhưng số ràng buộc KQKD chạy được giảm từ 28 xuống 12)
-            kept = (after_failed < n_failed and passed_after >= passed_before) or                    (after_failed <= n_failed and passed_after > passed_before)
+            # Giữ khi số phép đạt trừ số phép lệch tăng và số phép đạt không giảm. Chỉ so số phép lệch thì sai cả hai
+            # chiều: bản chép lại mất mã số chạy được ít ràng buộc hơn nên ít lệch hơn (TCX quý 2/2026: lệch 2 -> 0
+            # nhưng ràng buộc KQKD chạy được giảm từ 28 xuống 12), còn bản đọc đúng chiều trang thì chạy được nhiều
+            # ràng buộc hơn, có thể lộ thêm vài ô nhầm chữ số mà bước định vị sửa được sau đó (VHM quý 1/2026)
+            net_after, net_before = passed_after - after_failed, passed_before - n_failed
+            kept = passed_after >= passed_before and (net_after > net_before
+                                                      or (net_after == net_before and passed_after > passed_before))
             if not kept:
                 record["raw"][st] = before
             else:
@@ -390,6 +402,7 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
                         saved.pop(p, None)
                         saved[str(p)] = r
             log.append({"statement": st, "pages": pages, "rotation_added": extra_rotation,
+                        "rotations": {str(p): r for p, r in rotations.items()},
                         "failed_before": n_failed, "failed_after": after_failed,
                         "passed_before": passed_before, "passed_after": passed_after,
                         "rows_before": len(before.get("rows", [])), "rows_after": len(merged["rows"]),

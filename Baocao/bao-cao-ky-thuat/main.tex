@@ -827,7 +827,7 @@ mũi tên đầu hở là thông điệp không chờ trả lời; khung \code{o
 
 \section{Thiết kế cơ sở dữ liệu}
 CSDL PostgreSQL gồm 12 bảng, chia hai nhóm: dữ liệu BCTC (Hình~\ref{fig:erd-bctc}) và người dùng (Hình~\ref{fig:erd-nd}).
-Hai sơ đồ được \textbf{sinh tự động từ CSDL thật} bằng \code{tools/erd.py}, nên luôn khớp với code. Mỗi hộp là một bảng
+Hai sơ đồ được \textbf{sinh tự động từ cấu trúc bảng trong CSDL thật}, nên luôn khớp với code. Mỗi hộp là một bảng
 gồm tên cột, khóa (PK: khóa chính, FK: khóa ngoại) và kiểu dữ liệu; mỗi đường nối là một khóa ngoại, hai đầu ghi bội số
 theo UML (\code{1}: đúng một, \code{0..1}: không hoặc một, \code{0..*}: không hoặc nhiều).
 
@@ -856,7 +856,7 @@ Một số điểm thiết kế:
 \section{Thu thập tài liệu}
 \subsection{Lấy danh sách và nhận dạng tiêu đề}
 Watcher gọi API danh sách tài liệu của Vietstock (logic kế thừa từ khóa trước) cho các mã đang theo dõi. Từ tiêu đề tiếng
-Việt, bộ luật nhận dạng (tệp \code{titles.py} trong module thu thập) xác định bộ khóa: mã, loại báo cáo (quý, bán niên, năm),
+Việt, bộ luật nhận dạng xác định bộ khóa: mã, loại báo cáo (quý, bán niên, năm),
 kỳ, phạm vi (hợp nhất, riêng, duy nhất), trạng thái soát xét hay kiểm toán, và có phải bản điều chỉnh hay không.
 Bộ luật được kiểm thử trên toàn bộ tiêu đề thật của VN30 năm 2025--2026. Lần chạy đầu nhận dạng đúng 174/174 tài liệu.
 
@@ -1112,8 +1112,9 @@ Nhận diện file người dùng tải lên & -- & 3.000 \\
 
 \subsection{Đo và giới hạn chi phí}
 \begin{itemize}
-  \item Mỗi lần gọi được ghi số token vào, ra và thời gian \textbf{theo từng bước}; lệnh \code{cost} in bảng chi phí theo
-        bước (Bảng~\ref{tab:chiphi}). Trang tài liệu trên web hiện số token đã dùng cho BCTC đó.
+  \item Mỗi lần gọi được ghi số token vào, ra và thời gian \textbf{theo từng bước}; trang \enquote{Chi phí} dành cho
+        quản trị viên hiện chi phí tháng này so với trần, theo ngày, theo bước, theo người yêu cầu và các BCTC tốn nhiều
+        nhất (Bảng~\ref{tab:chiphi} lấy từ cùng nguồn số liệu). Trang tài liệu hiện số token đã dùng cho BCTC đó.
   \item Mỗi người dùng có \textbf{hạn mức yêu cầu mới mỗi ngày}; yêu cầu trả ngay từ kho không tính vào hạn mức.
   \item Tổng chi phí gọi mô hình mỗi tháng không vượt \textbf{trần tháng} (mặc định 5 USD); vượt thì yêu cầu mới nằm chờ
         sang tháng sau, giao diện báo cho người dùng biết.
@@ -1291,33 +1292,77 @@ VN100 & khoảng 100 & 10--12 & 60--72 \\
 \end{table}
 
 \section{Định vị ô đọc sai}\label{sec:evalrepair}
-Bộ đánh giá \code{eval/repair.py} không gọi mô hình. Nó lấy các ô \emph{đã biết là đọc sai}: các ô được sửa tay, và các
-ô đọc lại thành công ở BCTC nay đã kiểm chứng. Bộ đánh giá trả các ô đó về số sai ban đầu, chạy bước định vị, rồi so
-đề xuất với số đúng. Bộ đề gồm 41 ô thuộc 16 BCTC. 7 ô \enquote{ngoài tầm}: không ràng buộc nào, trong BCTC hay giữa các
-kỳ, chỉ ra chúng. Kết quả trên 34 ô còn lại ở Hình~\ref{fig:evalrepair}.
+\subsection{Bộ đề và cách thử}
+Trong các lần chạy, hệ thống đã gặp \textbf{41 ô số bị đọc sai} ở 16 BCTC mà ta biết cả số sai lẫn số đúng: hoặc người
+duyệt đã sửa tay sau khi xem ảnh gốc, hoặc lần đọc lại đã ra số đúng và BCTC sau đó đạt kiểm chứng. Thí nghiệm như sau:
+lấy từng BCTC, \textbf{đặt lại số sai vào đúng ô cũ}, chạy bước định vị (chỉ dùng phép tính trên các ràng buộc, không gọi
+mô hình), rồi so đề xuất với số đúng.
+
+Bộ đề này \textbf{nghiêng về các ca khó}: một ô chỉ vào bộ đề khi quy trình lúc đó chưa tự xử lý được, phải sửa tay hoặc
+phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì không có trong đề.
+
+\subsection{Bốn loại kết quả}
+\begin{itemize}
+  \item \textbf{Ngoài tầm:} ô sai không nằm trong phép cộng bắt buộc nào bị lệch, và đối chiếu với BCTC kỳ khác cũng không
+        tự chỉ ra được. Đọc sai ô này thì mọi phép cộng vẫn khớp, nên không phương pháp nào dựa trên phép cộng nhận ra
+        được. Các ô này được loại khỏi phép đo.
+  \item \textbf{Đúng ngay:} chỉ bằng phép tính, bước định vị chỉ ra đúng một ô và đúng số, chưa cần nhìn lại ảnh. Thường là
+        ô nằm trong hai phép cộng cùng lệch.
+  \item \textbf{Cần đọc lại cả nhóm:} phép tính thu hẹp được về một nhóm vài ô, trong đó có phương án đúng, nhưng chưa
+        biết ô nào. Ví dụ: tài sản ngắn hạn (mã 100) bằng tổng các mã 110 đến 150 nhưng đang lệch đúng 1 tỷ đồng. Nếu
+        tiền (mã 110) đọc nhầm 6,231 tỷ thành 5,231 tỷ thì lệch 1 tỷ; nếu tồn kho (mã 140) đọc nhầm 13,4 tỷ thành
+        12,4 tỷ thì cũng lệch đúng 1 tỷ. Cả hai đều chỉ khác một chữ số. Khi đó hệ thống \textbf{tự gửi ảnh trang cho
+        mô hình đọc lại riêng các ô trong nhóm} (không cho biết số mong đợi) và nhận ô duy nhất đọc ra đúng số đề xuất
+        (mục~\ref{sec:loi}). Bước này hoàn toàn tự động, không có người chấm.
+  \item \textbf{Sót:} bước định vị không đưa ra đề xuất nào cho ô này. Ô đi tiếp sang các bậc sau: chép lại trang, rồi
+        duyệt tay.
+\end{itemize}
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}
-\begin{axis}[xbar, bar width=7mm, width=0.8\linewidth, height=5.2cm, xmin=0, xmax=20,
-  symbolic y coords={Sót,Cần đọc lại cả nhóm,Đúng ô đúng số}, ytick=data,
-  xlabel={Số ô (trên 34 ô trong tầm)}, nodes near coords, nodes near coords align={horizontal},
-  tick label style={font=\small}, label style={font=\small}, enlarge y limits=0.3]
-\addplot[fill=soiblue!60,draw=soiblue] coordinates {(9,Đúng ô đúng số) (15,Cần đọc lại cả nhóm) (10,Sót)};
-\end{axis}
+\begin{tikzpicture}[font=\small\sffamily]
+  \node[box=40mm] (all) at (0,0) {41 ô đã biết là đọc sai\\(16 BCTC)};
+  \node[box=34mm,draw=soigray,fill=lightgray] (out) at (5.6,0) {7 ô ngoài tầm\\(không phép cộng nào lệch)};
+  \node[box=40mm] (in) at (0,-2.0) {34 ô trong tầm};
+  \node[gbox=34mm] (ok) at (-4.4,-4.4) {\textbf{9 ô} (26\%)\\đúng ngay, chỉ bằng phép tính};
+  \node[gbox=34mm] (grp) at (0,-4.4) {\textbf{15 ô} (44\%)\\thu hẹp về nhóm, máy tự đọc lại để chọn};
+  \node[rbox=34mm] (miss) at (4.4,-4.4) {\textbf{10 ô} (29\%)\\sót, chuyển sang chép lại trang, duyệt tay};
+  \draw[arr] (all) -- (out); \draw[arr] (all) -- (in);
+  \draw[arr] (in) -- (ok); \draw[arr] (in) -- (grp); \draw[arr] (in) -- (miss);
+  \draw[soigreen,very thick,decorate] ($(ok.south west)+(0,-0.25)$) -- ($(grp.south east)+(0,-0.25)$)
+     node[midway,below=1mm,font=\small\sffamily\bfseries,color=soigreen] {24/34 ô (71\%) tự định vị được};
 \end{tikzpicture}
-\caption{Kết quả định vị. \enquote{Đúng}: một đề xuất duy nhất, đúng ô, đúng số. \enquote{Cần đọc lại}: ô sai nằm trong
-một nhóm đề xuất ngang nhau có phương án đúng; đọc lại cả nhóm sẽ chọn ra (15 nhóm, tổng 52 ô phải đọc lại, 3 trường
-hợp nhờ đối chiếu kỳ khác). \enquote{Sót}: không có đề xuất, phần lớn là nhiều lỗi chồng lên nhau trong một cột.
-Có 2 đề xuất sai, cả hai đều bị bước đọc lại loại.}\label{fig:evalrepair}
+\caption{Kết quả định vị ô đọc sai trên bộ đề 41 ô. Trong 15 nhóm cần đọc lại có tổng cộng 52 ô, khoảng 3--4 ô mỗi nhóm;
+đọc lại vài ô tốn khoảng 0,003 USD mỗi BCTC.}\label{fig:evalrepair}
 \end{figure}
 
-Trong các lần chạy thật, mọi số được bước \enquote{định vị $\rightarrow$ đọc lại xác nhận} chấp nhận đều đúng khi đối
-chiếu với ảnh gốc. Ví dụ BCTC bán niên HDB: một ô BCĐKT đọc sai được sửa đúng nhờ đề xuất của bước định vị. Bước đọc
-phóng to theo dải sửa được một ô VHM mà lần đọc lại thường vẫn nhầm.
+\subsection{Phân tích các ca ngoài tầm, ca sót và đề xuất sai}
+\begin{itemize}
+  \item \textbf{7 ô ngoài tầm} là các dòng chi tiết không thuộc phép cộng bắt buộc nào, hoặc chỉ lệch so với BCTC kỳ khác.
+        Người duyệt tìm ra chúng nhờ màu bằng chứng trên trang tài liệu (\enquote{cần xem lại}, \enquote{chưa kiểm được}).
+        Các chỉ tiêu dùng trên thẻ KQKD đều nằm trong phép cộng bắt buộc, nên đọc sai thì phép cộng sẽ lệch và hệ thống
+        không công bố.
+  \item \textbf{10 ô sót} thuộc hai trường hợp:
+  \begin{itemize}
+    \item 8 ô nằm trong \textbf{cùng một cột} (số liệu cùng kỳ năm trước) của BCTC quý 4/2025 của VHM: cả cột bị đọc
+          sai nhiều chỗ một lúc, nhiều lỗi cộng dồn trong cùng một chuỗi phép cộng nên không có cách thay một ô nào làm
+          các phép cộng khớp lại.
+    \item 2 ô của BCTC quý 1/2026 của VHM: mô hình chép số của một dòng khác (số khác hẳn, không phải nhầm 1--2 chữ số),
+          nên nằm ngoài giả thiết \enquote{đọc nhầm ít chữ số} của bước định vị.
+  \end{itemize}
+  \item \textbf{Đã thử mở rộng sang thay hai ô cùng lúc} (đúng tinh thần Fellegi--Holt: tìm tập ô nhỏ nhất cần sửa; với
+        hai ô, lượng thay đổi của mỗi ô được giải từ hai phép cộng đang lệch). Kết quả \textbf{không bắt thêm ô nào}: cột
+        hỏng của VHM có nhiều hơn hai ô sai trong cùng một chuỗi, còn hai ô kia không phải lỗi nhầm chữ số. Vì vậy cách
+        này không được đưa vào hệ thống. Hướng phù hợp hơn cho loại lỗi \enquote{cả cột hỏng} là nhận ra nó (cột đó lệch
+        ở mọi phép cộng) và chép lại cả trang, việc mà bậc leo thang tiếp theo đã làm.
+  \item \textbf{2 đề xuất sai} (đều ở cột hỏng của VHM nói trên) bị bước đọc lại loại, vì ảnh không xác nhận số đề xuất.
+        Trong các lần chạy thật, mọi số được nhận qua bước \enquote{định vị $\rightarrow$ đọc lại xác nhận} đều đúng khi
+        đối chiếu với ảnh gốc. Ví dụ BCTC bán niên của HDB có một ô BCĐKT đọc sai được sửa đúng nhờ đề xuất của bước định
+        vị; bước đọc phóng to theo dải sửa được một ô của VHM mà lần đọc lại thường vẫn nhầm.
+\end{itemize}
 
 \section{Đối chiếu với nguồn dữ liệu công khai}\label{sec:doichieu}
-Sau mỗi mùa BCTC, lệnh \code{eval/external.py} so các chỉ tiêu trên thẻ với bảng KQKD theo quý của một trang dữ liệu
+Sau mỗi mùa BCTC, một chương trình đối chiếu so các chỉ tiêu trên thẻ với bảng KQKD theo quý của một trang dữ liệu
 tài chính công khai. Số của nguồn ngoài \textbf{chỉ dùng nội bộ}, không hiển thị trên Soi.
 
 \begin{figure}[H]

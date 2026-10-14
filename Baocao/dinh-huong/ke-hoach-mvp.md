@@ -238,6 +238,22 @@ số. Thuê máy có GPU đắt hơn nhiều lần so với trả theo lượt k
 Code chạy trong Docker cả khi phát triển trên máy (từ 12/10): Smart App Control của Windows chặn thư viện kết nối
 PostgreSQL, và đây cũng là cách chạy trên VPS.
 
+**Đo thử mô hình đọc tại chỗ so với gọi API (14/10/2026).** Thử PaddleOCR-VL-1.6 (0,9 tỷ tham số, Apache 2.0, nhóm điểm
+cao nhất OmniDocBench) trên 3 trang BCTC:
+
+| | Gọi API (gpt-5.4-mini) | PaddleOCR-VL, GPU laptop RTX 5050 | PaddleOCR-VL, CPU |
+|---|---|---|---|
+| Thời gian mỗi BCTC | khoảng 1 phút (trung vị 57 giây, 30 BCTC) | khoảng 4 phút (khoảng 25 giây/trang) | laptop i5-13450HX 4 luồng khoảng 100 giây/trang; VPS ước 25–35 phút/BCTC |
+| Bộ nhớ | không đáng kể | khoảng 2 GB VRAM | khoảng 5–6 GB RAM, VPS phải lên khoảng 16 GB |
+| Đọc số | scan mờ VHM: khoảng 91% | scan rõ VCB: 100%; scan mờ VHM: 78%, hay gộp dòng, tên dòng sai dấu | như GPU |
+| Chi phí VN30 / VN100 mỗi năm | khoảng 21 / 70 USD | (máy cá nhân, không chạy liên tục được) | nâng VPS thêm vài chục đến hơn 100 USD/năm |
+
+Kết luận: giữ gọi API, giữ VPS gói nhỏ. Chạy bằng CPU trên VPS vừa đắt hơn vừa không kịp mùa cao điểm (VN30 ngày hạn
+chót khoảng 15 BCTC: 6–8 giờ thay vì khoảng 15 phút; VN100 hơn một ngày), lại đọc kém hơn ở bản scan mờ nên tăng đọc lại
+và duyệt tay. Chỉ xem lại khi đọc toàn thị trường (khoảng 10.000 BCTC/năm, API khoảng 1.100 USD/năm): khi đó thuê GPU
+theo giờ (RTX 4090 khoảng 0,34 USD/giờ) mới rẻ hơn, sau khi đo độ chính xác trên mẫu rộng. Lưu ý khi chạy PaddleOCR-VL
+bằng transformers: phải bật `use_cache=True` (cấu hình gốc tắt), nếu không chậm khoảng 35 lần.
+
 ### 6.2 Ngân sách đến 4/2027
 
 Tiền gọi mô hình tăng theo **số BCTC phải đọc**, không theo số người dùng (mỗi BCTC đọc một lần, phục vụ mọi người).

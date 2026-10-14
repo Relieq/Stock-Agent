@@ -49,14 +49,11 @@
 
 \renewcommand{\lstlistingname}{Đoạn mã}
 
-\algrenewcommand\algorithmicrequire{\textbf{Vào:}}
-\algrenewcommand\algorithmicensure{\textbf{Ra:}}
-\algrenewcommand\algorithmicfor{\textbf{với mỗi}}
-\algrenewcommand\algorithmicdo{\textbf{làm}}
-\algrenewcommand\algorithmicif{\textbf{nếu}}
-\algrenewcommand\algorithmicthen{\textbf{thì}}
-\algrenewcommand\algorithmicelse{\textbf{ngược lại}}
-\algrenewcommand\algorithmicreturn{\textbf{trả về}}
+% Từ khóa giả mã giữ tiếng Anh chuẩn (Input, Output, for, if, return...); chỉ phần mô tả viết tiếng Việt
+\algrenewcommand\algorithmicrequire{\textbf{Input:}}
+\algrenewcommand\algorithmicensure{\textbf{Output:}}
+\algnewcommand\algorithmicand{\textbf{and}}
+\algnewcommand\AlgAnd{\algorithmicand}
 \floatname{algorithm}{Thuật toán}
 
 % Màu dùng trong sơ đồ
@@ -1018,9 +1015,9 @@ theo nguyên lý định vị lỗi của Fellegi--Holt~\cite{fellegi1976}. Soi 
 \State $P \gets \emptyset$
 \For{ràng buộc $r \in F$, ô $c$ thuộc $r$}
   \State $v \gets$ giá trị làm $r$ khớp nếu thay $c$ \Comment{$v = S[c] \pm \delta_r$}
-  \If{$v$ nguyên theo đơn vị in \textbf{và} số chữ số khác với $S[c]$ $\le 2$}
+  \If{$v$ nguyên theo đơn vị in \AlgAnd{} số chữ số khác với $S[c]$ $\le 2$}
      \State $S' \gets S$ với $S'[c] = v$
-     \If{$S'$ làm ít ràng buộc lệch hơn \textbf{và} không làm lệch ràng buộc nào đang đạt}
+     \If{$S'$ ít ràng buộc lệch hơn $S$ \AlgAnd{} không làm lệch ràng buộc đang đạt}
         \State thêm $(c, v, \text{số ràng buộc được sửa})$ vào $P$
      \EndIf
   \EndIf

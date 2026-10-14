@@ -31,7 +31,8 @@
 \usepackage{url}
 \usepackage{tcolorbox}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.misc,calc}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.misc,shapes.multipart,calc,fit,backgrounds}
+\usepackage{pgf-umlsd}            % biểu đồ tuần tự UML
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 
@@ -93,10 +94,35 @@
              minimum width=40mm,minimum height=9mm,inner sep=1pt},
   actor/.pic={\draw[thick] (0,0.42) circle (0.16);
               \draw[thick] (0,0.26) -- (0,-0.12) (-0.28,0.14) -- (0.28,0.14) (0,-0.12) -- (-0.2,-0.46) (0,-0.12) -- (0.2,-0.46);},
-  life/.style={draw=soiblue,fill=lightblue,rounded corners=2pt,font=\footnotesize\sffamily,align=center,
-               minimum width=20mm,minimum height=8mm},
-  msg/.style={-{Stealth[length=2mm]},thick},
-  ret/.style={-{Stealth[length=2mm]},dashed,color=soigray},
+  % --- UML: biểu đồ hoạt động ---
+  start/.style={circle,fill=black,minimum size=3.2mm,inner sep=0},
+  stop/.style={circle,draw=black,thick,fill=white,minimum size=4.4mm,inner sep=0,
+               path picture={\fill[black] (path picture bounding box.center) circle (1.25mm);}},
+  act/.style={rectangle,rounded corners=2.5mm,draw=black,fill=lightblue,align=center,font=\footnotesize\sffamily,
+              minimum height=8mm,inner sep=3pt,text width=#1},
+  act/.default=40mm,
+  dnode/.style={diamond,draw=black,fill=white,minimum size=6.5mm,inner sep=0},
+  flow/.style={-{Stealth[length=2.2mm]},thick},
+  guard/.style={font=\scriptsize\sffamily,fill=white,inner sep=1pt},
+  % --- UML: biểu đồ trạng thái ---
+  state/.style={rectangle,rounded corners=3mm,draw=black,fill=lightblue,align=center,font=\footnotesize\sffamily,
+                minimum height=9mm,minimum width=24mm,inner sep=3pt},
+  % --- UML: biểu đồ gói, triển khai ---
+  pkg/.style={rectangle,draw=black,fill=lightblue,align=center,font=\footnotesize\sffamily,minimum width=24mm,
+              minimum height=9mm,inner sep=2pt,
+              append after command={\pgfextra{\draw[fill=lightblue] (\tikzlastnode.north west) rectangle ++(8mm,2.4mm);}}},
+  dep/.style={-{Straight Barb[length=2mm]},dashed,thick},
+  udnode/.style={rectangle,draw=black,fill=lightblue,align=center,font=\footnotesize\sffamily,inner sep=4pt,
+                 append after command={\pgfextra{\draw (\tikzlastnode.north west) -- ++(3mm,3mm)
+                   -- ($(\tikzlastnode.north east)+(3mm,3mm)$) -- ($(\tikzlastnode.south east)+(3mm,3mm)$)
+                   -- (\tikzlastnode.south east) ($(\tikzlastnode.north east)+(3mm,3mm)$) -- (\tikzlastnode.north east);}}},
+  % --- sơ đồ CSDL (sinh bởi tools/erd.py) ---
+  erd/.style={rectangle split,rectangle split parts=2,draw=black,anchor=north west,font=\scriptsize\sffamily,
+              rectangle split part fill={lightblue,white},inner sep=2pt},
+  erdstub/.style={draw=black,dashed,anchor=north west,font=\scriptsize\sffamily,inner sep=4pt,fill=lightgray},
+  erdline/.style={thick},
+  erdmult/.style={font=\scriptsize\sffamily,fill=white,inner sep=1pt},
+  erdfk/.style={font=\tiny\sffamily,color=soigray,sloped,above,inner sep=1pt},
 }
 
 % ============================================================================
@@ -349,7 +375,7 @@ là $\pm 1$ đơn vị làm tròn cho mỗi số hạng.
   \draw[arr] (i61) -- node[above,lab]{60 = 61 + 62} (i60);
   \draw[arr] (i62) -| ($(i60.south)+(0.5,0)$);
 \end{tikzpicture}
-\caption{Một phần lưới ràng buộc của BCTC doanh nghiệp thường. Mỗi mũi tên là một phép cộng. Một ô số thường nằm trong
+\caption{Hình minh họa một phần lưới ràng buộc của BCTC doanh nghiệp thường. Mũi tên chỉ từ số hạng tới tổng của phép cộng. Một ô số thường nằm trong
 nhiều phép cộng cùng lúc, nên khi đọc nhầm một ô, các phép cộng chứa nó cùng lệch một lượng như nhau.}\label{fig:luoi}
 \end{figure}
 
@@ -383,7 +409,7 @@ Ngoài ràng buộc trong một BCTC, còn có \textbf{ràng buộc giữa các 
   \draw[arr,soigreen,<->] (Q2) -- node[right,lab]{cùng ngày 30/6} (H1);
   \draw[arr,soigreen,<->] (Q4) -- node[right,lab]{cùng ngày 31/12} (FY);
 \end{tikzpicture}
-\caption{Ràng buộc giữa các kỳ: số đầu năm phải bằng số cuối năm trước; quý = lũy kế kỳ này $-$ lũy kế kỳ trước; BCTC
+\caption{Hình minh họa ràng buộc giữa các kỳ: số đầu năm phải bằng số cuối năm trước; quý = lũy kế kỳ này $-$ lũy kế kỳ trước; BCTC
 quý 2 và bán niên (hay quý 4 và năm) cùng ngày nên phải khớp. Khi hai bản khác nhau, đó hoặc là đọc nhầm, hoặc là
 doanh nghiệp, kiểm toán đã sửa số.}\label{fig:cheoky}
 \end{figure}
@@ -493,37 +519,89 @@ từng câu. Đây là hình mẫu gần nhất của \enquote{lớp số liệu
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[font=\small\sffamily]
-  \draw[soigray,thick,rounded corners=4pt] (-3.3,-12.4) rectangle (3.3,1.0);
+  \draw[thick,rounded corners=3pt] (-3.3,1.0) rectangle (3.3,-12.9);
   \node[font=\sffamily\bfseries] at (0,0.6) {Hệ thống Soi};
-  % use case: cột giữa
-  \node[uc] (u1)  at (0,-0.2)  {Xem trang chia sẻ thẻ};
-  \node[uc] (u2)  at (0,-1.2)  {Đăng nhập bằng link email};
-  \node[uc] (u3)  at (0,-2.2)  {Xem bảng xếp hạng mùa BCTC};
-  \node[uc] (u4)  at (0,-3.2)  {Xem lịch công bố};
-  \node[uc] (u5)  at (0,-4.2)  {Xem thẻ KQKD, cờ cảnh báo};
-  \node[uc] (u6)  at (0,-5.2)  {Mở trang BCTC gốc của một số};
-  \node[uc] (u7)  at (0,-6.2)  {Theo dõi mã, nhận email};
-  \node[uc] (u8)  at (0,-7.2)  {Yêu cầu đọc mã ngoài danh sách};
-  \node[uc] (u9)  at (0,-8.2)  {Tải BCTC lên};
-  \node[uc] (u10) at (0,-9.2)  {Duyệt tay, sửa ô số};
-  \node[uc] (u11) at (0,-10.2) {Quản lý người dùng};
-  \node[uc] (u12) at (0,-11.4) {Phát hiện, đọc và kiểm chứng\\BCTC mới};
-  % tác nhân
-  \pic at (-5.4,-0.3) {actor}; \node (kh) at (-5.4,-0.3) {}; \node[below] at (-5.4,-0.8) {Khách};
-  \pic at (-5.4,-4.6) {actor}; \node (nd) at (-5.4,-4.6) {}; \node[below,align=center] at (-5.4,-5.1) {Người dùng\\được mời};
-  \pic at (5.4,-9.4) {actor}; \node (qt) at (5.4,-9.4) {}; \node[below] at (5.4,-9.9) {Quản trị viên};
-  \pic at (5.4,-11.6) {actor}; \node (bc) at (5.4,-11.6) {}; \node[below,align=center] at (5.4,-12.1) {Bộ canh\\(hệ thống)};
+  \foreach \i/\t in {1/Xem trang chia sẻ thẻ,2/Đăng nhập bằng link email,3/Xem bảng xếp hạng mùa BCTC,
+                     4/Xem lịch công bố,5/Xem thẻ KQKD,6/Mở trang BCTC gốc của một số,7/Theo dõi mã,
+                     8/Yêu cầu đọc mã ngoài danh sách,9/Tải BCTC lên,10/Duyệt tay BCTC,11/Quản lý người dùng,
+                     12/Xem chi phí gọi mô hình}
+    \node[uc] (u\i) at (0,-\i+0.8) {\t};
+  \node[uc] (u13) at (0,-12.25) {Phát hiện, đọc, kiểm chứng\\BCTC mới và gửi email};
+  \pic at (-6,-0.3) {actor};  \node (kh) at (-6,-0.3) {}; \node[below] at (-6,-0.8) {Khách};
+  \pic at (-6,-5.0) {actor};  \node (nd) at (-6,-5.0) {}; \node[below,align=center] at (-6,-5.5) {Người dùng\\được mời};
+  \pic at (-6,-10.0) {actor}; \node (qt) at (-6,-10.0) {}; \node[below] at (-6,-10.5) {Quản trị viên};
+  \pic at (6,-12.25) {actor};  \node (bc) at (6,-12.25) {}; \node[below,align=center] at (6,-12.75) {Bộ canh\\(hệ thống)};
   \draw (kh) -- (u1.west);
-  \foreach \u in {u2,u3,u4,u5,u6,u7,u8,u9} \draw (nd) -- (\u.west);
-  \foreach \u in {u10,u11} \draw (qt) -- (\u.east);
-  \draw (bc) -- (u12.east);
-  % quản trị viên kế thừa người dùng
-  \draw[-{Triangle[open,length=3mm]},thick] (5.4,-8.85) -- (5.4,1.4) -- (-6.3,1.4) -- (-6.3,-4.6) -- (-5.75,-4.6);
-  \node[lab,fill=white] at (0,1.4) {quản trị viên có mọi quyền của người dùng};
+  \foreach \u in {2,...,9} \draw (nd) -- (u\u.west);
+  \foreach \u in {10,11,12} \draw (qt) -- (u\u.west);
+  \draw (bc) -- (u13.east);
+  % khái quát hóa: tác nhân con kế thừa mọi use case của tác nhân cha (mũi tên tam giác rỗng chỉ vào tác nhân cha)
+  \draw[-{Triangle[open,length=3mm,width=3mm]},thick] (-6,-4.42) -- (-6,-1.35);
+  \draw[-{Triangle[open,length=3mm,width=3mm]},thick] (-6,-9.42) -- (-6,-6.35);
 \end{tikzpicture}
-\caption{Biểu đồ use case tổng quát của Soi. Bộ canh phát hiện, đọc, kiểm chứng BCTC mới rồi gửi email cho người theo
-dõi mã; yêu cầu đọc mã ngoài danh sách cũng đi qua đúng quy trình này.}\label{fig:usecase}
+\caption{Biểu đồ use case tổng quát. Đường nối là quan hệ giữa tác nhân và use case; mũi tên tam giác rỗng là quan hệ
+khái quát hóa: người dùng được mời làm được mọi việc của khách, quản trị viên làm được mọi việc của người dùng.}\label{fig:usecase}
 \end{figure}
+
+\subsection{Đặc tả các use case chính}
+\begin{table}[H]
+\centering\small
+\caption{Đặc tả use case \enquote{Xem thẻ KQKD}}\label{tab:uc-the}
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{3.2cm}X@{}}
+\toprule
+Tác nhân & Người dùng được mời \\
+Tiền điều kiện & Đã đăng nhập \\
+Luồng chính & 1. Người dùng chọn mã (từ bảng xếp hạng, lịch công bố hoặc đường dẫn \code{/ma/<mã>}) và kỳ.\newline
+2. Hệ thống chọn BCTC quý dùng cho thẻ: ưu tiên hợp nhất, bản đăng sau cùng.\newline
+3. Hệ thống tính thẻ từ số đã kiểm chứng: các chỉ tiêu, tăng trưởng, cờ cảnh báo, nguồn của từng số.\newline
+4. Người dùng bấm vào một số để mở đúng trang BCTC gốc. \\
+Luồng thay thế & 2a. Chưa có BCTC của kỳ đó: báo chưa có.\newline
+3a. BCTC chưa đạt kiểm chứng: hiện trạng thái, không hiện số.\newline
+3b. Mẫu BCTC chưa hỗ trợ (công ty chứng khoán): báo thẻ chưa hỗ trợ. \\
+Hậu điều kiện & Không thay đổi dữ liệu \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Đặc tả use case \enquote{Yêu cầu đọc mã ngoài danh sách}}\label{tab:uc-yeucau}
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{3.2cm}X@{}}
+\toprule
+Tác nhân & Người dùng được mời; bộ canh (xử lý hàng chờ) \\
+Tiền điều kiện & Đã đăng nhập \\
+Luồng chính & 1. Người dùng nhập mã và kỳ.\newline
+2. Hệ thống kiểm tra kho; chưa có thì kiểm tra hạn mức trong ngày của người dùng.\newline
+3. Hệ thống ghi yêu cầu vào hàng chờ.\newline
+4. Ở lượt kế tiếp (tối đa 15 phút), bộ canh tìm BCTC trên Vietstock, tải về, đọc và kiểm chứng.\newline
+5. Hệ thống gửi email báo kết quả; BCTC mới vào kho dùng chung. \\
+Luồng thay thế & 2a. Kho đã có BCTC đã đọc: trả kết quả ngay, không tính vào hạn mức.\newline
+2b. Hết hạn mức trong ngày: từ chối và báo cho người dùng.\newline
+4a. Chi phí đọc theo yêu cầu đã chạm trần tháng: yêu cầu nằm chờ sang tháng sau.\newline
+4b. Không tìm thấy mã hoặc BCTC: từ chối kèm lý do. \\
+Hậu điều kiện & Yêu cầu có trạng thái \code{done} hoặc \code{rejected} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Đặc tả use case \enquote{Duyệt tay BCTC}}\label{tab:uc-duyet}
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{3.2cm}X@{}}
+\toprule
+Tác nhân & Quản trị viên \\
+Tiền điều kiện & BCTC ở trạng thái \code{needs\_review} \\
+Luồng chính & 1. Quản trị viên mở hàng duyệt và chọn một BCTC.\newline
+2. Hệ thống hiện bảng số đã đọc, các ràng buộc còn lệch và ảnh trang gốc.\newline
+3. Quản trị viên đối chiếu với ảnh, nhập số đúng cho ô đọc sai kèm ghi chú.\newline
+4. Hệ thống ghi lịch sử sửa và kiểm tra lại ràng buộc; đạt thì chuyển \code{verified}. \\
+Luồng thay thế & 3a. Ảnh cho thấy chính BCTC tự in lệch: quản trị viên duyệt xuất bản; hệ thống chuyển \code{approved} và
+gửi email cho người theo dõi mã.\newline
+4a. Vẫn còn lệch: quay lại bước 2. \\
+Hậu điều kiện & Mỗi lần sửa được lưu (người sửa, số cũ, số mới), dùng làm dữ liệu vàng để đánh giá \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \subsection{Yêu cầu chức năng}
 \begin{table}[H]
@@ -539,7 +617,7 @@ F4 & Thẻ KQKD có cờ cảnh báo, mỗi số có nguồn tới trang BCTC & 
 F5 & Bảng xếp hạng mùa BCTC, lịch công bố, ảnh thẻ để chia sẻ & Đã làm \\
 F6 & Theo dõi mã và nhận email khi có BCTC mới & Đã làm \\
 F7 & Yêu cầu đọc mã ngoài danh sách, tải BCTC lên (có hạn mức) & Đã làm \\
-F8 & Quản trị: duyệt tay, sửa ô, mời và phân quyền người dùng & Đã làm \\
+F8 & Quản trị: duyệt tay, sửa ô, mời và phân quyền người dùng, xem chi phí gọi mô hình & Đã làm \\
 F9 & Chỉ số tài chính (biên lợi nhuận, ROE\ldots) & Dự kiến \\
 F10 & Agent báo cáo so sánh theo câu hỏi của người dùng & Dự kiến \\
 \bottomrule
@@ -583,7 +661,7 @@ F10 & Agent báo cáo so sánh theo câu hỏi của người dùng & Dự kiế
   \node[db] (db) at (7.6,-4.8) {PostgreSQL\\số + nguồn};
   \node[gbox=30mm] (web) at (3.8,-7.0) {Web: thẻ, mùa BCTC,\\lịch, ảnh chia sẻ};
   \node[gbox=28mm] (mail) at (7.6,-7.0) {Email khi mã đang\\theo dõi có BCTC};
-  \node[circle,draw=soigray,fill=lightgray,minimum size=12mm,font=\small\sffamily] (u) at (5.7,-9.0) {Người dùng};
+  \pic at (5.7,-9.0) {actor}; \node[minimum size=11mm] (u) at (5.7,-9.0) {}; \node[below] at (5.7,-9.5) {Người dùng};
   \draw[arr] (src) -- (w); \draw[arr] (w) -- (reg); \draw[arr] (reg) -- (pipe);
   \draw[arr,<->] (pipe) -- node[above,lab]{ảnh, JSON} (llm);
   \draw[arr,dashed] (pipe) to[bend right=25] node[above,lab]{còn lệch} (hr);
@@ -593,59 +671,189 @@ F10 & Agent báo cáo so sánh theo câu hỏi của người dùng & Dự kiế
   \draw[arr] (web) -- (u); \draw[arr] (mail) -- (u);
   \draw[arr,dashed] (u.east) -| node[pos=0.75,right,lab,text width=24mm,align=left]{tải BCTC lên,\\yêu cầu thêm mã} (10.0,-4.0) |- (pipe.south east);
 \end{tikzpicture}
-\caption{Kiến trúc tổng thể của Soi. Nét liền là luồng chính, nét đứt là luồng phụ (duyệt tay, yêu cầu của người
-dùng).}\label{fig:kientruc}
+\medskip
+\begin{tikzpicture}[font=\scriptsize\sffamily]
+  \foreach \x/\st/\t in {0/box/thành phần xử lý, 3.9/gbox/đầu ra cho người dùng, 8.3/abox/dịch vụ bên ngoài,
+                          12.1/rbox/bước con người}{
+    \node[\st=5mm,minimum height=4mm,inner sep=0] at (\x,0) {}; \node[right] at (\x+0.35,0) {\t};
+  }
+  \draw[arr] (-0.3,-0.6) -- (0.6,-0.6); \node[right] at (0.65,-0.6) {luồng chính};
+  \draw[arr,dashed] (3.6,-0.6) -- (4.5,-0.6); \node[right] at (4.55,-0.6) {luồng phụ};
+  \node[db,minimum height=5mm,text width=3mm] at (8.3,-0.6) {}; \node[right] at (8.65,-0.6) {kho dữ liệu};
+\end{tikzpicture}
+\caption{Sơ đồ kiến trúc tổng quan (sơ đồ khối) của Soi.}\label{fig:kientruc}
+\end{figure}
+
+\subsection{Phân rã module}
+Mã nguồn chia thành các gói Python theo bốn tầng (Hình~\ref{fig:goi}). Gói ở tầng trên chỉ dùng gói ở tầng dưới, không
+có chiều ngược lại. Phụ thuộc chi tiết (Bảng~\ref{tab:phuthuoc}) lấy từ các câu lệnh \code{import} thực tế.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.82, transform shape, font=\footnotesize\sffamily]
+  \node[pkg] (api) at (3.2,0) {api\\(web FastAPI)};
+  \node[pkg] (watcher) at (9.6,0) {watcher\\(bộ canh)};
+  \node[pkg] (users) at (0,-2.8) {users\\(tài khoản)};
+  \node[pkg] (ondemand) at (4.2,-2.8) {ondemand\\(yêu cầu đọc)};
+  \node[pkg] (alerts) at (8.4,-2.8) {alerts\\(email theo dõi)};
+  \node[pkg] (metrics) at (12.6,-2.8) {metrics\\(thẻ, lịch, xếp hạng)};
+  \node[pkg] (costs) at (8.0,-5.6) {costs\\(chi phí)};
+  \node[pkg] (ingestion) at (4.8,-5.6) {ingestion\\(thu thập)};
+  \node[pkg] (extraction) at (11.2,-5.6) {extraction\\(đọc, kiểm chứng)};
+  \node[pkg] (db) at (1.6,-8.4) {db\\(PostgreSQL)};
+  \node[pkg] (llm) at (7.2,-8.4) {llm\\(gọi mô hình)};
+  \node[pkg] (notify) at (12.8,-8.4) {notify\\(gửi email)};
+  \begin{scope}[on background layer]
+    \foreach \r/\a/\b/\t in {0/api/watcher/Tầng giao diện, 1/users/metrics/Tầng nghiệp vụ,
+                             2/ingestion/extraction/Tầng xử lý dữ liệu, 3/db/notify/Tầng hạ tầng}{
+      \node[draw=black,fill=white,fit=(\a)(\b),inner xsep=6mm,inner ysep=5mm] (L\r) {};
+      \draw[fill=white] (L\r.north west) rectangle ++(34mm,4.2mm)
+        node[midway,font=\scriptsize\sffamily\bfseries] {\t};
+    }
+  \end{scope}
+  \draw[dep] (L0.south) -- (L0.south |- L1.north);
+  \draw[dep] (L1.south) -- (L1.south |- L2.north);
+  \draw[dep] (L2.south) -- (L2.south |- L3.north);
+  \draw[dep] ([xshift=-12mm]L0.south east) -- ([xshift=-12mm]L0.south east |- L2.north);
+  \draw[dep] ([xshift=25mm]L1.south west) -- ([xshift=25mm]L1.south west |- L3.north);
+\end{tikzpicture}
+\caption{Biểu đồ gói theo tầng. Mũi tên đứt nét đầu hở là quan hệ phụ thuộc giữa các tầng; phụ thuộc giữa từng gói ở
+Bảng~\ref{tab:phuthuoc}.}\label{fig:goi}
+\end{figure}
+
+\begin{table}[H]
+\centering\small
+\caption{Phụ thuộc giữa các gói (lấy từ câu lệnh \code{import}; mọi gói nghiệp vụ và xử lý dữ liệu đều dùng \code{db})}\label{tab:phuthuoc}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Gói} & \textbf{Dùng các gói} \\ \midrule
+api & users, ondemand, metrics, costs, alerts, extraction, ingestion \\
+watcher & ondemand, alerts, extraction, ingestion, llm, notify \\
+ondemand & extraction, ingestion, metrics, alerts, users, costs, llm, notify \\
+alerts & metrics, users, notify \\
+users & notify \\
+metrics & extraction \\
+costs & ingestion, llm \\
+extraction & ingestion, llm, costs \\
+ingestion & (chỉ db) \\
+db, llm, notify & (không dùng gói nội bộ nào) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Triển khai}
+Hiện hệ thống chạy trên máy phát triển bằng Docker Compose; khi triển khai thật sẽ chuyển nguyên cụm container lên một
+máy chủ ảo (VPS) (Hình~\ref{fig:trienkhai}).
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.83, transform shape, font=\footnotesize\sffamily]
+  \node[udnode,text width=26mm] (web) at (0,0) {«container»\\\textbf{web}\\FastAPI, cổng 8765};
+  \node[udnode,text width=26mm] (watch) at (4.2,0) {«container»\\\textbf{watcher}\\bộ canh, 15 phút/lượt};
+  \node[udnode,text width=26mm] (db) at (2.1,-2.7) {«container»\\\textbf{db}\\PostgreSQL 16 + pgvector};
+  \begin{scope}[on background layer]
+    \node[udnode,fill=white,fit=(web)(watch)(db),inner xsep=6mm,inner ysep=6mm,yshift=4mm,
+          label={[font=\footnotesize\sffamily,anchor=north]north:«device» \textbf{Máy chủ} (Docker Compose)}] (srv) {};
+  \end{scope}
+  \node[udnode,text width=24mm] (browser) at (-5.4,-1.3) {«device»\\\textbf{Trình duyệt}\\của người dùng};
+  \node[udnode,text width=26mm] (vs) at (9.8,1.2) {«external»\\\textbf{Vietstock}};
+  \node[udnode,text width=26mm] (llm) at (9.8,-1.3) {«external»\\\textbf{Nhà cung cấp mô hình}\\(API kiểu OpenAI)};
+  \node[udnode,text width=26mm] (smtp) at (9.8,-3.8) {«external»\\\textbf{Máy chủ email}\\(SMTP)};
+  \draw[thick] (browser) -- node[above,guard]{HTTPS} (web);
+  \draw[thick] (web) -- node[left,guard]{SQL} (db);
+  \draw[thick] (watch) -- node[right,guard]{SQL} (db);
+  \draw[thick] (watch.east) -- node[above,guard,sloped]{HTTPS} (vs);
+  \draw[thick] (watch.east) -- node[above,guard,sloped]{HTTPS} (llm);
+  \draw[thick] (watch.south east) -- node[below,guard,sloped]{SMTP} (smtp);
+\end{tikzpicture}
+\caption{Biểu đồ triển khai. Hộp ba chiều là nút (thiết bị hoặc môi trường chạy); đường nối là kênh giao tiếp, ghi giao
+thức.}\label{fig:trienkhai}
 \end{figure}
 
 \subsection{Vòng đời một tài liệu}
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small\sffamily]
-  \node[box=20mm] (d) at (0,0) {discovered\\(đã thấy)};
-  \node[box=20mm] (dl) at (2.8,0) {downloaded\\(đã tải)};
-  \node[box=20mm] (ex) at (5.6,0) {extracting\\(đang đọc)};
-  \node[gbox=22mm] (v) at (9,1.8) {verified\\(đã kiểm chứng)};
-  \node[abox=22mm] (nr) at (9,0) {needs\_review\\(cần duyệt)};
-  \node[rbox=22mm] (f) at (9,-1.8) {failed\\(lỗi)};
-  \node[gbox=22mm] (ap) at (12.6,0) {approved\\(đã duyệt tay)};
-  \draw[arr] (d) -- (dl); \draw[arr] (dl) -- (ex);
-  \draw[arr] (ex) -- (v); \draw[arr] (ex) -- (nr); \draw[arr] (ex) -- (f);
-  \draw[arr] (nr) -- node[above,lab]{duyệt} (ap);
-  \draw[arr,dashed] (nr) -- node[right,lab]{sửa tay} (v);
+\begin{tikzpicture}[scale=0.86, transform shape, font=\footnotesize\sffamily]
+  \node[start] (s0) at (-1.8,0) {};
+  \node[state] (d) at (0,0) {discovered\\(đã thấy)};
+  \node[state] (dl) at (3.5,0) {downloaded\\(đã tải)};
+  \node[state] (ex) at (7.0,0) {extracting\\(đang đọc)};
+  \node[state] (v) at (11.0,2.2) {verified\\(đã kiểm chứng)};
+  \node[state] (nr) at (11.0,0) {needs\_review\\(cần duyệt)};
+  \node[state] (f) at (11.0,-2.2) {failed\\(lỗi)};
+  \node[state] (ap) at (14.8,0) {approved\\(đã duyệt tay)};
+  \draw[flow] (s0) -- (d);
+  \draw[flow] (d) -- node[above,guard]{tải file} (dl);
+  \draw[flow] (dl) -- node[above,guard,align=center]{bắt đầu\\đọc} (ex);
+  \draw[flow] (ex.north) |- node[above,guard,pos=0.75]{[ràng buộc đạt]} (v.west);
+  \draw[flow] (ex) -- node[above,guard,align=center]{[còn lệch sau\\leo thang]} (nr);
+  \draw[flow] (ex.south) |- node[below,guard,pos=0.75]{[không đọc được]} (f.west);
+  \draw[flow] (nr) -- node[above,guard]{duyệt} (ap);
+  \draw[flow] (nr) -- node[right,guard]{sửa tay [đạt]} (v);
 \end{tikzpicture}
-\caption{Trạng thái của một tài liệu. Chỉ \code{verified} và \code{approved} được hiển thị trên thẻ và bảng xếp hạng.
-\code{approved} dùng khi phần lệch còn lại là do chính BCTC in lệch, người duyệt ghi rõ lý do.}\label{fig:trangthai}
+\caption{Biểu đồ trạng thái của một tài liệu. Chấm đen là trạng thái đầu; nhãn trên mũi tên là sự kiện, phần trong ngoặc
+vuông là điều kiện. Chỉ \code{verified} và \code{approved} được hiển thị trên thẻ và bảng xếp hạng.}\label{fig:trangthai}
 \end{figure}
 
 \subsection{Luồng xử lý một BCTC mới}
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\footnotesize\sffamily, scale=0.92, transform shape]
-  \foreach \x/\n/\t in {0/w/Bộ canh,2.7/v/Vietstock,5.4/p/Pipeline,8.1/m/Mô hình\\thị giác,10.8/d/CSDL,13.5/u/Người\\theo dõi}{
-    \node[life] (\n) at (\x,0) {\t};
-    \draw[soigray,dashed] (\n.south) -- (\x,-11.2);
-  }
-  \newcommand{\msg}[5][msg]{\draw[#1] (#2,#4) -- node[above,font=\scriptsize\sffamily,fill=white,inner sep=1pt]{#5} (#3,#4);}
-  \msg{0}{2.7}{-1.0}{lấy danh sách tài liệu}
-  \msg[ret]{2.7}{0}{-1.6}{tài liệu mới}
-  \msg{0}{2.7}{-2.2}{tải file}
-  \msg{0}{5.4}{-2.9}{đọc BCTC}
-  \msg{5.4}{8.1}{-3.6}{ảnh nhỏ các trang đầu}
-  \msg[ret]{8.1}{5.4}{-4.2}{trang BCĐKT, KQKD, LCTT}
-  \msg{5.4}{8.1}{-4.9}{ảnh trang báo cáo}
-  \msg[ret]{8.1}{5.4}{-5.5}{bảng chép nguyên văn (JSON)}
-  \draw[msg] (5.4,-6.0) -- ++(0.7,0) -- ++(0,-0.5) -- (5.45,-6.5);
-  \node[right,font=\scriptsize\sffamily,align=left] at (6.15,-6.25) {chuẩn hóa,\\kiểm tra ràng buộc};
-  \draw[soiamber,thick,rounded corners=2pt] (4.4,-6.85) rectangle (9.0,-8.7);
-  \node[anchor=north west,font=\scriptsize\sffamily\bfseries,color=soiamber] at (4.45,-6.87) {nếu lệch};
-  \msg{5.4}{8.1}{-7.75}{ảnh ô được đề xuất}
-  \msg[ret]{8.1}{5.4}{-8.35}{số đọc lại}
-  \msg{5.4}{10.8}{-9.3}{lưu số, nguồn, trạng thái}
-  \msg[ret]{5.4}{0}{-9.9}{xong}
-  \msg{0}{13.5}{-10.6}{email thẻ KQKD (nếu đã kiểm chứng)}
-\end{tikzpicture}
-\caption{Biểu đồ tuần tự khi một BCTC mới xuất hiện. Mô hình thị giác chỉ được gọi để định vị trang, chép bảng và đọc
-lại các ô bị nghi; mọi bước tính toán và kiểm tra đều do code thực hiện.}\label{fig:tuantu}
+\resizebox{\linewidth}{!}{\sffamily%
+\begin{sequencediagram}
+  \renewcommand{\unitfactor}{0.85}
+  \newthread{w}{:Bộ canh}
+  \newinst[1.6]{v}{:Vietstock}
+  \newinst[1.6]{p}{:Pipeline}
+  \newinst[1.6]{m}{:Mô hình thị giác}
+  \newinst[1.6]{d}{:CSDL}
+  \newinst[1.6]{e}{:Máy chủ email}
+  \begin{call}{w}{lấy danh sách tài liệu}{v}{tài liệu mới}\end{call}
+  \begin{call}{w}{tải file}{v}{file PDF}\end{call}
+  \begin{call}{w}{đọc BCTC(id)}{p}{trạng thái}
+    \begin{call}{p}{định vị trang(ảnh nhỏ)}{m}{số trang các báo cáo}\end{call}
+    \begin{call}{p}{chép bảng(ảnh trang)}{m}{bảng (JSON)}\end{call}
+    \begin{callself}{p}{chuẩn hóa, kiểm tra ràng buộc}{}\end{callself}
+    \begin{sdblock}{opt}{[còn ràng buộc lệch]}
+      \begin{callself}{p}{định vị ô sai}{ô đề xuất}\end{callself}
+      \begin{call}{p}{đọc lại ô(ảnh)}{m}{số đọc lại}\end{call}
+    \end{sdblock}
+    \begin{call}{p}{lưu số, nguồn, trạng thái}{d}{}\end{call}
+  \end{call}
+  \begin{sdblock}{opt}{[đã kiểm chứng]}
+    \mess{w}{gửi thẻ KQKD cho người theo dõi}{e}
+  \end{sdblock}
+\end{sequencediagram}}
+\caption{Biểu đồ tuần tự khi một BCTC mới xuất hiện. Mũi tên liền đầu đặc là lời gọi, mũi tên đứt là giá trị trả về,
+mũi tên đầu hở là thông điệp không chờ trả lời; khung \code{opt} là đoạn chỉ chạy khi điều kiện trong ngoặc vuông
+đúng.}\label{fig:tuantu}
+\end{figure}
+
+\section{Thiết kế cơ sở dữ liệu}
+CSDL PostgreSQL gồm 12 bảng, chia hai nhóm: dữ liệu BCTC (Hình~\ref{fig:erd-bctc}) và người dùng (Hình~\ref{fig:erd-nd}).
+Hai sơ đồ được \textbf{sinh tự động từ CSDL thật} bằng \code{tools/erd.py}, nên luôn khớp với code. Mỗi hộp là một bảng
+gồm tên cột, khóa (PK: khóa chính, FK: khóa ngoại) và kiểu dữ liệu; mỗi đường nối là một khóa ngoại, hai đầu ghi bội số
+theo UML (\code{1}: đúng một, \code{0..1}: không hoặc một, \code{0..*}: không hoặc nhiều).
+
+Một số điểm thiết kế:
+\begin{itemize}
+  \item \code{documents} là một công bố (mã, loại, kỳ, phạm vi, trạng thái); \code{document\_files} là từng phiên bản file
+        (băm SHA-256), nên BCTC công bố lại tạo dòng mới chứ không ghi đè.
+  \item \code{line\_items} lưu từng ô số theo cột (\code{column\_kind}), kèm chuỗi gốc, trang và phiên bản pipeline;
+        \code{validations} lưu kết quả từng ràng buộc. Toàn bộ đầu ra của mô hình và lịch sử đọc lại, sửa tay được lưu
+        thêm thành bản ghi JSON theo từng file để kiểm tra lại mà không phải gọi mô hình.
+  \item \code{documents.owner\_user\_id} khác rỗng là BCTC do người dùng tải lên, không xuất hiện trong dữ liệu công khai.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{\input{so-do/erd-bctc.tex}}
+\caption{Sơ đồ CSDL phần dữ liệu BCTC. Bảng nét đứt thuộc sơ đồ còn lại.}\label{fig:erd-bctc}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{\input{so-do/erd-nguoi-dung.tex}}
+\caption{Sơ đồ CSDL phần người dùng. Bảng nét đứt thuộc sơ đồ còn lại.}\label{fig:erd-nd}
 \end{figure}
 
 \section{Thu thập tài liệu}
@@ -669,24 +877,32 @@ Kho hiện có 532 tài liệu của 31 mã (VN30 và một mã người dùng y
 \subsection{Quy trình}
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small\sffamily, node distance=5mm]
-  \node[box=58mm] (a) {1. Đánh giá lớp chữ, vẽ ảnh các trang};
-  \node[box=58mm, below=of a] (b) {2. Định vị trang BCĐKT, KQKD, LCTT\\(ảnh nhỏ, tối đa 30 trang đầu)};
-  \node[box=58mm, below=of b] (c) {3. Chép nguyên văn từng báo cáo\\(STT, mã, tên dòng, thuyết minh, các cột)};
-  \node[box=58mm, below=of c] (d) {4. Code chuẩn hóa: dấu phân cách, đơn vị,\\dấu âm, mã số, nhận dạng mẫu};
-  \node[abox=58mm, below=of d] (e) {5. Thử các giả thuyết rẻ, không gọi mô hình\\(đảo cột STT/mã, nhãn ngân hàng, mã thiếu)};
-  \node[dec, below=7mm of e] (f) {Ràng buộc\\bắt buộc đạt?};
-  \node[gbox=30mm, right=14mm of f] (ok) {verified};
-  \node[abox=58mm, below=9mm of f] (g) {6. Thang leo thang (mục~\ref{sec:leothang})};
-  \node[dec, below=7mm of g] (h) {Đạt?};
-  \node[rbox=30mm, right=14mm of h] (nr) {needs\_review\\$\rightarrow$ duyệt tay};
-  \node[gbox=30mm, left=14mm of h] (ok2) {verified};
-  \draw[arr] (a)--(b); \draw[arr] (b)--(c); \draw[arr] (c)--(d); \draw[arr] (d)--(e); \draw[arr] (e)--(f);
-  \draw[arr] (f)-- node[above,lab]{có} (ok); \draw[arr] (f)-- node[right,lab]{không} (g);
-  \draw[arr] (g)--(h); \draw[arr] (h)-- node[above,lab]{không} (nr);
-  \draw[arr] (h)-- node[above,lab]{có} (ok2);
+\begin{tikzpicture}[node distance=5mm]
+  \node[start] (s) {};
+  \node[act=64mm, below=of s] (a) {Đánh giá lớp chữ, vẽ ảnh các trang};
+  \node[act=64mm, below=of a] (b) {Định vị trang BCĐKT, KQKD, LCTT (mô hình, ảnh nhỏ)};
+  \node[act=64mm, below=of b] (c) {Chép nguyên văn từng báo cáo (mô hình)};
+  \node[act=64mm, below=of c] (d) {Chuẩn hóa số, nhận dạng mẫu (code)};
+  \node[act=64mm, below=of d] (e) {Thử giả thuyết rẻ: đảo cột, ghép nhãn, suy mã thiếu (code)};
+  \node[dnode, below=6mm of e] (f) {};
+  \node[act=64mm, below=10mm of f] (g) {Leo thang: định vị ô sai, đọc lại ô, chép lại trang (mục~\ref{sec:leothang})};
+  \node[dnode, below=6mm of g] (h) {};
+  \node[act=40mm, below=10mm of h] (nr) {Lưu, trạng thái \textit{needs\_review}};
+  \node[stop, below=of nr] (x2) {};
+  \node[dnode] (m) at ($(h)+(5.6,0)$) {};
+  \node[act=36mm, below=10mm of m] (ok) {Lưu, trạng thái \textit{verified}};
+  \node[stop, below=of ok] (x1) {};
+  \draw[flow] (s)--(a); \draw[flow] (a)--(b); \draw[flow] (b)--(c); \draw[flow] (c)--(d); \draw[flow] (d)--(e);
+  \draw[flow] (e)--(f);
+  \draw[flow] (f) -- node[right,guard]{[còn lệch]} (g);
+  \draw[flow] (f) -| node[above,guard,pos=0.25]{[ràng buộc bắt buộc đạt]} (m);
+  \draw[flow] (g)--(h);
+  \draw[flow] (h) -- node[above,guard]{[đạt]} (m);
+  \draw[flow] (h) -- node[right,guard]{[vẫn lệch]} (nr);
+  \draw[flow] (m)--(ok); \draw[flow] (ok)--(x1); \draw[flow] (nr)--(x2);
 \end{tikzpicture}
-\caption{Quy trình đọc và kiểm chứng một BCTC. Mô hình chỉ tham gia ở bước 2, 3 và các bước đọc lại.}\label{fig:pipeline}
+\caption{Biểu đồ hoạt động của quy trình đọc và kiểm chứng một BCTC. Hình thoi là nút rẽ nhánh (điều kiện ghi trong
+ngoặc vuông trên mỗi nhánh) hoặc nút gộp; chấm đen là điểm bắt đầu, vòng tròn có chấm là điểm kết thúc.}\label{fig:pipeline}
 \end{figure}
 
 \subsection{Mô hình chỉ chép, code mới hiểu số}
@@ -733,6 +949,41 @@ phương án làm số ràng buộc đạt nhiều nhất mà không làm mất 
   \item Vẫn lệch thì chuyển duyệt tay. Người duyệt xem ảnh trang cạnh bảng số, sửa từng ô. Mỗi lần sửa được ghi lại và
         trở thành \textbf{dữ liệu vàng} để đánh giá.
 \end{enumerate}
+
+\subsection{Duyệt tay}
+BCTC còn lệch sau mọi bậc leo thang được đưa vào hàng duyệt. Hình~\ref{fig:duyettay} chia việc theo hai làn: quản trị
+viên và hệ thống.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=5mm]
+  \draw[thick] (0,0.6) rectangle (14.6,-12.6); \draw[thick] (7.3,0.6) -- (7.3,-12.6); \draw[thick] (0,0) -- (14.6,0);
+  \node[font=\footnotesize\sffamily\bfseries] at (3.65,0.3) {Quản trị viên};
+  \node[font=\footnotesize\sffamily\bfseries] at (10.95,0.3) {Hệ thống};
+  \node[start] (s) at (3.65,-0.7) {};
+  \node[act=46mm] (a1) at (3.65,-1.7) {Mở hàng duyệt, chọn BCTC};
+  \node[act=50mm] (s1) at (10.95,-1.7) {Hiện bảng số, ràng buộc lệch và ảnh trang gốc};
+  \node[act=46mm] (a2) at (3.65,-3.3) {Đối chiếu ô lệch với ảnh gốc};
+  \node[dnode] (d1) at (3.65,-4.6) {};
+  \node[act=26mm] (a4) at (1.75,-6.2) {Duyệt xuất bản};
+  \node[act=26mm] (a3) at (5.45,-6.2) {Nhập số đúng và ghi chú};
+  \node[act=50mm] (s2) at (10.95,-6.2) {Ghi lịch sử sửa, kiểm tra lại ràng buộc};
+  \node[dnode] (d2) at (10.95,-7.6) {};
+  \node[act=40mm] (s3) at (10.95,-9.0) {Đặt trạng thái \textit{verified}};
+  \node[stop] (x1) at (10.95,-10.1) {};
+  \node[act=50mm] (s4) at (10.95,-11.2) {Đặt trạng thái \textit{approved}, gửi email người theo dõi};
+  \node[stop] (x2) at (10.95,-12.2) {};
+  \draw[flow] (s)--(a1); \draw[flow] (a1)--(s1); \draw[flow] (s1.south) |- (a2.east);
+  \draw[flow] (a2)--(d1);
+  \draw[flow] (d1) -| node[above,guard,pos=0.3]{[ô bị đọc sai]} (a3);
+  \draw[flow] (d1) -| node[above,guard,pos=0.3]{[BCTC tự in lệch]} (a4);
+  \draw[flow] (a3)--(s2); \draw[flow] (s2)--(d2);
+  \draw[flow] (d2) -- node[right,guard]{[đạt]} (s3); \draw[flow] (s3)--(x1);
+  \draw[flow] (d2.east) -- node[above,guard]{[còn lệch]} ++(1.9,0) |- (s1.east);
+  \draw[flow] (a4) |- (s4); \draw[flow] (s4)--(x2);
+\end{tikzpicture}
+\caption{Biểu đồ hoạt động của việc duyệt tay, chia làn theo người thực hiện.}\label{fig:duyettay}
+\end{figure}
 
 \subsection{Bằng chứng cho từng ô}
 Sau khi kiểm chứng, mỗi ô số được xếp vào một loại bằng chứng: khớp cả phép cộng lẫn giữa các kỳ; chỉ khớp giữa các kỳ;
@@ -785,23 +1036,30 @@ theo nguyên lý định vị lỗi của Fellegi--Holt~\cite{fellegi1976}. Soi 
 \subsection{Xác nhận bằng đọc lại}
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small\sffamily, node distance=6mm and 8mm, scale=0.88, transform shape]
-  \node[rbox=34mm] (fail) {Ràng buộc lệch\\$100 \ne 110+120+130$};
-  \node[box=34mm, right=of fail] (loc) {Định vị: đề xuất\\ô 120 = \textbf{4.83}1 thay vì \textbf{3.83}1};
-  \node[box=34mm, right=of loc] (rr) {Đọc lại \emph{riêng} ô 120\\(không đưa số mong đợi)};
-  \node[dec, below=9mm of rr] (eq) {Ra đúng\\số đề xuất?};
-  \node[gbox=30mm, left=12mm of eq] (acc) {Nhận số mới\\ghi lịch sử sửa};
-  \node[dec, below=9mm of eq] (old) {Vẫn ra\\số cũ?};
-  \node[abox=34mm, left=12mm of old] (zoom) {Đọc phóng to theo dải\\(4200 px, 3 dải chồng nhau)};
-  \node[rbox=30mm, right=10mm of old] (fm) {Nghi BCTC\\tự in lệch};
-  \draw[arr] (fail) -- (loc); \draw[arr] (loc) -- (rr); \draw[arr] (rr) -- (eq);
-  \draw[arr] (eq) -- node[above,lab]{có} (acc);
-  \draw[arr] (eq) -- node[right,lab]{không} (old);
-  \draw[arr] (old) -- node[above,lab]{có} (zoom);
-  \draw[arr] (zoom) -- node[left,lab]{xác nhận} (acc);
-  \draw[arr,dashed] (zoom.south) |- ++(0,-6mm) -| node[pos=0.25,below,lab]{vẫn số cũ} (fm.south);
+\begin{tikzpicture}[node distance=5mm]
+  \node[start] (s) {};
+  \node[act=56mm, below=of s] (a) {Định vị: đề xuất ô và số mới thỏa ràng buộc (code)};
+  \node[act=56mm, below=of a] (b) {Đọc lại riêng ô đó, không đưa số mong đợi (mô hình)};
+  \node[dnode, below=6mm of b] (d1) {};
+  \node[act=48mm, below=10mm of d1] (z) {Đọc phóng to theo dải 4200 px (mô hình)};
+  \node[dnode, below=6mm of z] (d2) {};
+  \node[act=48mm, below=10mm of d2] (fm) {Ghi nhận nghi BCTC tự in lệch};
+  \node[stop, below=of fm] (x2) {};
+  \node[dnode] (m) at ($(d2)+(5.4,0)$) {};
+  \node[act=40mm, below=10mm of m] (acc) {Nhận số mới, ghi lịch sử sửa};
+  \node[stop, below=of acc] (x1) {};
+  \node[act=34mm] (keep) at ($(d1)+(-5.2,-1.4)$) {Giữ số cũ, chuyển sang bậc leo thang sau};
+  \node[stop, below=of keep] (x3) {};
+  \draw[flow] (s)--(a); \draw[flow] (a)--(b); \draw[flow] (b)--(d1);
+  \draw[flow] (d1) -| node[above,guard,pos=0.25]{[ra đúng số đề xuất]} (m);
+  \draw[flow] (d1) -- node[right,guard]{[ra số cũ]} (z);
+  \draw[flow] (d1) -| node[above,guard,pos=0.25]{[ra số khác]} (keep);
+  \draw[flow] (z)--(d2);
+  \draw[flow] (d2) -- node[above,guard]{[ra đúng số đề xuất]} (m);
+  \draw[flow] (d2) -- node[right,guard]{[vẫn ra số cũ]} (fm);
+  \draw[flow] (m)--(acc); \draw[flow] (acc)--(x1); \draw[flow] (fm)--(x2); \draw[flow] (keep)--(x3);
 \end{tikzpicture}
-\caption{Đọc lại để xác nhận đề xuất (số trong hình chỉ để minh họa). Với một nhóm đề xuất ngang nhau, hệ thống đọc lại
+\caption{Biểu đồ hoạt động của bước đọc lại để xác nhận một đề xuất. Với một nhóm đề xuất ngang nhau, hệ thống đọc lại
 cả nhóm và chỉ nhận khi đúng \emph{một} ô ra số đề xuất.}\label{fig:xacnhan}
 \end{figure}
 

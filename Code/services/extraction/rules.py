@@ -114,7 +114,8 @@ _CF = (
     rule("CF", "08", *codes(1, 7, 2), when_present="08", include_suffixed=True),
     rule("CF", "20", "08", *codes(9, 17, 2), when_present="08", include_suffixed=True),
     rule("CF", "20", *codes(1, 7, 2), id="CF_20_direct", when_absent="08", include_suffixed=True),
-    rule("CF", "30", *codes(21, 27, 2), include_suffixed=True),
+    # 28: tiền chi lợi ích cổ đông không kiểm soát, có ở TT99 và một số BCTC lập theo TT200 (MWG quý 4/2025)
+    rule("CF", "30", *codes(21, 28, 2), include_suffixed=True),
     rule("CF", "40", *codes(31, 36, 2), include_suffixed=True),
     rule("CF", "50", "20", "30", "40"),
     rule("CF", "70", "50", "60", "61", "62"),   # 62: chênh lệch quy đổi BCTC công ty con nước ngoài (VNM)

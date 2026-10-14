@@ -430,19 +430,33 @@ _SPLIT_LABELS = (("61", re.compile(r"sau thuế (thu nhập doanh nghiệp )?(c�
                  ("62", re.compile(r"cổ đông không kiểm soát|cổ đông thiểu số|lợi ích (của )?cổ đông không")))
 
 
+# Dòng đầu LCTT gián tiếp đôi khi mất cả số thứ tự lẫn mã số (VIC quý 4/2025: "Lợi nhuận trước thuế" không có "01"),
+# và không suy được từ phép cộng 08 = 01 + ... + 07 vì dòng 07 cũng vắng mặt
+_CF_PBT_LABEL = re.compile(r"^(1\.?\s*)?lợi nhuận (kế toán )?trước thuế")
+
+
 def _label_split_codes(extracted, statements) -> list[dict]:
+    """Gán mã theo tên dòng cho các dòng quan trọng mà BCTC không in mã: 61/62 trên KQKD, 01 trên LCTT gián tiếp."""
+    out = []
     st = statements.get("IS")
     ex = next((e for e in extracted if e.statement == "IS"), None)
-    if st is None or ex is None or "60" not in st.values or "61" in st.values or "62" in st.values:
-        return []
-    out = []
-    for code, pattern in _SPLIT_LABELS:
+    if st is not None and ex is not None and "60" in st.values and "61" not in st.values and "62" not in st.values:
+        for code, pattern in _SPLIT_LABELS:
+            hit = next((it for it in ex.items if normalize_code(it.code) is None
+                        and pattern.search(unicodedata.normalize("NFC", it.label or "").casefold())
+                        and any(v not in (None, "", "-") for v in it.values_raw.values())), None)
+            if hit is not None:
+                hit.code = code
+                out.append({"statement": "IS", "code": code, "label": hit.label, "rule": "label"})
+    cf = statements.get("CF")
+    ex = next((e for e in extracted if e.statement == "CF"), None)
+    if cf is not None and ex is not None and "08" in cf.values and "01" not in cf.values:
         hit = next((it for it in ex.items if normalize_code(it.code) is None
-                    and pattern.search(unicodedata.normalize("NFC", it.label or "").casefold())
+                    and _CF_PBT_LABEL.search(unicodedata.normalize("NFC", it.label or "").strip().casefold())
                     and any(v not in (None, "", "-") for v in it.values_raw.values())), None)
         if hit is not None:
-            hit.code = code
-            out.append({"statement": "IS", "code": code, "label": hit.label, "rule": "label"})
+            hit.code = "01"
+            out.append({"statement": "CF", "code": "01", "label": hit.label, "rule": "label"})
     return out
 
 
@@ -545,6 +559,13 @@ def _check_variants(record: dict):
     swapped: frozenset = frozenset()
     best_score, best = evaluate(swapped)
     baseline_checks = sum(c.gate for c in best[4])
+    # Mốc "số phép kiểm" lấy thêm từ phương án đảo mọi trang: bản nguyên văn có khi không có mã ở cả một trang
+    # (VHM quý 2/2026 trang 12), nếu chỉ lấy mốc nguyên văn thì bỏ mã trang đó không bị phạt, và một ô đọc sai trên
+    # trang làm phương án bỏ mã thắng, mất cả trang khỏi kiểm tra
+    every = frozenset(u for us in units.values() for u in us)
+    if every:
+        baseline_checks = max(baseline_checks, sum(c.gate for c in evaluate(every)[1][4]))
+        best_score, best = evaluate(swapped)
     moves = [frozenset(u) for u in units.values() if u] + [frozenset([u]) for us in units.values() for u in us]
     # Mô hình chép lẫn lộn trong cùng một bảng: dòng thì mã số ở cột stt (cột code là số thuyết minh), dòng thì đúng
     # chỗ (MSN quý 1/2026). Phương án: dòng nào có stt dạng số thì lấy stt làm mã.

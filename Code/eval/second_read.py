@@ -119,7 +119,14 @@ def compare_document(conn, d: int, period: str) -> list[dict]:
             b = theirs.values.get((st, key), {}).get(twin) if twin else None
         if a is None:
             continue
-        result = "không thấy" if b is None else ("trùng" if a == b else "khác")
+        if b is None:
+            result = "không thấy"
+        elif a == b:
+            result = "trùng"
+        elif b != 0 and any(a == b * Decimal(1000) ** k or b == a * Decimal(1000) ** k for k in (1, 2, 3)):
+            result = "khác đơn vị"      # cùng dãy chữ số, hai lần đọc hiểu đơn vị tính khác nhau
+        else:
+            result = "khác"
         out.append({"document_id": d, "statement": st, "row": row, "key": key, "column_kind": col, "cat": cat,
                     "mine": str(a), "theirs": None if b is None else str(b), "result": result,
                     "second_gate_ok": gate_ok})
@@ -148,7 +155,7 @@ def compare(list_n: int) -> None:
         t = tally[cat]
         n = sum(t.values())
         print(f"  {cat}. {NAMES[cat]}: {n:,} ô; trùng {t['trùng']:,} ({100 * t['trùng'] / n:.1f}%), "
-              f"khác {t['khác']:,}, không thấy {t['không thấy']:,}")
+              f"khác {t['khác']:,}, khác đơn vị {t['khác đơn vị']:,}, không thấy {t['không thấy']:,}")
     for ticker, period, r in differ[:list_n]:
         print(f"  khác: {ticker} {period} (doc {r['document_id']}) {r['statement']} {r['key']} {r['column_kind']} "
               f"nhóm {r['cat']}: lưu {r['mine']} / người thứ hai {r['theirs']}")

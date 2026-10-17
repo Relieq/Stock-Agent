@@ -314,3 +314,55 @@ def test_reread_label_names_which_of_duplicate_rows():
     assert "dòng thứ 2 trong 2" in _label_on_page(record, "IS", 2)
     assert "dòng thứ 1 trong 2" in _label_on_page(record, "IS", 0)
     assert _label_on_page(record, "IS", 3) == "Lợi nhuận đã thực hiện"
+
+
+class _FakeReader:
+    """Giả lập mô hình đọc lại: by_step[bước][tên dòng] là số trả về; dòng không có trong bảng thì trả số đang in."""
+
+    def __init__(self, by_step, step_providers):
+        import types
+        self.by_step, self.step_providers, self.calls = by_step, step_providers, []
+        self.cfg = types.SimpleNamespace(model="fake", provider="fake")
+
+    def json_from_images(self, prompt, images, schema, schema_name, step=None, detail=None):
+        import re
+        self.calls.append(step)
+        printed = {"TÀI SẢN NGẮN HẠN": "60", "Tiền": "50"}
+        return {"cells": [{"code": cid, "column_kind": "end_period",
+                           "value": self.by_step.get(step, {}).get(label, printed.get(label))}
+                          for cid, label in re.findall(r'ô (o\d+): dòng "([^"]+)"', prompt)]}
+
+
+def _bs_with_misread_cash():
+    rows = [_row(None, "100", "TÀI SẢN NGẮN HẠN", "60"), _row(None, "110", "Tiền", "50"),
+            _row(None, "200", "TÀI SẢN DÀI HẠN", "40"), _row(None, "280", "TỔNG CỘNG TÀI SẢN", "100"),
+            _row(None, "300", "NỢ PHẢI TRẢ", "70"), _row(None, "400", "VỐN CHỦ SỞ HỮU", "30"),
+            _row(None, "440", "TỔNG CỘNG NGUỒN VỐN", "100")]
+    rec = _record({"BS": rows})
+    rec.update(candidates=[{"name": "f.pdf", "rotations": {}}], chosen="f.pdf")
+    return rec
+
+
+def test_escalation_reader_confirms_when_main_model_repeats_old_value(monkeypatch):
+    # FPT quý 2/2026: ô bị con dấu đè, mô hình chính đọc lại vẫn ra số cũ; mô hình mạnh hơn đọc ra đúng số ràng buộc đòi
+    from services.extraction import pipeline
+    monkeypatch.setattr(pipeline, "render_sharp", lambda *a, **k: b"")
+    monkeypatch.setattr(pipeline, "render_strips", lambda *a, **k: [b""])
+    rec = _bs_with_misread_cash()
+    reader = _FakeReader({"repair_escalate": {"Tiền": "60"}},
+                         {"repair_escalate": "anthropic:claude-opus-5-5"})
+    assert pipeline._repair_by_constraints(rec, reader, doc=None) is True
+    assert rec["raw"]["BS"]["rows"][1]["values"]["end_period"] == "60"
+    assert reader.calls[-1] == "repair_escalate"
+    assert any(r["escalated"] == "60" and r["accepted"] for r in rec["repairs"])
+
+
+def test_no_escalation_step_when_not_configured(monkeypatch):
+    from services.extraction import pipeline
+    monkeypatch.setattr(pipeline, "render_sharp", lambda *a, **k: b"")
+    monkeypatch.setattr(pipeline, "render_strips", lambda *a, **k: [b""])
+    rec = _bs_with_misread_cash()
+    reader = _FakeReader({}, {})
+    assert pipeline._repair_by_constraints(rec, reader, doc=None) is False
+    assert "repair_escalate" not in reader.calls
+    assert rec["raw"]["BS"]["rows"][1]["values"]["end_period"] == "50"

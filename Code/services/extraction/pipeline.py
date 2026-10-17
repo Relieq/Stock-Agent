@@ -283,7 +283,8 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
                     if page:
                         esc_pages.setdefault((q.statement, int(page)), []).append(q)
         for (st, page), qs in esc_pages.items():
-            ids = {f"o{n}": q for n, q in enumerate(dict.fromkeys(qs), 1)}
+            unique = list({(q.statement, q.row, q.column_kind): q for q in qs}.values())
+            ids = {f"o{n}": q for n, q in enumerate(unique, 1)}
             result = client.json_from_images(prompts.verify_prompt(st, _asked_cells(record, ids)),
                                              [(f"Trang {page}", render_sharp(doc, page, _rotation(record, page)))],
                                              prompts.REREAD_SCHEMA, "reread_cells", step="repair_escalate",

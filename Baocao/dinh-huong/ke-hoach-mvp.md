@@ -337,6 +337,21 @@ sai. Kết quả của Haiku ở bước này còn dao động (FPT lần này �
 theo bước, OpenAI định vị trang, Haiku chép và đọc lại; ước tính khoảng 0,035–0,04 USD mỗi BCTC (hiện khoảng 0,11).
 Đã làm: `LLM_STEP_PROVIDERS` / trang Chi phí ("Bước định vị trang: luôn dùng ...").
 
+**Người đọc bậc cao và công cụ cắt ảnh (17/10/2026).** Thử trên 6 trang khó (31 ô sai, 49 ô đúng; mức suy nghĩ medium):
+Haiku không công cụ 26/31, Haiku có công cụ cắt và phóng ảnh 25/31, Opus 5.5 không công cụ 27/31, Opus 5.5 có công cụ
+27/31; ô đúng 49/49 ở mọi cách. 4 ô sai chung của mọi cách là dòng "Lợi nhuận đã thực hiện" của TCX (trang có hai dòng
+cùng tên, câu hỏi chỉ nêu tên nên mô hình đọc đúng số của dòng kia): đã sửa câu hỏi, ghi "dòng thứ mấy có tên này".
+Bỏ 4 ô đó, Opus 5.5 đúng 27/27, Haiku 25–26/27; ô FPT bị con dấu đè Haiku lúc đúng lúc sai, Opus đúng cả hai lần. Công
+cụ cắt ảnh ít được gọi (Opus trung bình 1,8 lượt mỗi trang), không tăng độ đúng, tốn thêm khoảng 70%: chưa dùng.
+Đã làm: bước "người đọc bậc cao" (repair_escalate) chỉ chạy khi mô hình chính đọc lại vẫn không xác nhận được số ràng buộc
+đề xuất, chọn mô hình trên trang Chi phí (đặt anthropic:claude-opus-5-5).
+
+**Trọn quy trình kết hợp, bản cuối (17/10/2026, không ghi CSDL).** OpenAI định vị trang, Haiku 5.5 chép và đọc lại,
+Opus 5.5 làm người đọc bậc cao: FPT, GVR, TCX, VCB tự kiểm chứng (FPT nhờ Opus đọc đúng ô bị con dấu đè, 0,023 USD);
+VHM quý 4/2025 chờ duyệt (6 ô cột quý 4/2024 bị vệt mờ che, chính BCTC in sai một chữ số ở mã 30), như bản đang lưu.
+Ô đúng 1.611/1.619 (99,5%); chi phí khoảng 0,066 USD mỗi BCTC (OpenAI một mình khoảng 0,11). So với bản đang lưu (OpenAI):
+GVR tự kiểm chứng thay vì phải sửa tay 33 ô; không BCTC nào kém hơn. Quyết định: dùng cách kết hợp này cho mùa quý 3.
+
 **Bậc chép lại cả báo cáo (đo 14/10/2026 từ nhật ký 120 BCTC).** 46 báo cáo phải chép lại, giữ bản mới 16 (cả 16 nay đạt
 mọi ràng buộc bắt buộc, 4 nhờ xoay 180 độ); 30 lần không giúp gì nhưng vẫn tốn tiền (bậc này khoảng 0,033 USD mỗi BCTC).
 Việc cho mùa quý 3: ghi lại đặc điểm của các lần không được giữ (số ràng buộc lệch, lệch ở một cột hay mọi cột, bước định vị

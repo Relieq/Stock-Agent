@@ -131,6 +131,12 @@ _CASH_CROSS = (
     CrossRule("X_cash_end", left=("BS", "110", "end_period"), right=("CF", "70", "ytd_cur")),
     CrossRule("X_cash_begin", left=("BS", "110", "begin_year"), right=("CF", "60", "ytd_cur")),
 )
+# Lợi nhuận trước thuế trên LCTT (01) = trên KQKD (50), lũy kế. Đo 17/10/2026: khớp 91/92 cột; GAS quý 2/2026 tự in lệch
+# khoảng 11 tỷ (đã đối chiếu ảnh) nên chưa bắt buộc: khớp thì là thêm bằng chứng, lệch thì hiện để người duyệt xem.
+_PBT_CROSS = (
+    CrossRule("X_pbt", left=("CF", "01", "ytd_cur"), right=("IS", "50", "ytd_cur"), gate=False),
+    CrossRule("X_pbt_prev", left=("CF", "01", "ytd_prev_year"), right=("IS", "50", "ytd_prev_year"), gate=False),
+)
 
 # LCTT không in mã ở các dòng thành phần (pipeline._cf_positional_codes): dòng tổng = tổng các dòng thành phần nằm
 # ngay trên nó; dòng 20 cộng thêm dòng 08, dòng 08 cộng thêm dòng 01 nếu 01 có in mã
@@ -141,7 +147,7 @@ TT200 = RuleSet(
     template="TT200",
     total_assets_code="270",
     rules=_TT200_BS + _TT200_IS + _CF,
-    cross_rules=_CASH_CROSS,
+    cross_rules=_CASH_CROSS + _PBT_CROSS,
     **_CF_GROUPS,
 )
 
@@ -202,7 +208,7 @@ TT99 = RuleSet(
         rule("BS", "110", "111", "112"),
     ),
     # Tiền đầu kỳ trên LCTT có thể khác số đầu năm trên BCĐKT thật (GAS lệch 15,5 triệu ở cả hai quý: ảnh hưởng tỷ giá)
-    cross_rules=(_CASH_CROSS[0], replace(_CASH_CROSS[1], gate=False)),
+    cross_rules=(_CASH_CROSS[0], replace(_CASH_CROSS[1], gate=False)) + _PBT_CROSS,
     **_CF_GROUPS,
 )
 
@@ -279,6 +285,14 @@ CTCK = RuleSet(
         rule("CF", "70", *codes(61, 65, 2)),
         rule("CF", "80", *codes(71, 76, 2)),
         rule("CF", "90", "60", "70", "80"),
+        # Chi tiết suy từ dữ liệu, khớp 100% trên mọi BCTC CTCK đã đọc (đo 17/10/2026, 3-7 BCTC mỗi công thức)
+        rule("BS", "130", *codes(131, 139), id="BS_130_detail"),
+        rule("BS", "210", *codes(211, 219), id="BS_210_detail"),
+        rule("BS", "250", *codes(251, 259), id="BS_250_detail"),
+        rule("BS", "410", *codes(411, 419), id="BS_410_detail"),
+        *(rule("BS", c, *(f"{c}.{k}" for k in range(1, 10)), id=f"BS_{c}_parts")
+          for c in ("111", "212", "417", "021", "029", "031")),
+        *(rule("CF", c, *(f"{c}.{k}" for k in range(1, 10)), id=f"CF_{c}_parts") for c in ("73", "74")),
     ),
 )
 

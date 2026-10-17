@@ -31,7 +31,7 @@ def client_with(*backends) -> VisionClient:
     c = VisionClient.__new__(VisionClient)
     c._configs = [LLMConfig("anthropic", "", "k", "claude-haiku-5-5"), LLMConfig("openai", "", "k", "gpt-5.4-mini")][:len(backends)]
     c._backends = dict(enumerate(backends))
-    c.active, c.usage, c.steps, c.switches, c.down, c.step_providers = 0, Usage(), {}, [], set(), {}
+    c.active, c.usage, c.steps, c.switches, c.down, c.step_providers, c.extras = 0, Usage(), {}, [], set(), {}, set()
     return c
 
 
@@ -119,3 +119,25 @@ def test_step_override_falls_back_when_its_provider_is_down():
     c.json_from_images("p", [], {}, "page_classification")          # openai lỗi -> anthropic trả lời
     c.json_from_images("p", [], {}, "page_classification")          # openai đã hỏng trong đợt: không thử lại
     assert other.calls == 1 and primary.calls == 2 and c.active == 0
+
+
+def test_step_model_spec_uses_extra_model_only_for_that_step(monkeypatch):
+    primary, other, strong = Fake(), Fake(), Fake()
+    c = client_with(primary, other)
+    c.step_providers = {"repair_escalate": "anthropic:claude-opus-5-5"}
+    monkeypatch.setattr(llm, "_provider_config", lambda p, m: LLMConfig(p, "", "k", m))
+    c._backends[2] = strong
+    c.json_from_images("p", [], {}, "reread_cells", step="repair_escalate")
+    c.json_from_images("p", [], {}, "statement_BS")
+    assert strong.calls == 1 and primary.calls == 1 and other.calls == 0
+    assert c.steps["repair_escalate"].usd == pytest.approx(llm.cost_usd("claude-opus-5-5", 100, 10))
+
+
+def test_failed_step_model_falls_back_to_normal_order(monkeypatch):
+    primary, strong = Fake(), Fake(FakeStatusError(529))
+    c = client_with(primary, Fake())
+    c.step_providers = {"repair_escalate": "anthropic:claude-opus-5-5"}
+    monkeypatch.setattr(llm, "_provider_config", lambda p, m: LLMConfig(p, "", "k", m))
+    c._backends[2] = strong
+    c.json_from_images("p", [], {}, "x", step="repair_escalate")
+    assert primary.calls == 1 and c.active == 0

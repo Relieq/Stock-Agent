@@ -24,6 +24,7 @@ from services.extraction.pipeline import (
     ORIGINAL,
     _finalize,
     _gate_tally,
+    _label_on_page,
     _load_record,
     _rotation,
     open_record_pdf,
@@ -92,7 +93,8 @@ def verify_document(conn: psycopg.Connection, document_id: int, cells: set[Cell]
             ids = {f"o{n}": item for n, item in enumerate(items, 1)}
             rows = record["raw"][st]["rows"]
             # Mã số lấy theo khóa ô (đã qua bước sửa đảo cột), không theo bản chép gốc
-            asked = [(cid, None if key.startswith(("~", "b.")) else key, rows[i].get("label") or label, col)
+            asked = [(cid, None if key.startswith(("~", "b.")) else key,
+                      _label_on_page(record, st, i, rows[i].get("label") or label), col)
                      for cid, (key, i, col, label) in ids.items()]
             result = client.json_from_images(prompts.verify_prompt(st, asked), [(f"Trang {page}", image)],
                                              prompts.REREAD_SCHEMA, "reread_cells", step="verify_cells",

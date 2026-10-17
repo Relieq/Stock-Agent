@@ -179,6 +179,7 @@ def admin_costs(request: Request, tb: str | None = None):
     except RuntimeError as e:
         providers, order, tb = [], [], str(e)
     locate_provider = step_providers().get("page_classification", "")
+    escalate_model = step_providers().get("repair_escalate", "")
     rep = report()
     doc_cost = {d.document_id: d.tally.usd for d in rep.docs}
     with connect() as conn:
@@ -207,7 +208,9 @@ def admin_costs(request: Request, tb: str | None = None):
         "steps": sorted(rep.by_step_month.items(), key=lambda x: -x[1].usd),
         "steps_all": sorted(rep.by_step.items(), key=lambda x: -x[1].usd),
         "docs": rep.docs[:15], "names": names, "users": users, "tb": tb,
-        "providers": providers, "order": order, "switches": recent_switches(), "locate_provider": locate_provider})
+        "providers": providers, "order": order, "switches": recent_switches(), "locate_provider": locate_provider,
+        "escalate_model": escalate_model, "escalate_options": [o for o in ESCALATE_OPTIONS if o.split(":")[0] in
+                                                               [p for p, _ in providers]]})
 
 
 @router.post("/quan-tri/mo-hinh")
@@ -220,6 +223,22 @@ def admin_set_provider(request: Request, provider: str = Form(...)):
         return _back("/quan-tri/chi-phi", f"Nhà cung cấp {provider} chưa được cấu hình trong Code/.env")
     write_settings(llm_primary=provider, llm_primary_by=me.email)
     return _back("/quan-tri/chi-phi", f"Đã đặt {provider} làm nhà cung cấp chính; áp dụng cho các lần đọc BCTC từ giờ")
+
+
+# Mô hình cho người đọc bậc cao (bước repair_escalate): chỉ được hỏi khi mô hình chính đọc lại vẫn không xác nhận được
+# số mà ràng buộc kế toán đề xuất, nên chọn mô hình mạnh dù đắt hơn
+ESCALATE_OPTIONS = ("anthropic:claude-opus-5-5", "anthropic:claude-sonnet-5-5", "openai:gpt-5.4")
+
+
+@router.post("/quan-tri/mo-hinh-bac-cao")
+def admin_set_escalate_model(request: Request, model: str = Form("")):
+    me = require_admin(request)
+    from services.llm import configured, step_providers, write_settings
+    if model and (model not in ESCALATE_OPTIONS or model.split(":")[0] not in [p for p, _ in configured()]):
+        return _back("/quan-tri/chi-phi", f"Không dùng được {model}: nhà cung cấp chưa cấu hình trong Code/.env")
+    steps = step_providers() | {"repair_escalate": model}
+    write_settings(llm_step_providers=steps, llm_step_providers_by=me.email)
+    return _back("/quan-tri/chi-phi", "Người đọc bậc cao: " + (model if model else "tắt"))
 
 
 @router.post("/quan-tri/mo-hinh-dinh-vi")

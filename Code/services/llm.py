@@ -299,6 +299,7 @@ class VisionClient:
                                    "Code/.env (xem danh sách: python -m services.llm)")
         self._backends: dict[int, object] = {}
         self.active = 0
+        self.extras: set[int] = set()         # mô hình chỉ dùng cho một bước (step_providers dạng "nhà:mô hình")
         self.down: set[int] = set()           # nhà cung cấp đã hết tiền / lỗi trong đợt này: chỉ dùng khi không còn nhà nào khác
         self.step_providers = step_providers() if cfg is None else {}
         self.usage = Usage()
@@ -309,6 +310,15 @@ class VisionClient:
     def cfg(self) -> LLMConfig:
         """Cấu hình của nhà cung cấp đang dùng (đổi khi đã chuyển sang nhà dự phòng)."""
         return self._configs[self.active]
+
+    def _extra(self, spec: str) -> int:
+        provider, model = spec.split(":", 1)
+        for i, c in enumerate(self._configs):
+            if c.provider == provider and c.model == model:
+                return i
+        self._configs.append(_provider_config(provider, model))
+        self.extras.add(len(self._configs) - 1)
+        return len(self._configs) - 1
 
     def _get(self, i: int):
         if i not in self._backends:
@@ -326,8 +336,14 @@ class VisionClient:
         limit = output_limit(step or schema_name)
         name = step or schema_name
         wanted = next((p for prefix, p in self.step_providers.items() if name.startswith(prefix)), None)
-        first = next((i for i, c in enumerate(self._configs) if c.provider == wanted and i not in self.down), self.active)
-        order = [first] + [i for i in range(len(self._configs)) if i != first]
+        main = [i for i in range(len(self._configs)) if i not in self.extras]
+        if wanted and ":" in wanted:
+            # "nhà cung cấp:mô hình" (ví dụ repair_escalate=anthropic:claude-opus-5-5): mô hình riêng cho bước này,
+            # không dùng cho các bước khác; lỗi thì quay về thứ tự thường
+            first = self._extra(wanted)
+        else:
+            first = next((i for i in main if self._configs[i].provider == wanted and i not in self.down), self.active)
+        order = [first] + [i for i in main if i != first]
         order = [i for i in order if i not in self.down] + [i for i in order if i in self.down]
         last: Exception | None = None
         for n, i in enumerate(order):
@@ -348,7 +364,7 @@ class VisionClient:
                       file=sys.stderr, flush=True)
                 if sticky:
                     self.down.add(i)
-                    if i == self.active:
+                    if i == self.active and nxt not in self.extras:
                         self.active = nxt
                 continue
             usd = cost_usd(self._configs[i].model, ti, to) or 0.0

@@ -226,7 +226,7 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
     for (st, page), qs in by_page.items():
         image = render_sharp(doc, page, _rotation(record, page))
         ids = {f"o{n}": q for n, q in enumerate(qs, 1)}
-        asked = [(cid, None if q.code.startswith(("~", "b.")) else q.code, q.label, q.column_kind) for cid, q in ids.items()]
+        asked = _asked_cells(record, ids)
         result = client.json_from_images(prompts.verify_prompt(st, asked), [(f"Trang {page}", image)],
                                          prompts.REREAD_SCHEMA, "reread_cells", step="repair_cells", detail=ORIGINAL)
         for ans in result.get("cells", []):
@@ -237,9 +237,13 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
     mult = {name: st.multiplier for name, st in statements.items()}
     zoomed: dict[tuple[str, int, str], list[str | None]] = {}
 
+    escalated: dict[tuple[str, int, str], str | None] = {}
+
     def confirmed(q) -> bool:
         key = (q.statement, q.row, q.column_kind)
-        return (key in reread and agrees(q, reread[key], sep, mult[q.statement])) or             any(agrees(q, v, sep, mult[q.statement]) for v in zoomed.get(key, []))
+        return ((key in reread and agrees(q, reread[key], sep, mult[q.statement]))
+                or any(agrees(q, v, sep, mult[q.statement]) for v in zoomed.get(key, []))
+                or (key in escalated and agrees(q, escalated[key], sep, mult[q.statement])))
 
     # Đọc lại cả trang mà vẫn ra đúng số cũ ở mọi ô của nhóm: có thể mô hình lặp cùng một lỗi vì chữ số quá nhỏ (VHM quý
     # 4/2025: 34.276.497 đọc hai lần đều ra 34.276.197). Đọc thêm một lần trên các dải phóng to trước khi kết luận
@@ -254,7 +258,7 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
             zoom_pages.setdefault((q.statement, int(page)), []).append(q)
     for (st, page), qs in zoom_pages.items():
         ids = {f"o{n}": q for n, q in enumerate(qs, 1)}
-        asked = [(cid, None if q.code.startswith(("~", "b.")) else q.code, q.label, q.column_kind) for cid, q in ids.items()]
+        asked = _asked_cells(record, ids)
         for strip in render_strips(doc, page, _rotation(record, page)):
             result = client.json_from_images(
                 prompts.verify_prompt(st, asked) + "\nẢnh chỉ là một dải của trang: ô nào không có trong ảnh thì trả null.",
@@ -264,6 +268,30 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
                 q = ids.get((ans.get("code") or "").strip())
                 if q is not None and ans.get("value"):
                     zoomed.setdefault((q.statement, q.row, q.column_kind), []).append(ans["value"])
+
+    # Người đọc bậc cao (thang leo thang: mô hình mạnh hơn): nhóm vẫn chưa ô nào được ảnh xác nhận thì nhờ một mô hình
+    # mạnh hơn đọc lại cả trang, chỉ khi người quản trị đã chọn mô hình cho bước repair_escalate (trang Chi phí). Đo
+    # 17/10/2026: Claude Opus 5.5 đọc đúng ô FPT bị con dấu đè và ô VHM mà Haiku đọc lại vẫn nhầm.
+    if any(k.startswith("repair_escalate") for k in getattr(client, "step_providers", {})):
+        esc_pages: dict[tuple[str, int], list] = {}
+        for group in groups:
+            if any(confirmed(p) for p in group):
+                continue
+            for p in group:
+                for q in (p, p.partner):
+                    page = record["raw"][q.statement]["rows"][q.row].get("page") if q is not None else None
+                    if page:
+                        esc_pages.setdefault((q.statement, int(page)), []).append(q)
+        for (st, page), qs in esc_pages.items():
+            ids = {f"o{n}": q for n, q in enumerate(dict.fromkeys(qs), 1)}
+            result = client.json_from_images(prompts.verify_prompt(st, _asked_cells(record, ids)),
+                                             [(f"Trang {page}", render_sharp(doc, page, _rotation(record, page)))],
+                                             prompts.REREAD_SCHEMA, "reread_cells", step="repair_escalate",
+                                             detail=ORIGINAL)
+            for ans in result.get("cells", []):
+                q = ids.get((ans.get("code") or "").strip())
+                if q is not None:
+                    escalated[(q.statement, q.row, q.column_kind)] = ans.get("value")
 
     log = record.setdefault("repairs", [])
     changed = False
@@ -276,6 +304,7 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
                     continue
                 log.append(proposal_dict(q) | {"reread": reread.get((q.statement, q.row, q.column_kind)),
                                                "zoomed": zoomed.get((q.statement, q.row, q.column_kind)),
+                                               "escalated": escalated.get((q.statement, q.row, q.column_kind)),
                                                "accepted": accepted is not None and q in (accepted, accepted.partner),
                                                "group_size": len(group), "model": client.cfg.model})
         if accepted is not None:
@@ -285,9 +314,29 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
             changed = True
         elif all(_same_raw(reread.get((p.statement, p.row, p.column_kind)), p.before, sep)
                  and all(_same_raw(v, p.before, sep) for v in zoomed.get((p.statement, p.row, p.column_kind), []))
+                 and ((p.statement, p.row, p.column_kind) not in escalated
+                      or _same_raw(escalated[(p.statement, p.row, p.column_kind)], p.before, sep))
                  for p in group):
             record.setdefault("filing_mismatch", []).append(sorted({f for p in group for f in p.fixes}))
     return changed
+
+
+def _label_on_page(record: dict, statement: str, row: int, label: str | None = None) -> str:
+    """Tên dòng để hỏi khi đọc lại. Trang có nhiều dòng cùng tên (TCX: hai dòng "Lợi nhuận đã thực hiện") thì nói rõ
+    dòng thứ mấy có tên này trên trang, nếu không mô hình đọc đúng số nhưng của dòng kia."""
+    rows = record["raw"][statement]["rows"]
+    label = label if label is not None else rows[row].get("label") or ""
+    norm = lambda x: re.sub(r"\s+", " ", unicodedata.normalize("NFC", x or "")).strip().casefold()
+    page = rows[row].get("page")
+    same = [i for i, r in enumerate(rows) if r.get("page") == page and norm(r.get("label")) == norm(label)]
+    if len(same) < 2 or row not in same:
+        return label
+    return f"{label} (dòng thứ {same.index(row) + 1} trong {len(same)} dòng cùng tên này trên trang, tính từ trên xuống)"
+
+
+def _asked_cells(record: dict, ids: dict) -> list[tuple[str, str | None, str, str]]:
+    return [(cid, None if q.code.startswith(("~", "b.")) else q.code, _label_on_page(record, q.statement, q.row, q.label),
+             q.column_kind) for cid, q in ids.items()]
 
 
 def _try_load(conn, document_id: int) -> dict | None:

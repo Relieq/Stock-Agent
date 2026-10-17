@@ -299,3 +299,18 @@ def test_cash_flow_positional_codes_skip_direct_method_and_mixed_blocks():
                  (None, "Biến động khác", "5"), ("20", "Lưu chuyển tiền thuần từ hoạt động kinh doanh", "75")])
     _cf_positional_codes([mixed], ".")
     assert mixed.items[2].code is None
+
+
+def test_reread_label_names_which_of_duplicate_rows():
+    # TCX quý 1/2026: trang có hai dòng "Lợi nhuận đã thực hiện"; hỏi theo tên thì mô hình đọc số của dòng kia
+    from services.extraction.pipeline import _label_on_page
+    record = {"raw": {"IS": {"rows": [
+        {"label": "Lợi nhuận đã thực hiện", "page": 11},
+        {"label": "Chi phí", "page": 11},
+        {"label": "Lợi nhuận  đã thực hiện", "page": 11},
+        {"label": "Lợi nhuận đã thực hiện", "page": 12},
+    ]}}}
+    assert _label_on_page(record, "IS", 1) == "Chi phí"
+    assert "dòng thứ 2 trong 2" in _label_on_page(record, "IS", 2)
+    assert "dòng thứ 1 trong 2" in _label_on_page(record, "IS", 0)
+    assert _label_on_page(record, "IS", 3) == "Lợi nhuận đã thực hiện"

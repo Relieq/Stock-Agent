@@ -182,7 +182,7 @@ ràng buộc đòi hỏi. Chỉ số liệu đã qua kiểm chứng mới đư�
 báo và xếp hạng. Mỗi con số trên giao diện đều mở được đúng trang BCTC gốc.
 
 Đến ngày 14/10/2026, trên nhóm VN30, hệ thống đã đọc 120 BCTC (quý 4/2025, quý 1 và quý 2/2026, bán niên 2026). Trong
-đó 119 BCTC đạt kiểm chứng hoặc được duyệt tay, và 92,8\% trong khoảng 35.000 ô số được phép kiểm kế toán xác nhận (chưa phải đối chiếu từng ô với ảnh gốc). Chi phí gọi mô hình để đọc một BCTC trung bình
+đó 119 BCTC đạt kiểm chứng hoặc được duyệt tay, và 94,4\% trong khoảng 35.000 ô số được phép kiểm kế toán xác nhận (chưa phải đối chiếu từng ô với ảnh gốc). Chi phí gọi mô hình để đọc một BCTC trung bình
 khoảng 0,12 USD (trung vị 0,08 USD), chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
 trong chính BCTC. Các phần agent phân tích, chỉ số tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho
 người dùng thật được liệt kê ở Chương~\ref{chap:ketluan} dưới dạng đề mục, sẽ hoàn thiện ở các giai đoạn sau.
@@ -1290,41 +1290,107 @@ có cấu trúc trang khác thường.
 
 \section{Độ đúng theo từng ô}\label{sec:theoo}
 Tỷ lệ BCTC đạt kiểm chứng chưa cho biết bao nhiêu ô số được xác nhận, vì một ô chỉ được kiểm khi nó nằm trong ít nhất
-một phép kiểm. Bảng~\ref{tab:theoo} chia toàn bộ 35.075 ô số của 119 BCTC đã kiểm chứng hoặc đã duyệt theo cách ô đó được
+một phép kiểm. Bảng~\ref{tab:theoo} chia toàn bộ 35.080 ô số của 119 BCTC đã kiểm chứng hoặc đã duyệt theo cách ô đó được
 xác nhận. \enquote{Được xác nhận} nghĩa là số khớp ít nhất một phép kiểm (phép cộng trong chính BCTC, hoặc đối chiếu với
-BCTC kỳ khác), \emph{không} có nghĩa là đã được người đối chiếu với ảnh gốc: chỉ 80 ô sửa tay là đã đối chiếu ảnh. Một số
-đọc sai gần như luôn làm lệch phép cộng chứa nó, nên xác nhận bằng phép kiểm loại được hầu hết lỗi đọc nhầm chữ số; nó
-không loại được hai ô cùng sai bù trừ nhau, hay số đúng nhưng gán nhầm dòng (mục~\ref{sec:doichieu}).
+BCTC kỳ khác), \emph{không} có nghĩa là đã được người đối chiếu với ảnh gốc: chỉ 151 ô sửa tay là đã đối chiếu ảnh. Phép
+kiểm bắt được bao nhiêu phần trăm lỗi đọc thì đo riêng bằng cách cấy lỗi (mục~\ref{sec:caloi}); số ô thật sự sai còn lại
+thì ước lượng bằng một người đọc thứ hai độc lập (mục~\ref{sec:nguoidoc2}).
 
 \begin{table}[H]
 \centering\small
-\caption{Phân loại 35.075 ô số theo cách được xác nhận (VN30, quý 4/2025 đến bán niên 2026)}\label{tab:theoo}
+\caption{Phân loại 35.080 ô số theo cách được xác nhận (VN30, quý 4/2025 đến bán niên 2026)}\label{tab:theoo}
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 \textbf{Loại} & \textbf{Số ô} & \textbf{Tỷ lệ} \\ \midrule
-Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 30.968 & 88,3\% \\
-Thuộc báo cáo phải chép lại trang, sau đó có phép kiểm xác nhận & 1.445 & 4,1\% \\
+Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 31.473 & 89,7\% \\
+Thuộc báo cáo phải chép lại trang, sau đó có phép kiểm xác nhận & 1.443 & 4,1\% \\
 Đọc lại riêng ô (định vị ô sai, đối chiếu kỳ) rồi mới khớp & 57 & 0,2\% \\
-Người duyệt sửa sau khi đối chiếu ảnh gốc & 80 & 0,2\% \\
+Người duyệt sửa sau khi đối chiếu ảnh gốc & 151 & 0,4\% \\
 Phép kiểm vẫn lệch, người duyệt đã đối chiếu ảnh: chính BCTC in lệch & 33 & 0,1\% \\
-Chưa nằm trong phép kiểm nào & 2.492 & 7,1\% \\
+Chưa kiểm được: dòng không thuộc phép cộng nào của mẫu biểu & 815 & 2,3\% \\
+Chưa kiểm được: dòng có phép cộng nhưng hệ thống chưa khai báo & 1.108 & 3,2\% \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Như vậy 92,8\% số ô được phép kiểm xác nhận. 33 ô vẫn lệch phép kiểm sau khi người duyệt đối chiếu ảnh và thấy chính BCTC
+Như vậy 94,4\% số ô được phép kiểm xác nhận. Nhóm chưa kiểm được tách làm hai. Phần thứ nhất là các dòng mà mẫu biểu không
+đặt vào phép cộng nào: mục ngoài bảng của ngân hàng (cam kết, bảo lãnh, nợ khó đòi đã xử lý), lãi trên cổ phiếu và các
+dòng \enquote{trong đó}; chúng chỉ được xác nhận khi có BCTC kỳ khác để đối chiếu, và phép tính của chúng nằm trong thuyết
+minh (hướng mở rộng ở chương~\ref{chap:ketluan}). Phần thứ hai là các dòng có phép cộng mà hệ thống chưa khai báo, chủ yếu
+là dòng chi tiết của công ty chứng khoán. 33 ô vẫn lệch phép kiểm sau khi người duyệt đối chiếu ảnh và thấy chính BCTC
 in lệch (BSR, VHM, VPL, SSB quý 4/2025). Không còn ô nào bị phép kiểm chỉ ra nghi sai mà chưa xử lý: với các ô chỉ khác
 BCTC kỳ khác vài chữ số, hệ thống đọc lại ô ở cả hai BCTC; khi cả hai lần đọc lại đều ra đúng số cũ, chênh lệch được ghi
 nhận là số thật khác nhau. Các trường hợp đã đối chiếu ảnh đều là công ty điều chỉnh số khi soát xét (BID, SHB, VPL bán
 niên 2026 khác bản quý 2 ở nhiều dòng cùng lúc) hoặc trình bày khác (một bản tách khoản thu và khoản chi, bản kia gộp
-thành một dòng). Nhóm chưa kiểm được không có nghĩa là sai: đó là
-các ô không nằm trong phép kiểm nào, kể cả ô khác với BCTC kỳ khác mà không có phép cộng nào xác nhận. 1.041 ô trong nhóm
-này là dòng chi tiết của công ty chứng khoán chưa có công thức (12 công thức chi tiết suy từ dữ liệu đã được thêm, khớp
-100\% trên 3--7 BCTC mỗi công thức; cần xác nhận lại khi có thêm BCTC); phần còn lại chủ yếu là các dòng ngoài bảng của
-ngân hàng và các dòng đứng riêng như \enquote{trong đó: chi phí lãi vay} hay lãi cơ bản trên cổ phiếu. Ngoài ra
+thành một dòng).
+
+LCTT của công ty chứng khoán có thêm phần lưu chuyển tiền của khách hàng đánh mã lại từ 01. Trước đây các dòng của phần
+này trùng mã với phần của công ty nên bị cộng dồn vào đó; nay chúng được tách riêng và kiểm bằng công thức của phần mình.
+23 công thức chi tiết cho công ty chứng khoán (12 cho BCĐKT và LCTT phần công ty, 11 cho khúc kinh doanh và phần khách
+hàng) khớp 100\% trên 7 BCTC sau khi sửa 3 chỗ đọc sai mà chính các công thức mới chỉ ra; cần xác nhận lại khi có thêm
+BCTC. Ngoài ra
 công thức nối hai báo cáo \enquote{lợi nhuận trước thuế trên LCTT (mã 01) bằng trên KQKD (mã 50)} khớp 91/92 cột và được
 dùng làm bằng chứng thêm; cột lệch duy nhất là do chính BCTC của GAS quý 2/2026 in lệch khoảng 11 tỷ đồng (đã đối chiếu
 ảnh), nên công thức này chưa đưa vào nhóm bắt buộc.
+
+\section{Phép kiểm bắt được bao nhiêu lỗi}\label{sec:caloi}
+Để đo khả năng bắt lỗi của bộ phép kiểm, hệ thống cấy lỗi giả vào các ô đang được xác nhận của 114 BCTC đã kiểm chứng
+rồi chạy lại toàn bộ phép kiểm, không gọi mô hình. Lỗi nhầm chữ số được lấy theo đúng tần suất nhầm thật: từ các lỗi đã
+sửa, người đọc nhầm 6 thành 8, 1 thành 7, 6 thành 5, 8 thành 5 và 5 thành 3 nhiều hơn hẳn các cặp khác. Một nửa số lỗi
+thật dùng để học tần suất, nửa còn lại dùng để sinh lỗi cấy. Bảng~\ref{tab:caloi} cho kết quả theo từng kiểu lỗi.
+
+\begin{table}[H]
+\centering\small
+\caption{Tỷ lệ lỗi cấy bị phát hiện theo kiểu lỗi}\label{tab:caloi}
+\begin{tabularx}{\linewidth}{@{}Xrrrr@{}}
+\toprule
+\textbf{Kiểu lỗi} & \textbf{Số lỗi} & \textbf{Phép cộng bắt buộc} & \textbf{Thêm phép kiểm khác} & \textbf{Tổng} \\ \midrule
+Nhầm một chữ số & 2.000 & 83,5\% & 9,9\% & 93,4\% \\
+Mất dấu âm (số trong ngoặc thành số dương) & 500 & 90,8\% & 8,8\% & 99,6\% \\
+Thiếu một chữ số & 500 & 90,2\% & 9,6\% & 99,8\% \\
+Đổi chỗ hai dòng cùng thuộc một phép cộng & 500 & 41,2\% & 43,6\% & 84,8\% \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\enquote{Phép kiểm khác} gồm các công thức tham khảo và đối chiếu với BCTC kỳ khác. Hai giới hạn rút ra từ phép thử:
+\begin{itemize}
+  \item \textbf{Lỗi ở chữ số hàng đơn vị} gần như là toàn bộ phần lọt của kiểu nhầm chữ số: sai số cho phép là một đơn vị
+        cho mỗi số hạng (để chấp nhận việc làm tròn của chính BCTC), nên một lỗi nhỏ hơn mức đó không phân biệt được với
+        làm tròn. Ảnh hưởng tối đa là 9 đơn vị tính của bảng.
+  \item \textbf{Đổi chỗ hai dòng cùng thuộc một tổng} không làm đổi tổng, nên phép cộng chỉ bắt được khi hai dòng đó còn
+        nằm trong phép cộng khác; một nửa còn lại được đối chiếu kỳ khác bắt (số đầu năm, quý bằng lũy kế trừ lũy kế quý
+        trước). Lỗi này chỉ lọt khi không có BCTC kỳ khác của cùng công ty.
+\end{itemize}
+
+Với các lỗi nhầm chữ số bị phép cộng bắt, bước định vị lỗi chỉ ra đúng một ô và đúng số ở 30\% trường hợp; 69\% còn lại
+ô đúng nằm trong một nhóm trung bình 6 ô cùng làm khớp phép cộng, cần đọc lại để chọn; chỉ 1 trong 1.670 lần đề xuất nhầm
+ô. Khi xếp nhóm này theo tần suất nhầm thật thay vì theo số chữ số phải đổi, ô đúng đứng đầu 69\% so với 43\%; trên các
+lỗi thật đã sửa (mỗi BCTC dùng tần suất học từ các BCTC khác) tỷ lệ này là 22/32. Xác suất này được dùng để chọn khi lần
+đọc lại xác nhận nhiều hơn một ô trong nhóm, và để gợi ý ô cần xem trước cho người duyệt.
+
+\section{Người đọc thứ hai}\label{sec:nguoidoc2}
+Phép kiểm chỉ nói một ô có khớp hay không; để ước lượng số ô sai thật sự mà không phải đối chiếu từng ô với ảnh, toàn bộ
+119 BCTC được một mô hình khác hãng với lần đọc đầu chép lại từ đầu (Claude Haiku 5.5 cho các BCTC trước đây do
+gpt-5.4-mini đọc), rồi so từng ô với số đang lưu. Chi phí 1,39 USD. Ô hai bên khác nhau được phân xử bằng phép kiểm (thay
+số của người thứ hai vào; nếu làm lệch phép kiểm đang khớp thì người thứ hai đọc sai), phần còn lại đối chiếu ảnh gốc.
+
+\begin{itemize}
+  \item \textbf{Nhóm đã được phép kiểm xác nhận} (33.112 ô so được): hai lần đọc trùng ở 97,8\%. Phần lớn chỗ khác là
+        người thứ hai hiểu sai đơn vị tính của cả bảng ở hai BCTC ngân hàng (cùng dãy chữ số); các chỗ khác chữ số đều
+        do người thứ hai đọc sai, trừ 5 ô do lần đọc đầu sai (hai ô ở chữ số hàng đơn vị nằm dưới con dấu, đúng kiểu lỗi
+        mà phép thử cấy lỗi chỉ ra là lọt). Tỷ lệ sai của nhóm đã xác nhận vì vậy vào khoảng 5/33.000, tức 0,02\%.
+        Hai người đọc khác hãng cùng đọc sai thành đúng một số là rất hiếm, nên phần lỗi cả hai cùng bỏ sót không đáng kể.
+  \item \textbf{Nhóm chưa kiểm được}: mọi chỗ hai bên khác chữ số đều do lần đọc đầu sai. Đáng chú ý là các lỗi lệch cả
+        một khối dòng: phần ngoài bảng của SSB bán niên 2026 lệch một dòng (dòng tiêu đề không có số bị gán số của dòng
+        dưới), phần thay đổi công nợ trong LCTT của MBB quý 1/2026 lệch một dòng vì dòng tổng tạm bị bỏ sót, và đoạn
+        cuối khúc kinh doanh LCTT của SSI quý 2/2026 lệch một dòng. Các khối này nằm ngoài mọi phép cộng đã khai báo nên
+        BCTC vẫn đạt kiểm chứng.
+\end{itemize}
+
+Tổng cộng 71 số và 6 mã số ở 10 BCTC được sửa theo ảnh nhờ người đọc thứ hai. Sau khi sửa, ở nhóm chưa kiểm được không
+còn ô nào hai người đọc khác chữ số. Bước tiếp theo là đưa lần đọc thứ hai vào quy trình xử lý BCTC mới, cho các ô
+không có phép kiểm nào phủ.
 
 \section{Chi phí}
 \subsection{Cách tính}
@@ -1574,7 +1640,7 @@ nhầm dòng}. Vì vậy đối chiếu nguồn ngoài đã trở thành bước
 \section{Kết luận}
 Đến giữa tháng 10/2026, Soi đã có đủ chuỗi xử lý: thu thập BCTC, đọc bằng mô hình thị giác, kiểm chứng bằng ràng buộc kế
 toán, tự định vị và sửa ô đọc sai, tính thẻ KQKD có cờ cảnh báo, và giao diện web. Trên VN30, 119/120 BCTC (quý và bán niên) đạt
-kiểm chứng hoặc được duyệt tay, 92,8\% số ô được phép kiểm kế toán xác nhận, với chi phí đọc trung bình khoảng 0,12 USD
+kiểm chứng hoặc được duyệt tay, 94,4\% số ô được phép kiểm kế toán xác nhận, với chi phí đọc trung bình khoảng 0,12 USD
 mỗi BCTC (khoảng 3--3,5 USD cho
 cả nhóm VN30 mỗi mùa BCTC quý). Đối chiếu với nguồn ngoài cho thấy số liệu khớp ở 208/211 ô, và cả 3 ô
 lệch đều có lời giải thích từ chính BCTC.
@@ -1594,6 +1660,10 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Phép thử so với trợ lý AI đa năng}\chualam
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Tìm nguyên nhân biến động trong thuyết minh và công văn giải trình}\chualam
+\subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam
+\subsection{Đọc lần thứ hai bằng nhà cung cấp khác cho ô không có phép kiểm, trong quy trình xử lý BCTC mới}\chualam
+\subsection{Xác suất đúng cho từng ô và bước kiểm chứng tự chọn công cụ theo lợi ích trên chi phí}\chualam
+\subsection{Đo độ đúng trên BCTC xuất thẳng từ phần mềm (lớp chữ làm đáp án) theo chất lượng ảnh}\chualam
 \subsection{Sàng lọc doanh nghiệp tăng trưởng và kiểm định lịch sử (backtest)}\chualam
 \subsection{Radar sự kiện công bố thông tin và bản tin sáng theo danh mục}\chualam
 \subsection{Kênh phân phối: Facebook, Zalo, MCP}\chualam

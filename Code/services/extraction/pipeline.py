@@ -343,8 +343,16 @@ def _asked_column(record: dict, col: str) -> str:
     return col
 
 
+def printed_code(key: str) -> str | None:
+    """Mã in trên BCTC của một khóa ô: khóa theo tên dòng ("~...") và mã chuẩn ngân hàng ("b....") không in trên BCTC;
+    mã phần tiền khách hàng của CTCK ("kh.01") in là "01"."""
+    if key.startswith(("~", "b.")):
+        return None
+    return key[3:] if key.startswith("kh.") else key
+
+
 def _asked_cells(record: dict, ids: dict) -> list[tuple[str, str | None, str, str]]:
-    return [(cid, None if q.code.startswith(("~", "b.")) else q.code, _label_on_page(record, q.statement, q.row, q.label),
+    return [(cid, printed_code(q.code), _label_on_page(record, q.statement, q.row, q.label),
              _asked_column(record, q.column_kind)) for cid, q in ids.items()]
 
 

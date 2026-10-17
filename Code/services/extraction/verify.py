@@ -28,6 +28,7 @@ from services.extraction.pipeline import (
     _load_record,
     _reread_on_page,
     open_record_pdf,
+    printed_code,
     track_usage,
 )
 from services.llm import VisionClient
@@ -92,7 +93,7 @@ def verify_document(conn: psycopg.Connection, document_id: int, cells: set[Cell]
             rows = record["raw"][st]["rows"]
             # Mã số lấy theo khóa ô (đã qua bước sửa đảo cột), không theo bản chép gốc
             asked = lambda sub, st=st, rows=rows: prompts.verify_prompt(st, [
-                (cid, None if key.startswith(("~", "b.")) else key,
+                (cid, printed_code(key),
                  _label_on_page(record, st, i, rows[i].get("label") or label), _asked_column(record, col))
                 for cid, (key, i, col, label) in sub.items()])
             # Kết luận "công ty sửa số" dựa vào việc đọc lại ra như lần đầu, nên lần đọc lại phải khác hãng với lần đọc

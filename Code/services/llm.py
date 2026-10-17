@@ -103,6 +103,22 @@ def provider_order() -> list[tuple[str, str | None]]:
     return sorted(order, key=lambda pm: pm[0] != chosen) if any(p == chosen for p, _ in order) else order
 
 
+def step_providers() -> dict[str, str]:
+    """Bước nào luôn ưu tiên nhà cung cấp nào (tiền tố tên bước -> nhà cung cấp), bất kể nhà chính là ai. Ví dụ đo
+    17/10/2026 trên 31 BCTC quý 2/2026: OpenAI định vị trang đúng góc xoay 31/31, Claude Haiku 5.5 chỉ 27/31, trong khi
+    Haiku chép bảng đúng hơn; nên đặt page_classification=openai. Nguồn: trang Chi phí (settings.json), nếu chưa đặt thì
+    LLM_STEP_PROVIDERS trong Code/.env (dạng "page_classification=openai,identify_upload=openai")."""
+    chosen = read_settings().get("llm_step_providers")
+    if isinstance(chosen, dict):
+        return {k: v for k, v in chosen.items() if v}
+    out = {}
+    for part in (os.environ.get("LLM_STEP_PROVIDERS") or "").split(","):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            out[k.strip()] = v.strip().lower()
+    return out
+
+
 def config() -> LLMConfig:
     """Cấu hình của nhà cung cấp đang đứng đầu."""
     provider, model = provider_order()[0]
@@ -283,6 +299,8 @@ class VisionClient:
                                    "Code/.env (xem danh sách: python -m services.llm)")
         self._backends: dict[int, object] = {}
         self.active = 0
+        self.down: set[int] = set()           # nhà cung cấp đã hết tiền / lỗi trong đợt này: chỉ dùng khi không còn nhà nào khác
+        self.step_providers = step_providers() if cfg is None else {}
         self.usage = Usage()
         self.steps: dict[str, Usage] = {}     # theo bước, khóa là schema_name (page_classification, statement_BS...)
         self.switches: list[dict] = []        # các lần chuyển nhà cung cấp (thời điểm, từ, sang, lý do)
@@ -306,7 +324,11 @@ class VisionClient:
         bước (mặc định là schema_name). `detail="original"`: API OpenAI không thu nhỏ ảnh (mặc định của gpt-5.4-mini
         thu cạnh dài về 2048 điểm ảnh); Claude và các nhà khác không nhận tham số này."""
         limit = output_limit(step or schema_name)
-        order = [self.active] + [i for i in range(len(self._configs)) if i != self.active]
+        name = step or schema_name
+        wanted = next((p for prefix, p in self.step_providers.items() if name.startswith(prefix)), None)
+        first = next((i for i, c in enumerate(self._configs) if c.provider == wanted and i not in self.down), self.active)
+        order = [first] + [i for i in range(len(self._configs)) if i != first]
+        order = [i for i in order if i not in self.down] + [i for i in order if i in self.down]
         last: Exception | None = None
         for n, i in enumerate(order):
             started = time.monotonic()
@@ -325,7 +347,9 @@ class VisionClient:
                 print(f"[llm] {self.switches[-1]['from']} lỗi ({type(e).__name__}); chuyển sang {self.switches[-1]['to']}",
                       file=sys.stderr, flush=True)
                 if sticky:
-                    self.active = nxt
+                    self.down.add(i)
+                    if i == self.active:
+                        self.active = nxt
                 continue
             usd = cost_usd(self._configs[i].model, ti, to) or 0.0
             step_usage = self.steps.setdefault(step or schema_name, Usage())

@@ -173,11 +173,12 @@ def admin_costs(request: Request, tb: str | None = None):
     cấp mô hình đang dùng và các lần tự chuyển sang nhà dự phòng."""
     require_admin(request)
     from services.costs import recent_switches, report
-    from services.llm import configured, provider_order
+    from services.llm import configured, provider_order, step_providers
     try:
         providers, order = configured(), provider_order()
     except RuntimeError as e:
         providers, order, tb = [], [], str(e)
+    locate_provider = step_providers().get("page_classification", "")
     rep = report()
     doc_cost = {d.document_id: d.tally.usd for d in rep.docs}
     with connect() as conn:
@@ -206,7 +207,7 @@ def admin_costs(request: Request, tb: str | None = None):
         "steps": sorted(rep.by_step_month.items(), key=lambda x: -x[1].usd),
         "steps_all": sorted(rep.by_step.items(), key=lambda x: -x[1].usd),
         "docs": rep.docs[:15], "names": names, "users": users, "tb": tb,
-        "providers": providers, "order": order, "switches": recent_switches()})
+        "providers": providers, "order": order, "switches": recent_switches(), "locate_provider": locate_provider})
 
 
 @router.post("/quan-tri/mo-hinh")
@@ -219,6 +220,18 @@ def admin_set_provider(request: Request, provider: str = Form(...)):
         return _back("/quan-tri/chi-phi", f"Nhà cung cấp {provider} chưa được cấu hình trong Code/.env")
     write_settings(llm_primary=provider, llm_primary_by=me.email)
     return _back("/quan-tri/chi-phi", f"Đã đặt {provider} làm nhà cung cấp chính; áp dụng cho các lần đọc BCTC từ giờ")
+
+
+@router.post("/quan-tri/mo-hinh-dinh-vi")
+def admin_set_locate_provider(request: Request, provider: str = Form("")):
+    """Bước định vị trang (tìm trang báo cáo, góc xoay) luôn ưu tiên một nhà cung cấp; để trống thì theo nhà chính."""
+    me = require_admin(request)
+    from services.llm import configured, step_providers, write_settings
+    if provider and provider not in [p for p, _ in configured()]:
+        return _back("/quan-tri/chi-phi", f"Nhà cung cấp {provider} chưa được cấu hình trong Code/.env")
+    steps = step_providers() | {"page_classification": provider}
+    write_settings(llm_step_providers=steps, llm_step_providers_by=me.email)
+    return _back("/quan-tri/chi-phi", "Bước định vị trang: " + (f"luôn dùng {provider}" if provider else "theo nhà chính"))
 
 
 @router.post("/quan-tri/moi")

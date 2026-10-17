@@ -319,7 +319,23 @@ cùng đợt. Chấm: đưa bản chép qua đúng phần chuẩn hóa, gán mã
   chép đủ. GVR: OpenAI sai 7 ô, thiếu 4; Haiku sai 1, thiếu 2. TCX: cả hai cùng thiếu một dòng KQKD (4 ô); Haiku lệch
   thêm 3 ràng buộc vì dòng đó, OpenAI sai thêm 2 chữ số.
 - Haiku tốn nhiều token ra hơn (chế độ suy nghĩ luôn bật) nhưng vẫn rẻ hơn khoảng 5 lần; chậm hơn khoảng 1,7 lần.
-- Giới hạn: 5 BCTC, mỗi bên một lượt; chưa đo bước định vị trang (khoảng 1/5 chi phí).
+- Giới hạn: 5 BCTC, mỗi bên một lượt.
+
+**Trọn quy trình với Haiku và bước định vị trang (17/10/2026).** Chạy trọn quy trình bằng Haiku trên 5 BCTC trên (không
+ghi CSDL): GVR, TCX, VCB đạt kiểm chứng; FPT chờ duyệt vì Haiku gán nhầm loại trang (trang 6 thuộc BCĐKT thành KQKD,
+trang 7 là KQKD thành "thư"), OpenAI định vị đúng FPT từ đầu; VHM quý 4/2025 chờ duyệt (2 chỗ lệch do chính BCTC). Đo
+riêng bước định vị trang trên 31 BCTC quý 2/2026 (đáp án là trang và góc xoay đã kiểm chứng):
+
+| Cách | Đúng trang | Đủ trang (có thể thừa) | Đúng góc xoay | Chi phí |
+|---|---|---|---|---|
+| OpenAI gpt-5.4-mini, ảnh 900 | 28/31 | 29/31 | 31/31 | 0,60 USD |
+| Claude Haiku 5.5, ảnh 900 | 29/31 | 30/31 | 27/31 | 0,09 USD |
+| Claude Haiku 5.5, ảnh 1.400 | 25/31 | 26/31 | 26/31 | 0,19 USD |
+
+Haiku xoay sai trang ngang ở MWG, TCX, VIC, VPL (trả 270, 0 hoặc 180 thay vì 90): cả báo cáo sẽ bị chép trên ảnh xoay
+sai. Kết quả của Haiku ở bước này còn dao động (FPT lần này đúng). Ảnh to hơn không giúp. Kết luận: chọn nhà cung cấp
+theo bước, OpenAI định vị trang, Haiku chép và đọc lại; ước tính khoảng 0,035–0,04 USD mỗi BCTC (hiện khoảng 0,11).
+Đã làm: `LLM_STEP_PROVIDERS` / trang Chi phí ("Bước định vị trang: luôn dùng ...").
 
 **Bậc chép lại cả báo cáo (đo 14/10/2026 từ nhật ký 120 BCTC).** 46 báo cáo phải chép lại, giữ bản mới 16 (cả 16 nay đạt
 mọi ràng buộc bắt buộc, 4 nhờ xoay 180 độ); 30 lần không giúp gì nhưng vẫn tốn tiền (bậc này khoảng 0,033 USD mỗi BCTC).

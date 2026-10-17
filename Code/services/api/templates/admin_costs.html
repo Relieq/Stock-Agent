@@ -14,6 +14,11 @@
   <td>{% if not loop.first %}<form method="post" action="/quan-tri/mo-hinh" style="margin:0"><input type="hidden" name="provider" value="{{ p }}">
     <button type="submit">Đặt làm nhà chính</button></form>{% endif %}</td></tr>{% endfor %}
 </tbody></table>
+<form method="post" action="/quan-tri/mo-hinh-dinh-vi" class="small">Bước định vị trang (tìm trang báo cáo, góc xoay):
+  <select name="provider"><option value="" {{ "selected" if not locate_provider }}>theo nhà chính</option>
+  {% for p, m in order %}<option value="{{ p }}" {{ "selected" if locate_provider == p }}>luôn dùng {{ p }}</option>{% endfor %}</select>
+  <button type="submit">Lưu</button>
+  <span class="muted">(đo 17/10/2026 trên 31 BCTC: OpenAI đúng góc xoay 31/31, Claude Haiku 27/31)</span></form>
 <p class="muted small">Khi nhà chính hết tiền, bị giới hạn lượt, lỗi máy chủ hay mất kết nối, hệ thống tự chuyển sang nhà dự phòng
   cho các lần gọi sau trong đợt đọc đó. Nhà cung cấp và mô hình khai báo trong <code>Code/.env</code>
   (<code>LLM_PROVIDER</code>, <code>LLM_MODEL</code>, <code>LLM_FALLBACK_PROVIDER</code>, <code>LLM_FALLBACK_MODEL</code>).</p>

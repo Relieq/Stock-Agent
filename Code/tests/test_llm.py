@@ -31,7 +31,7 @@ def client_with(*backends) -> VisionClient:
     c = VisionClient.__new__(VisionClient)
     c._configs = [LLMConfig("anthropic", "", "k", "claude-haiku-5-5"), LLMConfig("openai", "", "k", "gpt-5.4-mini")][:len(backends)]
     c._backends = dict(enumerate(backends))
-    c.active, c.usage, c.steps, c.switches = 0, Usage(), {}, []
+    c.active, c.usage, c.steps, c.switches, c.down, c.step_providers = 0, Usage(), {}, [], set(), {}
     return c
 
 
@@ -101,3 +101,21 @@ def test_claude_images_fit_its_limits():
     Image.new("L", (2380, 3370), 255).save(buf, "PNG")
     w, h = Image.open(io.BytesIO(llm.fit_claude(buf.getvalue()))).size
     assert max(w, h) <= 2576 and -(-w // 28) * -(-h // 28) <= 4784
+
+
+def test_step_override_uses_named_provider_for_that_step_only():
+    primary, other = Fake(), Fake()
+    c = client_with(primary, other)                 # nhà chính: anthropic; nhà thứ hai: openai
+    c.step_providers = {"page_classification": "openai"}
+    c.json_from_images("p", [], {}, "page_classification")
+    c.json_from_images("p", [], {}, "statement_BS")
+    assert other.calls == 1 and primary.calls == 1 and c.active == 0
+
+
+def test_step_override_falls_back_when_its_provider_is_down():
+    primary, other = Fake(), Fake(FakeStatusError(429))
+    c = client_with(primary, other)
+    c.step_providers = {"page_classification": "openai"}
+    c.json_from_images("p", [], {}, "page_classification")          # openai lỗi -> anthropic trả lời
+    c.json_from_images("p", [], {}, "page_classification")          # openai đã hỏng trong đợt: không thử lại
+    assert other.calls == 1 and primary.calls == 2 and c.active == 0

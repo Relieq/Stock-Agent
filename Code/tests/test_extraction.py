@@ -395,3 +395,25 @@ def test_reread_tries_neighbor_page_when_cell_not_found(monkeypatch):
     assert out == {"o1": "(12.752.505)", "o2": "20.272.517"}
     assert reader.pages == [13, 12]
     assert [r["page"] for r in record["raw"]["CF"]["rows"]] == [12, 12, 13]
+
+
+def test_ctck_client_section_codes_are_not_summed_into_company_section():
+    # SSI quý 2/2026: phần tiền của khách hàng đánh mã lại từ 01; trước đây cộng dồn vào mã 01 (lợi nhuận trước thuế)
+    from services.extraction.pipeline import _ctck_client_codes
+    from services.extraction.validate import normalize, validate
+    cf = _cf([("01", "Lợi nhuận trước thuế TNDN", "100"),
+              ("60", "Lưu chuyển tiền thuần từ hoạt động kinh doanh", "100"),
+              (None, "Lưu chuyển tiền hoạt động môi giới, ủy\nthác của khách hàng", None),
+              ("01", "Tiền thu bán chứng khoán môi giới cho khách hàng", "500"),
+              ("02", "Tiền chi mua chứng khoán môi giới cho khách hàng", "(450)"),
+              ("07.1", "Tiền gửi ký quỹ của Nhà đầu tư tại VSD", "(10)"),
+              ("20", "Tăng tiền thuần trong kỳ", "40"),
+              ("30", "Tiền đầu kỳ của khách hàng", "60"),
+              ("40", "Tiền cuối kỳ của khách hàng", "100")])
+    assert _ctck_client_codes([cf]) == 6
+    statements, _ = normalize([cf])
+    values = statements["CF"].values
+    assert values["01"]["ytd_cur"] == 100 and values["kh.01"]["ytd_cur"] == 500
+    checks = {c.rule_id: c.passed for c in validate(statements, "CTCK")}
+    assert checks["CF_kh_20"] and checks["CF_kh_40"]
+    assert _ctck_client_codes([_cf([("01", "Lợi nhuận trước thuế", "1")])]) == 0

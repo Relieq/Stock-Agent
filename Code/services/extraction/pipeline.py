@@ -606,7 +606,35 @@ def _check(record: dict):
         statements, sep = normalize(extracted)
         checks = validate(statements, template)
         record["cf_positional"] = positional
+    if template == "CTCK" and _ctck_client_codes(extracted):
+        statements, sep = normalize(extracted)
+        checks = validate(statements, template)
     return extracted, statements, sep, template, checks
+
+
+_CTCK_CLIENT = re.compile(r"(moi gioi|uy thac).*khach hang")
+
+
+def _ctck_client_codes(extracted) -> int:
+    """LCTT của CTCK có phần "lưu chuyển tiền hoạt động môi giới, ủy thác của khách hàng" đánh mã lại từ 01. Trước đây
+    các dòng này trùng mã với phần của công ty nên bị cộng dồn vào đó (LCTT cộng các dòng chi tiết cùng mã): mã 01 của
+    SSI là lợi nhuận trước thuế cộng tiền bán chứng khoán môi giới. Gắn tiền tố "kh." cho mã các dòng sau dòng tiêu đề
+    của phần này để kiểm riêng (rules.CTCK). Trả về số dòng đã đổi mã."""
+    ex = next((e for e in extracted if e.statement == "CF"), None)
+    if ex is None:
+        return 0
+    folded = lambda it: re.sub(r"\s+", " ", unicodedata.normalize("NFD", it.label or "")).encode("ascii", "ignore").decode().lower()
+    start = next((i for i, it in enumerate(ex.items) if _CTCK_CLIENT.search(folded(it))
+                  and not any(v not in (None, "", "-") for v in it.values_raw.values())), None)
+    if start is None:
+        return 0
+    n = 0
+    for it in ex.items[start + 1:]:
+        code = normalize_code(it.code)
+        if code and not code.startswith("kh."):
+            it.code = f"kh.{code}"
+            n += 1
+    return n
 
 
 # Dòng tổng của LCTT gián tiếp theo tên dòng, dùng khi BCTC (hoặc bản chép) không có mã số (MSN quý 1/2026)

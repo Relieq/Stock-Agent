@@ -256,7 +256,7 @@ TCTD = RuleSet(
 
 # Công ty chứng khoán (CTCK): mẫu B01/B02/B03-CTCK theo TT334/2016/TT-BTC. Các dòng tổng đã khớp trên BCTC SSI và TCX
 # quý 2/2026 (riêng TCX lệch đúng ở 2 ô đọc sai, đã đối chiếu ảnh). LCTT của CTCK có thêm phần lưu chuyển tiền của
-# khách hàng đánh mã lại từ 01, nên chỉ lần xuất hiện đầu của mỗi mã (phần của công ty) được dùng.
+# khách hàng đánh mã lại từ 01; mã của phần này mang tiền tố "kh." (pipeline._ctck_client_codes).
 CTCK = RuleSet(
     template="CTCK",
     total_assets_code="270",
@@ -293,6 +293,21 @@ CTCK = RuleSet(
         *(rule("BS", c, *(f"{c}.{k}" for k in range(1, 10)), id=f"BS_{c}_parts")
           for c in ("111", "212", "417", "021", "029", "031")),
         *(rule("CF", c, *(f"{c}.{k}" for k in range(1, 10)), id=f"CF_{c}_parts") for c in ("73", "74")),
+        # Khúc kinh doanh của LCTT phần công ty (TT334, mẫu B03b-CTCK) và phần lưu chuyển tiền của khách hàng (mã đánh lại
+        # từ 01, gắn tiền tố "kh." ở pipeline._ctck_client_codes). Bắt buộc từ 18/10/2026: khớp 100% trên 7 BCTC CTCK
+        # sau khi sửa 3 ô đọc sai mà chính các công thức này chỉ ra (đã đối chiếu ảnh).
+        rule("CF", "02", *codes(3, 9, 2), id="CF_02_detail"),
+        rule("CF", "10", *codes(11, 17, 2), id="CF_10_detail"),
+        rule("CF", "18", *codes(19, 22, 2), id="CF_18_detail"),
+        rule("CF", "30", "01", "02", "10", "18", id="CF_30_detail"),
+        rule("CF", "60", "30", *codes(31, 52, 2), id="CF_60_detail"),
+        # Phần lưu chuyển tiền của khách hàng: mã đánh lại từ 01, gắn tiền tố "kh." (pipeline._ctck_client_codes)
+        rule("CF", "kh.20", *(f"kh.{c}" for c in codes(1, 19, 2)), "kh.07.1", id="CF_kh_20"),
+        rule("CF", "kh.40", "kh.20", "kh.30", id="CF_kh_40"),
+        rule("CF", "kh.30", "kh.31", id="CF_kh_30"),
+        rule("CF", "kh.31", *(f"kh.{c}" for c in codes(32, 39, 2)), id="CF_kh_31"),
+        rule("CF", "kh.40", "kh.41", id="CF_kh_40_41"),
+        rule("CF", "kh.41", *(f"kh.{c}" for c in codes(42, 49, 2)), id="CF_kh_41"),
     ),
 )
 

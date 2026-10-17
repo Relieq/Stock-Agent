@@ -155,9 +155,16 @@ def _same(st: str, a: Decimal, b: Decimal, tol: Decimal) -> bool:
 
 
 def digit_slip(a: Decimal, b: Decimal) -> bool:
-    """Hai số cùng số chữ số và khác nhau ở tối đa 2 vị trí: dấu hiệu đọc sai chữ số, không phải điều chỉnh số liệu."""
+    """Dấu hiệu đọc sai chữ số, không phải điều chỉnh số liệu: hai số cùng số chữ số và khác nhau ở tối đa 2 vị trí, hoặc
+    một số thừa đúng một chữ số so với số kia (STB quý 4/2025: "15,980,444" nằm dưới con dấu được đọc thành "5,980,444";
+    trước đây coi là hai số khác thật nên không đọc lại)."""
     x, y = str(abs(int(a))), str(abs(int(b)))
-    return len(x) == len(y) and sum(c != d for c, d in zip(x, y)) <= 2
+    if len(x) == len(y):
+        return sum(c != d for c, d in zip(x, y)) <= 2
+    if abs(len(x) - len(y)) == 1:
+        long, short = (x, y) if len(x) > len(y) else (y, x)
+        return any(long[:i] + long[i + 1:] == short for i in range(len(long)))
+    return False
 
 
 def _mark_consistency(checks: list[PeriodCheck], *docs: Cells) -> list[PeriodCheck]:

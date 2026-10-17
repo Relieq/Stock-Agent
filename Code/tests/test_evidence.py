@@ -68,3 +68,13 @@ def test_year_end_is_next_year_begin_balance():
     q1.values[("BS", "110")]["begin_year"] = D(64321)     # BCTC năm đã kiểm toán sửa số cuối quý 4: chênh lớn, không nghi đọc sai
     [check] = compare_year_start(q4, q1)
     assert not check.passed and not check.suspect_misread
+
+
+def test_digit_slip_includes_one_missing_digit():
+    # STB quý 4/2025: chữ số đầu dưới con dấu bị mất (15.980.444 đọc thành 5.980.444)
+    from decimal import Decimal
+    from services.extraction.evidence import digit_slip
+    assert digit_slip(Decimal("5980444000000"), Decimal("15980444000000"))
+    assert digit_slip(Decimal("1234567"), Decimal("1234867"))
+    assert not digit_slip(Decimal("5980444"), Decimal("15980445"))
+    assert not digit_slip(Decimal("100"), Decimal("250000"))

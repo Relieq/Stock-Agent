@@ -281,6 +281,46 @@ sai và 86 ô đối chứng (ô đúng, lấy ngẫu nhiên trên cùng trang),
   khoảng 80%. Mùa quý 3 đo lại tỷ lệ đúng ngay lần đầu và chi phí cho các file mờ.
 - Mỗi cách chỉ chạy một lần, kết quả từng trang dao động nhiều; kết luận V2 hơn V0 chắc chắn, chênh lệch V2–V3 thì không.
 
+**So OpenAI với Claude ở bước đọc lại ô (17/10/2026).** Có 100 USD tín dụng Claude API. Cùng 27 trang, 71 ô đã biết
+là đọc sai và 71 ô đối chứng của thí nghiệm ảnh nét (bỏ 3 trang lộn ngược); cùng ảnh V2, cùng câu lệnh và schema viết cho
+OpenAI (không chỉnh cho Claude), mức suy nghĩ thấp ở cả hai; Claude giới hạn cạnh dài 2576 điểm ảnh, 4784 ô 28×28 nên ảnh
+được thu nhỏ trước bằng Lanczos (khoảng 197 dpi so với 216–288 dpi của OpenAI); không bật chuyển mô hình khi bị từ chối.
+Tiêu chí chốt trước khi chạy: Claude chỉ "đạt" nếu đọc đúng ô sai không ít hơn OpenAI và không hỏng thêm quá 2 ô đúng.
+
+| Mô hình | Ô sai đọc ra đúng | Ô đối chứng vẫn đúng | Chi phí 27 trang |
+|---|---|---|---|
+| OpenAI gpt-5.4-mini (V2, chạy 14/10) | 57/71 (80%) | 67/71 (94%) | khoảng 0,21 USD |
+| Claude Haiku 5.5 (2 lượt, kết quả giống hệt) | 66/71 (93%) | 71/71 (100%) | 0,019 USD |
+| Claude Sonnet 5.5 | 66/71 (93%) | 71/71 (100%) | 0,36 USD |
+
+So từng ô (142 ô): Claude đúng mà OpenAI sai 18, ngược lại 5 (p = 0,011), như nhau ở Haiku và Sonnet. Câu lệnh không chứa
+số đáp án hay số sai cũ (đã kiểm). Chỗ Claude kém: 4 ô dòng "Lợi nhuận đã thực hiện" của TCX quý 1/2026 (trang có hai
+dòng trùng tên; Haiku lấy số dòng kia, Sonnet trả rỗng, OpenAI đúng). Phép thử chỉ đo bước đọc lại (khoảng 3% chi phí);
+bước chép đầu đo riêng bên dưới trước khi quyết định đổi mô hình.
+
+**So OpenAI với Claude Haiku 5.5 ở bước chép đầu (17/10/2026).** 5 BCTC đã kiểm chứng: FPT quý 2/2026 (scan rõ), GVR
+bán niên 2026 (72 dpi), TCX quý 2/2026 (công ty chứng khoán), VCB quý 2/2026 (ngân hàng), VHM quý 4/2025 (67 dpi, KQKD
+trang ngang). Mỗi bên chép trọn BCĐKT, KQKD, LCTT như lần chép đầu của quy trình (mọi trang của một báo cáo trong một
+lần gọi, cùng câu lệnh và schema, cùng ảnh của quy trình; Claude thu nhỏ trước theo giới hạn của nó), OpenAI chạy lại
+cùng đợt. Chấm: đưa bản chép qua đúng phần chuẩn hóa, gán mã, kiểm tra của Soi rồi so từng ô với số đã kiểm chứng.
+
+| BCTC | OpenAI: ô đúng | Claude Haiku 5.5: ô đúng | OpenAI: ràng buộc đạt / lệch | Haiku: đạt / lệch |
+|---|---|---|---|---|
+| FPT quý 2/2026 | 319/319 | 319/319 | 85 / 0 | 85 / 0 |
+| GVR bán niên 2026 | 280/291 | 288/291 | 64 / 9 | 75 / 2 |
+| TCX quý 2/2026 | 436/442 | 438/442 | 45 / 1 | 42 / 4 |
+| VCB quý 2/2026 | 269/269 | 269/269 | 72 / 0 | 72 / 0 |
+| VHM quý 4/2025 | 202/298 | 295/298 | 52 / 14 | 90 / 4 |
+| **Tổng** | **1.506/1.619 (93,0%)** | **1.609/1.619 (99,4%)** | 318 / 24 | 364 / 10 |
+| Chi phí 5 BCTC | 0,363 USD | 0,067 USD | | |
+| Thời gian mỗi BCTC | khoảng 35 giây | khoảng 60 giây | | |
+
+- VHM: OpenAI bỏ trống cả cột mã số của KQKD (chép số thứ tự nhưng không chép mã), nên 78 ô không gán được dòng; Haiku
+  chép đủ. GVR: OpenAI sai 7 ô, thiếu 4; Haiku sai 1, thiếu 2. TCX: cả hai cùng thiếu một dòng KQKD (4 ô); Haiku lệch
+  thêm 3 ràng buộc vì dòng đó, OpenAI sai thêm 2 chữ số.
+- Haiku tốn nhiều token ra hơn (chế độ suy nghĩ luôn bật) nhưng vẫn rẻ hơn khoảng 5 lần; chậm hơn khoảng 1,7 lần.
+- Giới hạn: 5 BCTC, mỗi bên một lượt; chưa đo bước định vị trang (khoảng 1/5 chi phí).
+
 **Bậc chép lại cả báo cáo (đo 14/10/2026 từ nhật ký 120 BCTC).** 46 báo cáo phải chép lại, giữ bản mới 16 (cả 16 nay đạt
 mọi ràng buộc bắt buộc, 4 nhờ xoay 180 độ); 30 lần không giúp gì nhưng vẫn tốn tiền (bậc này khoảng 0,033 USD mỗi BCTC).
 Việc cho mùa quý 3: ghi lại đặc điểm của các lần không được giữ (số ràng buộc lệch, lệch ở một cột hay mọi cột, bước định vị

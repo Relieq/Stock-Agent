@@ -352,6 +352,16 @@ VHM quý 4/2025 chờ duyệt (6 ô cột quý 4/2024 bị vệt mờ che, chín
 Ô đúng 1.611/1.619 (99,5%); chi phí khoảng 0,066 USD mỗi BCTC (OpenAI một mình khoảng 0,11). So với bản đang lưu (OpenAI):
 GVR tự kiểm chứng thay vì phải sửa tay 33 ô; không BCTC nào kém hơn. Quyết định: dùng cách kết hợp này cho mùa quý 3.
 
+**Nếu khoản Claude hết hạn (đo 18/10/2026).** Người đọc bậc cao chỉ dùng OpenAI, trên cùng 6 trang khó: gpt-5.4 đọc đúng
+21/31 ô sai và làm hỏng 3/49 ô đúng (0,19 USD), gpt-5.4-mini 21/31 và 49/49 (0,06 USD); Opus 5.5 là 27/31 và 49/49. gpt-5.4
+không hơn bản mini nên không dùng làm người đọc bậc cao. Khi Claude báo hết tiền, VisionClient tự chuyển mọi bước (kể cả
+bước người đọc bậc cao) sang gpt-5.4-mini; không cần đổi cấu hình trước.
+
+**Công thức mới (17/10/2026, đo trên mọi BCTC đã đọc, không gọi mô hình).** Lợi nhuận trước thuế LCTT 01 = KQKD 50 khớp
+91/92 cột (GAS quý 2/2026 tự in lệch khoảng 11 tỷ, đã đối chiếu ảnh) nên dùng làm công thức tham khảo; chi phí đi vay LCTT
+06 = chi phí lãi vay KQKD lệch 16/80 cột (lãi vay vốn hóa, gộp khoản khác) nên không dùng. 12 công thức chi tiết cho công
+ty chứng khoán suy từ dữ liệu, khớp 100%, đưa vào nhóm bắt buộc. Ô chưa kiểm được giảm từ 7,0% xuống 6,6%.
+
 **Bậc chép lại cả báo cáo (đo 14/10/2026 từ nhật ký 120 BCTC).** 46 báo cáo phải chép lại, giữ bản mới 16 (cả 16 nay đạt
 mọi ràng buộc bắt buộc, 4 nhờ xoay 180 độ); 30 lần không giúp gì nhưng vẫn tốn tiền (bậc này khoảng 0,033 USD mỗi BCTC).
 Việc cho mùa quý 3: ghi lại đặc điểm của các lần không được giữ (số ràng buộc lệch, lệch ở một cột hay mọi cột, bước định vị

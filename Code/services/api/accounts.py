@@ -168,10 +168,16 @@ def admin_users(request: Request, tb: str | None = None):
 
 
 @router.get("/quan-tri/chi-phi")
-def admin_costs(request: Request):
-    """Chi phí gọi mô hình: tháng này so với trần, theo ngày, theo bước, theo tài liệu, theo người yêu cầu."""
+def admin_costs(request: Request, tb: str | None = None):
+    """Chi phí gọi mô hình: tháng này so với trần, theo ngày, theo bước, theo tài liệu, theo người yêu cầu; nhà cung
+    cấp mô hình đang dùng và các lần tự chuyển sang nhà dự phòng."""
     require_admin(request)
-    from services.costs import report
+    from services.costs import recent_switches, report
+    from services.llm import configured, provider_order
+    try:
+        providers, order = configured(), provider_order()
+    except RuntimeError as e:
+        providers, order, tb = [], [], str(e)
     rep = report()
     doc_cost = {d.document_id: d.tally.usd for d in rep.docs}
     with connect() as conn:
@@ -199,7 +205,20 @@ def admin_costs(request: Request):
         "days": days, "months": sorted(rep.by_month.items(), reverse=True)[:6],
         "steps": sorted(rep.by_step_month.items(), key=lambda x: -x[1].usd),
         "steps_all": sorted(rep.by_step.items(), key=lambda x: -x[1].usd),
-        "docs": rep.docs[:15], "names": names, "users": users})
+        "docs": rep.docs[:15], "names": names, "users": users, "tb": tb,
+        "providers": providers, "order": order, "switches": recent_switches()})
+
+
+@router.post("/quan-tri/mo-hinh")
+def admin_set_provider(request: Request, provider: str = Form(...)):
+    """Đổi nhà cung cấp chính (chỉ chọn trong các nhà đã cấu hình ở Code/.env). Nhà còn lại thành dự phòng: khi nhà
+    chính hết tiền hay gặp lỗi, hệ thống tự chuyển sang nhà dự phòng."""
+    me = require_admin(request)
+    from services.llm import configured, write_settings
+    if provider not in [p for p, _ in configured()]:
+        return _back("/quan-tri/chi-phi", f"Nhà cung cấp {provider} chưa được cấu hình trong Code/.env")
+    write_settings(llm_primary=provider, llm_primary_by=me.email)
+    return _back("/quan-tri/chi-phi", f"Đã đặt {provider} làm nhà cung cấp chính; áp dụng cho các lần đọc BCTC từ giờ")
 
 
 @router.post("/quan-tri/moi")

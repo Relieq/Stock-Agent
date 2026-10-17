@@ -25,11 +25,13 @@ class Tally:
     output_tokens: int = 0
     usd: float = 0.0
 
-    def add(self, model: str | None, calls: int, ti: int, to: int) -> None:
+    def add(self, model: str | None, calls: int, ti: int, to: int, usd: float | None = None) -> None:
+        """`usd`: chi phí đã tính theo từng lần gọi (bản ghi từ 17/10/2026, khi có thể đã chuyển nhà cung cấp giữa
+        chừng); bản ghi cũ không có thì ước tính theo mô hình của bản ghi."""
         self.calls += calls
         self.input_tokens += ti
         self.output_tokens += to
-        self.usd += cost_usd(model, ti, to) or 0.0
+        self.usd += usd if usd is not None else (cost_usd(model, ti, to) or 0.0)
 
 
 @dataclass
@@ -76,12 +78,14 @@ def report(now: datetime | None = None) -> Report:
         except ValueError:
             day = "?"
         doc = Tally()
-        doc.add(model, u.get("calls", 0), u.get("input_tokens", 0), u.get("output_tokens", 0))
+        doc.add(model, u.get("calls", 0), u.get("input_tokens", 0), u.get("output_tokens", 0), u.get("usd"))
         for t in (rep.total, rep.by_month.setdefault(day[:7], Tally()), rep.by_day.setdefault(day, Tally())):
-            t.add(model, u.get("calls", 0), u.get("input_tokens", 0), u.get("output_tokens", 0))
+            t.add(model, u.get("calls", 0), u.get("input_tokens", 0), u.get("output_tokens", 0), u.get("usd"))
         steps = dict(r.get("usage_by_step") or {})
         rest = {k: u.get(k, 0) - sum(s.get(k, 0) for s in steps.values())
                 for k in ("calls", "input_tokens", "output_tokens")}
+        if "usd" in u:
+            rest["usd"] = u["usd"] - sum(s.get("usd", 0) for s in steps.values())
         if rest["calls"] > 0:
             steps[UNSPLIT] = rest
         for step, su in steps.items():
@@ -89,10 +93,19 @@ def report(now: datetime | None = None) -> Report:
             if day.startswith(rep.month):
                 targets.append(rep.by_step_month.setdefault(step, Tally()))
             for t in targets:
-                t.add(model, su.get("calls", 0), su.get("input_tokens", 0), su.get("output_tokens", 0))
+                t.add(model, su.get("calls", 0), su.get("input_tokens", 0), su.get("output_tokens", 0), su.get("usd"))
         rep.docs.append(DocCost(r.get("document_id"), r.get("ticker", ""), day, doc))
     rep.docs.sort(key=lambda d: -d.tally.usd)
     return rep
+
+
+def recent_switches(limit: int = 10) -> list[dict]:
+    """Các lần tự chuyển nhà cung cấp mô hình gần nhất (ghi trong bản ghi đọc BCTC), mới nhất trước."""
+    out = []
+    for r in _records():
+        for s in r.get("llm_switches") or []:
+            out.append(s | {"document_id": r.get("document_id"), "ticker": r.get("ticker", "")})
+    return sorted(out, key=lambda s: s.get("at", ""), reverse=True)[:limit]
 
 
 MONTH_START = "date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh'"

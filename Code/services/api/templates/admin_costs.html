@@ -5,6 +5,26 @@
   <td class="num">{{ "{:,}".format(t.input_tokens) }}</td><td class="num">{{ "{:,}".format(t.output_tokens) }}</td>
   <td class="num">{{ "%.2f" | format(t.usd) }}</td></tr>{% endmacro %}
 <h1>Chi phí gọi mô hình</h1>
+{% if tb %}<p class="infobox">{{ tb }}</p>{% endif %}
+
+<h2>Nhà cung cấp mô hình</h2>
+{% if order %}
+<table class="list"><thead><tr><th>Thứ tự</th><th>Nhà cung cấp</th><th>Mô hình</th><th></th></tr></thead><tbody>
+{% for p, m in order %}<tr><td>{{ "Chính" if loop.first else "Dự phòng" }}</td><td>{{ p }}</td><td><code>{{ m }}</code></td>
+  <td>{% if not loop.first %}<form method="post" action="/quan-tri/mo-hinh" style="margin:0"><input type="hidden" name="provider" value="{{ p }}">
+    <button type="submit">Đặt làm nhà chính</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+<p class="muted small">Khi nhà chính hết tiền, bị giới hạn lượt, lỗi máy chủ hay mất kết nối, hệ thống tự chuyển sang nhà dự phòng
+  cho các lần gọi sau trong đợt đọc đó. Nhà cung cấp và mô hình khai báo trong <code>Code/.env</code>
+  (<code>LLM_PROVIDER</code>, <code>LLM_MODEL</code>, <code>LLM_FALLBACK_PROVIDER</code>, <code>LLM_FALLBACK_MODEL</code>).</p>
+{% if switches %}
+<table class="list"><thead><tr><th>Lúc</th><th>BCTC</th><th>Bước</th><th>Chuyển</th><th>Lý do</th></tr></thead><tbody>
+{% for s in switches %}<tr><td class="small">{{ s.at }}</td><td>{{ s.ticker }} (<a href="/tai-lieu/{{ s.document_id }}">{{ s.document_id }}</a>)</td>
+  <td class="small">{{ s.step }}</td><td class="small">{{ s.from }} → {{ s.to }}{% if not s.sticky %} (chỉ lần gọi đó){% endif %}</td>
+  <td class="small muted">{{ s.reason[:120] }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p class="muted small">Chưa lần nào phải chuyển nhà cung cấp.</p>{% endif %}
+{% endif %}
 <p class="muted small">Tính từ số token đã ghi trong từng bản ghi đọc BCTC, theo bảng giá trong <code>services/llm.py</code>.
   Mỗi BCTC tính vào ngày bắt đầu đọc, kể cả các lần đọc lại về sau. Đơn vị: USD.</p>
 

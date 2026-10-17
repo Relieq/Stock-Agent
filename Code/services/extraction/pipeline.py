@@ -125,6 +125,7 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
 
     usage_before = asdict(client.usage)   # client dùng chung cho nhiều tài liệu: chỉ tính phần của tài liệu này
     steps_before = client.steps_snapshot()
+    switches_before = len(client.switches)
     record: dict = {
         "document_id": document_id, "ticker": ticker, "title": title, "file_id": file_id, "sha256": sha256,
         "pipeline_ver": PIPELINE_VER, "model": client.cfg.model, "provider": client.cfg.provider,
@@ -162,6 +163,8 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
     _escalate(record, client, doc, conn)
     record["usage"] = {k: v - usage_before[k] for k, v in asdict(client.usage).items()}
     record["usage_by_step"] = usage_delta(client.steps_snapshot(), steps_before)
+    if client.switches[switches_before:]:
+        record["llm_switches"] = client.switches[switches_before:]
     return _finalize(conn, record)
 
 
@@ -824,8 +827,10 @@ def open_record_pdf(conn: psycopg.Connection, record: dict):
 @contextmanager
 def track_usage(record: dict, client: VisionClient):
     """Cộng thêm chi phí các lần gọi mô hình trong khối lệnh vào usage và usage_by_step của bản ghi."""
-    usage_before, steps_before = asdict(client.usage), client.steps_snapshot()
+    usage_before, steps_before, switches_before = asdict(client.usage), client.steps_snapshot(), len(client.switches)
     yield
+    if client.switches[switches_before:]:
+        record.setdefault("llm_switches", []).extend(client.switches[switches_before:])
     usage = record.get("usage") or {}
     for k, v in asdict(client.usage).items():
         usage[k] = usage.get(k, 0) + v - usage_before[k]

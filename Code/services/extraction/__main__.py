@@ -58,7 +58,10 @@ def cmd_run(args) -> None:
             print(f"    trang: {pages}; mẫu: {rec['template_ver']}; ràng buộc bắt buộc: "
                   f"{s['gate_checks'] - s['gate_failed']}/{s['gate_checks']} đạt; -> {rec['status']}")
     u = client.usage
-    print(f"Tổng: {u.calls} lần gọi, {u.input_tokens:,} token vào, {u.output_tokens:,} token ra, {u.seconds:.0f} giây")
+    print(f"Tổng: {u.calls} lần gọi, {u.input_tokens:,} token vào, {u.output_tokens:,} token ra, {u.seconds:.0f} giây, "
+          f"khoảng {u.usd:.3f} USD")
+    for s in client.switches:
+        print(f"    chuyển nhà cung cấp lúc {s['at']} ({s['step']}): {s['from']} -> {s['to']}; {s['reason'][:120]}")
 
 
 def cmd_recheck(args) -> None:
@@ -176,7 +179,7 @@ def cmd_verify(args) -> None:
                 print(f"    {mark} {e['statement']} {e['label'][:40]} [{e['key']}] {e['column_kind']}: "
                       f"{e['before']} -> {e['after']}")
     u = client.usage
-    cost = cost_usd(client.cfg.model, u.input_tokens, u.output_tokens)
+    cost = u.usd or cost_usd(client.cfg.model, u.input_tokens, u.output_tokens)
     print(f"Tổng: {u.calls} lần gọi, {u.input_tokens:,} token vào, {u.output_tokens:,} token ra"
           + (f", khoảng {cost:.2f} USD" if cost is not None else ""))
 

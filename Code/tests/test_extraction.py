@@ -366,3 +366,32 @@ def test_no_escalation_step_when_not_configured(monkeypatch):
     assert pipeline._repair_by_constraints(rec, reader, doc=None) is False
     assert "repair_escalate" not in reader.calls
     assert rec["raw"]["BS"]["rows"][1]["values"]["end_period"] == "50"
+
+
+def test_reread_tries_neighbor_page_when_cell_not_found(monkeypatch):
+    # VPL bán niên 2026: mục II LCTT ghi trang 13, thật ra ở trang 12; đọc lại trên trang 13 luôn ra rỗng
+    import types
+
+    from services.extraction import pipeline
+    monkeypatch.setattr(pipeline, "render_sharp", lambda doc, page, rot: page)
+    monkeypatch.setattr(pipeline, "_rotation", lambda record, page: 0)
+    record = {"raw": {"CF": {"rows": [{"label": "Khấu hao", "page": 12}, {"label": "Tiền chi cho vay", "page": 13},
+                                      {"label": "Tiền thu từ đi vay", "page": 13}]}}}
+
+    class Reader:
+        cfg = types.SimpleNamespace(model="fake")
+        pages = []
+
+        def json_from_images(self, prompt, images, schema, schema_name, step=None, detail=None):
+            page = images[0][1]
+            self.pages.append(page)
+            printed = {12: {"o1": "(12.752.505)"}, 13: {"o2": "20.272.517"}}[page]
+            return {"cells": [{"code": cid, "value": printed.get(cid)} for cid in ("o1", "o2") if cid in prompt]}
+
+    reader = Reader()
+    ids = {"o1": 1, "o2": 2}
+    out = pipeline._reread_on_page(reader, None, record, "CF", 13, ids, lambda sub: " ".join(sub), "verify_cells",
+                                   lambda i: i)
+    assert out == {"o1": "(12.752.505)", "o2": "20.272.517"}
+    assert reader.pages == [13, 12]
+    assert [r["page"] for r in record["raw"]["CF"]["rows"]] == [12, 12, 13]

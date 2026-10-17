@@ -10,6 +10,7 @@ phải đã được người đối chiếu với ảnh gốc; chỉ nhóm "s�
   4 sửa tay sau khi đối chiếu ảnh gốc
   5 cần xem lại: phép cộng hoặc BCTC kỳ khác chỉ ra nghi sai, chưa xử lý
   6 chưa kiểm được: không nằm trong phép kiểm nào (kể cả ô khác BCTC kỳ khác mà không có phép cộng nào xác nhận)
+  7 lệch do chính BCTC: phép kiểm vẫn lệch nhưng người đã đối chiếu ảnh và duyệt BCTC (in sai trong bản công bố)
 """
 
 from __future__ import annotations
@@ -26,7 +27,8 @@ from services.extraction.pipeline import _check_cached, _load_record
 
 NAMES = {1: "đúng ngay lần đọc đầu, có ràng buộc xác nhận", 2: "đọc lại riêng ô rồi mới khớp",
          3: "thuộc báo cáo phải chép lại trang", 4: "sửa tay sau khi đối chiếu ảnh",
-         5: "cần xem lại (nghi sai, chưa xử lý)", 6: "chưa kiểm được"}
+         5: "cần xem lại (nghi sai, chưa xử lý)", 6: "chưa kiểm được",
+         7: "lệch do chính BCTC (đã đối chiếu ảnh, duyệt tay)"}
 
 
 def _digits(s: str | None) -> str:
@@ -40,6 +42,7 @@ def classify(conn, document_id: int) -> list[tuple[int, str, int, str, str, str]
     if ev is None:
         return []
     _, _, _, template, _ = _check_cached(rec)
+    approved = conn.execute("SELECT status FROM documents WHERE id = %s", (document_id,)).fetchone()[0] == "approved"
     manual = {(m["statement"], m["row"], m["column_kind"]) for m in rec.get("manual_fixes", [])}
     reread_cells = {(x["statement"], x["row"], x["column_kind"])
                     for k in ("cell_verifications", "repairs") for x in rec.get(k, [])
@@ -67,7 +70,7 @@ def classify(conn, document_id: int) -> list[tuple[int, str, int, str, str, str]
                 elif st in reextracted:
                     cat = 3
                 elif status == "conflict":
-                    cat = 5
+                    cat = 7 if approved else 5
                 elif status == "none" or (status in ("differs", "restated") and not s.get("sum")):
                     cat = 6
                 else:

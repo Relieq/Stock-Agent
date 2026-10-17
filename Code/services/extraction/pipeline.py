@@ -111,7 +111,7 @@ def _json_default(o):
 def extract_document(conn: psycopg.Connection, document_id: int, client: VisionClient) -> dict:
     row = conn.execute(
         """
-        SELECT d.ticker, d.title_raw, c.template, f.id, f.sha256, f.storage_key
+        SELECT d.ticker, d.title_raw, c.template, f.id, f.sha256, f.storage_key, d.doc_type
         FROM documents d JOIN companies c ON c.ticker = d.ticker
         JOIN document_files f ON f.document_id = d.id
         WHERE d.id = %s ORDER BY f.downloaded_at DESC LIMIT 1
@@ -120,14 +120,15 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
     ).fetchone()
     if row is None:
         raise RuntimeError(f"Tài liệu {document_id} chưa có file đã tải")
-    ticker, title, company_template, file_id, sha256, storage_key = row
+    ticker, title, company_template, file_id, sha256, storage_key, doc_type = row
     path = raw_data_dir() / storage_key
 
     usage_before = asdict(client.usage)   # client dùng chung cho nhiều tài liệu: chỉ tính phần của tài liệu này
     steps_before = client.steps_snapshot()
     switches_before = len(client.switches)
     record: dict = {
-        "document_id": document_id, "ticker": ticker, "title": title, "file_id": file_id, "sha256": sha256,
+        "document_id": document_id, "ticker": ticker, "title": title, "doc_type": doc_type, "file_id": file_id,
+        "sha256": sha256,
         "pipeline_ver": PIPELINE_VER, "model": client.cfg.model, "provider": client.cfg.provider,
         "started_at": datetime.now(timezone.utc).isoformat(), "candidates": [],
     }
@@ -224,15 +225,13 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
             by_page.setdefault((st, int(page)), []).append(q)
     reread: dict[tuple[str, int, str], str | None] = {}
     for (st, page), qs in by_page.items():
-        image = render_sharp(doc, page, _rotation(record, page))
         ids = {f"o{n}": q for n, q in enumerate(qs, 1)}
-        asked = _asked_cells(record, ids)
-        result = client.json_from_images(prompts.verify_prompt(st, asked), [(f"Trang {page}", image)],
-                                         prompts.REREAD_SCHEMA, "reread_cells", step="repair_cells", detail=ORIGINAL)
-        for ans in result.get("cells", []):
-            q = ids.get((ans.get("code") or "").strip())
-            if q is not None:
-                reread[(q.statement, q.row, q.column_kind)] = ans.get("value")
+        answers = _reread_on_page(client, doc, record, st, page, ids,
+                                  lambda sub, st=st: prompts.verify_prompt(st, _asked_cells(record, sub)),
+                                  "repair_cells", lambda q: q.row)
+        for cid, value in answers.items():
+            q = ids[cid]
+            reread[(q.statement, q.row, q.column_kind)] = value
 
     mult = {name: st.multiplier for name, st in statements.items()}
     zoomed: dict[tuple[str, int, str], list[str | None]] = {}
@@ -335,9 +334,43 @@ def _label_on_page(record: dict, statement: str, row: int, label: str | None = N
     return f"{label} (dòng thứ {same.index(row) + 1} trong {len(same)} dòng cùng tên này trên trang, tính từ trên xuống)"
 
 
+def _asked_column(record: dict, col: str) -> str:
+    """Tên cột để hỏi khi đọc lại. BCTC bán niên/năm chỉ in một cặp cột cả kỳ, mô tả cột trong lời nhắc gọi nó là
+    ytd_cur/ytd_prev_year, nhưng bản chép có thể đã ghi vào q_cur/q_prev_year (BID, HPG, VHM... bán niên 2026); hỏi
+    "q_cur" thì mô hình trả rỗng vì không thấy cột quý nào."""
+    if record.get("doc_type") in ("fs_semiannual", "fs_annual"):
+        return {"q_cur": "ytd_cur", "q_prev_year": "ytd_prev_year"}.get(col, col)
+    return col
+
+
 def _asked_cells(record: dict, ids: dict) -> list[tuple[str, str | None, str, str]]:
     return [(cid, None if q.code.startswith(("~", "b.")) else q.code, _label_on_page(record, q.statement, q.row, q.label),
-             q.column_kind) for cid, q in ids.items()]
+             _asked_column(record, q.column_kind)) for cid, q in ids.items()]
+
+
+def _reread_on_page(client: VisionClient, doc, record: dict, st: str, page: int, ids: dict, prompt, step: str,
+                    row_of) -> dict[str, str | None]:
+    """Hỏi các ô `ids` trên trang `page`; ô nào trả rỗng thì hỏi lại ở trang liền trước/sau của cùng báo cáo và, nếu
+    thấy ở đó, ghi lại trang của dòng (row_of(ô) -> chỉ số dòng). Mô hình đôi khi đặt ranh giới trang lệch một khối
+    (VPL bán niên 2026: mục II LCTT ghi trang 13, thật ra ở trang 12), khi đó đọc lại trên trang đã ghi luôn ra rỗng.
+    prompt(ids con) -> lời nhắc. Trả {mã ô: giá trị}."""
+    rows = record["raw"][st]["rows"]
+    st_pages = {int(r["page"]) for r in rows if r.get("page")}
+    out: dict[str, str | None] = {}
+    todo = dict(ids)
+    for p in [page] + [n for n in (page - 1, page + 1) if n in st_pages]:
+        if not todo:
+            break
+        result = client.json_from_images(prompt(todo), [(f"Trang {p}", render_sharp(doc, p, _rotation(record, p)))],
+                                         prompts.REREAD_SCHEMA, "reread_cells", step=step, detail=ORIGINAL)
+        for ans in result.get("cells", []):
+            cid = (ans.get("code") or "").strip()
+            if cid in todo and (cid not in out or ans.get("value")):
+                out[cid] = ans.get("value")
+                if ans.get("value") and p != page:
+                    rows[row_of(todo[cid])]["page"] = p
+        todo = {cid: x for cid, x in todo.items() if not out.get(cid)}
+    return out
 
 
 def _try_load(conn, document_id: int) -> dict | None:
@@ -950,6 +983,8 @@ def _load_record(conn: psycopg.Connection, document_id: int) -> dict:
             "SELECT c.template FROM documents d JOIN companies c ON c.ticker = d.ticker WHERE d.id = %s",
             (document_id,),
         ).fetchone()[0]
+    if "doc_type" not in record:
+        record["doc_type"] = conn.execute("SELECT doc_type FROM documents WHERE id = %s", (document_id,)).fetchone()[0]
     return record
 
 

@@ -182,7 +182,7 @@ ràng buộc đòi hỏi. Chỉ số liệu đã qua kiểm chứng mới đư�
 báo và xếp hạng. Mỗi con số trên giao diện đều mở được đúng trang BCTC gốc.
 
 Đến ngày 14/10/2026, trên nhóm VN30, hệ thống đã đọc 120 BCTC (quý 4/2025, quý 1 và quý 2/2026, bán niên 2026). Trong
-đó 119 BCTC đạt kiểm chứng hoặc được duyệt tay, và 92,7\% trong khoảng 35.000 ô số được phép kiểm kế toán xác nhận (chưa phải đối chiếu từng ô với ảnh gốc). Chi phí gọi mô hình để đọc một BCTC trung bình
+đó 119 BCTC đạt kiểm chứng hoặc được duyệt tay, và 92,8\% trong khoảng 35.000 ô số được phép kiểm kế toán xác nhận (chưa phải đối chiếu từng ô với ảnh gốc). Chi phí gọi mô hình để đọc một BCTC trung bình
 khoảng 0,12 USD (trung vị 0,08 USD), chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
 trong chính BCTC. Các phần agent phân tích, chỉ số tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho
 người dùng thật được liệt kê ở Chương~\ref{chap:ketluan} dưới dạng đề mục, sẽ hoàn thiện ở các giai đoạn sau.
@@ -1302,18 +1302,22 @@ không loại được hai ô cùng sai bù trừ nhau, hay số đúng nhưng g
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 \textbf{Loại} & \textbf{Số ô} & \textbf{Tỷ lệ} \\ \midrule
-Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 30.932 & 88,2\% \\
+Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 30.968 & 88,3\% \\
 Thuộc báo cáo phải chép lại trang, sau đó có phép kiểm xác nhận & 1.445 & 4,1\% \\
 Đọc lại riêng ô (định vị ô sai, đối chiếu kỳ) rồi mới khớp & 57 & 0,2\% \\
 Người duyệt sửa sau khi đối chiếu ảnh gốc & 80 & 0,2\% \\
-Cần xem lại: phép kiểm chỉ ra nghi sai, chưa xử lý & 69 & 0,2\% \\
+Phép kiểm vẫn lệch, người duyệt đã đối chiếu ảnh: chính BCTC in lệch & 33 & 0,1\% \\
 Chưa nằm trong phép kiểm nào & 2.492 & 7,1\% \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Như vậy 92,7\% số ô được phép kiểm xác nhận. 69 ô bị phép kiểm chỉ ra nghi sai mà chưa xử lý, phần lớn thuộc các BCTC đã
-được duyệt tay vì chính BCTC in lệch (BSR, VHM, VPL, SSB quý 4/2025). Nhóm chưa kiểm được không có nghĩa là sai: đó là
+Như vậy 92,8\% số ô được phép kiểm xác nhận. 33 ô vẫn lệch phép kiểm sau khi người duyệt đối chiếu ảnh và thấy chính BCTC
+in lệch (BSR, VHM, VPL, SSB quý 4/2025). Không còn ô nào bị phép kiểm chỉ ra nghi sai mà chưa xử lý: với các ô chỉ khác
+BCTC kỳ khác vài chữ số, hệ thống đọc lại ô ở cả hai BCTC; khi cả hai lần đọc lại đều ra đúng số cũ, chênh lệch được ghi
+nhận là số thật khác nhau. Các trường hợp đã đối chiếu ảnh đều là công ty điều chỉnh số khi soát xét (BID, SHB, VPL bán
+niên 2026 khác bản quý 2 ở nhiều dòng cùng lúc) hoặc trình bày khác (một bản tách khoản thu và khoản chi, bản kia gộp
+thành một dòng). Nhóm chưa kiểm được không có nghĩa là sai: đó là
 các ô không nằm trong phép kiểm nào, kể cả ô khác với BCTC kỳ khác mà không có phép cộng nào xác nhận. 1.041 ô trong nhóm
 này là dòng chi tiết của công ty chứng khoán chưa có công thức (12 công thức chi tiết suy từ dữ liệu đã được thêm, khớp
 100\% trên 3--7 BCTC mỗi công thức; cần xác nhận lại khi có thêm BCTC); phần còn lại chủ yếu là các dòng ngoài bảng của
@@ -1570,7 +1574,7 @@ nhầm dòng}. Vì vậy đối chiếu nguồn ngoài đã trở thành bước
 \section{Kết luận}
 Đến giữa tháng 10/2026, Soi đã có đủ chuỗi xử lý: thu thập BCTC, đọc bằng mô hình thị giác, kiểm chứng bằng ràng buộc kế
 toán, tự định vị và sửa ô đọc sai, tính thẻ KQKD có cờ cảnh báo, và giao diện web. Trên VN30, 119/120 BCTC (quý và bán niên) đạt
-kiểm chứng hoặc được duyệt tay, 92,7\% số ô được phép kiểm kế toán xác nhận, với chi phí đọc trung bình khoảng 0,12 USD
+kiểm chứng hoặc được duyệt tay, 92,8\% số ô được phép kiểm kế toán xác nhận, với chi phí đọc trung bình khoảng 0,12 USD
 mỗi BCTC (khoảng 3--3,5 USD cho
 cả nhóm VN30 mỗi mùa BCTC quý). Đối chiếu với nguồn ngoài cho thấy số liệu khớp ở 208/211 ô, và cả 3 ô
 lệch đều có lời giải thích từ chính BCTC.

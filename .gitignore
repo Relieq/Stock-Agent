@@ -10,3 +10,4 @@ __pycache__/
 
 # Dữ liệu lớn (lưu trên Google Drive, xem Data/README.md)
 Data/raw/
+Data/backup/

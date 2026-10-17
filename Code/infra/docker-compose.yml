@@ -57,6 +57,24 @@ services:
     command: python -u -m services.watcher --interval 15
     restart: unless-stopped
 
+  # Sao lưu hằng ngày (infra/backup.sh). Thư mục đích: biến SOI_BACKUP_DIR trong infra/.env (ví dụ một thư mục Google
+  # Drive đồng bộ trên máy), mặc định Data/backup.
+  backup:
+    image: pgvector/pgvector:pg16
+    container_name: soi-backup
+    environment:
+      PGPASSWORD: soi
+      TZ: Asia/Ho_Chi_Minh
+    entrypoint: ["sh", "/backup.sh"]
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - ../../Data/raw:/data:ro
+      - ${SOI_BACKUP_DIR:-../../Data/backup}:/backup
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   # Lệnh chạy một lần: docker compose -f infra/docker-compose.yml run --rm app <lệnh>
   app:
     <<: *app

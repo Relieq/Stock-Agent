@@ -151,6 +151,7 @@ PRICES = {
 # trang <= 4.150, định vị trang <= 1.300, đọc lại ô <= 1.200), vì token ra gồm cả phần suy luận. Bước lạ: không đặt trần.
 OUTPUT_LIMITS = (
     ("statement_", 24_000),       # chép cả một báo cáo, có thể nhiều trang
+    ("second_read_", 24_000),     # người đọc thứ hai chép lại cả một báo cáo (eval/second_read.py)
     ("reextract_", 16_000),       # chép lại một trang
     ("page_classification", 6_000),
     ("identify_upload", 3_000),
@@ -305,6 +306,7 @@ class VisionClient:
         self.usage = Usage()
         self.steps: dict[str, Usage] = {}     # theo bước, khóa là schema_name (page_classification, statement_BS...)
         self.switches: list[dict] = []        # các lần chuyển nhà cung cấp (thời điểm, từ, sang, lý do)
+        self.last_model: str | None = None    # mô hình đã trả lời lần gọi gần nhất ("nhà/mô hình")
 
     @property
     def cfg(self) -> LLMConfig:
@@ -325,17 +327,23 @@ class VisionClient:
             self._backends[i] = _backend(self._configs[i])
         return self._backends[i]
 
+    def other_than(self, provider: str | None) -> str | None:
+        """Nhà cung cấp chính/dự phòng khác `provider` (khác hãng với lần đọc đầu), None nếu chỉ cấu hình một nhà."""
+        return next((c.provider for i, c in enumerate(self._configs)
+                     if i not in self.extras and c.provider != provider), None)
+
     def steps_snapshot(self) -> dict:
         return {k: asdict(v) for k, v in self.steps.items()}
 
     def json_from_images(self, prompt: str, images: list[tuple[str, bytes]], schema: dict, schema_name: str,
-                         step: str | None = None, detail: str | None = None) -> dict:
+                         step: str | None = None, detail: str | None = None, provider: str | None = None) -> dict:
         """Gửi lời nhắc kèm các ảnh PNG (mỗi ảnh có nhãn), nhận về JSON theo schema. `step` để tính chi phí theo
         bước (mặc định là schema_name). `detail="original"`: API OpenAI không thu nhỏ ảnh (mặc định của gpt-5.4-mini
-        thu cạnh dài về 2048 điểm ảnh); Claude và các nhà khác không nhận tham số này."""
+        thu cạnh dài về 2048 điểm ảnh); Claude và các nhà khác không nhận tham số này. `provider`: ưu tiên nhà này cho riêng
+        lần gọi (lần đọc dùng để kết luận phải khác hãng với lần đọc đầu), thay cho cài đặt theo bước."""
         limit = output_limit(step or schema_name)
         name = step or schema_name
-        wanted = next((p for prefix, p in self.step_providers.items() if name.startswith(prefix)), None)
+        wanted = provider or next((p for prefix, p in self.step_providers.items() if name.startswith(prefix)), None)
         main = [i for i in range(len(self._configs)) if i not in self.extras]
         if wanted and ":" in wanted:
             # "nhà cung cấp:mô hình" (ví dụ repair_escalate=anthropic:claude-opus-5-5): mô hình riêng cho bước này,
@@ -368,6 +376,7 @@ class VisionClient:
                         self.active = nxt
                 continue
             usd = cost_usd(self._configs[i].model, ti, to) or 0.0
+            self.last_model = f"{self._configs[i].provider}/{self._configs[i].model}"
             step_usage = self.steps.setdefault(step or schema_name, Usage())
             for u in (self.usage, step_usage):
                 u.calls += 1

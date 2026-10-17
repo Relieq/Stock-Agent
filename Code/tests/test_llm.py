@@ -141,3 +141,13 @@ def test_failed_step_model_falls_back_to_normal_order(monkeypatch):
     c._backends[2] = strong
     c.json_from_images("p", [], {}, "x", step="repair_escalate")
     assert primary.calls == 1 and c.active == 0
+
+
+def test_call_level_provider_reads_with_the_other_house():
+    # Lần đọc dùng để kết luận "công ty sửa số" phải khác hãng với lần đọc đầu (verify.py)
+    primary, other = Fake(), Fake()
+    c = client_with(primary, other)
+    assert c.other_than("anthropic") == "openai" and c.other_than("openai") == "anthropic"
+    c.json_from_images("p", [], {}, "reread_cells", step="verify_cells", provider=c.other_than("anthropic"))
+    assert other.calls == 1 and primary.calls == 0 and c.last_model == "openai/gpt-5.4-mini" and c.active == 0
+    assert client_with(Fake()).other_than("anthropic") is None

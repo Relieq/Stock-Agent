@@ -297,7 +297,7 @@ def _repair_by_constraints(record: dict, client: VisionClient, doc, conn: psycop
     changed = False
     for group in groups:
         ok = [p for p in group if confirmed(p) and (p.partner is None or confirmed(p.partner))]
-        accepted = ok[0] if len(ok) == 1 else None
+        accepted = ok[0] if len(ok) == 1 else _dominant(ok)
         for p in group:
             for q in (p, p.partner):
                 if q is None:
@@ -348,12 +348,25 @@ def _asked_cells(record: dict, ids: dict) -> list[tuple[str, str | None, str, st
              _asked_column(record, q.column_kind)) for cid, q in ids.items()]
 
 
+# Đọc lại xác nhận nhiều ô trong cùng một nhóm phương án ngang nhau (chỉ một ô có thể sai): chọn ô có kiểu nhầm hay gặp
+# hơn hẳn theo mô hình nhầm chữ số (repair.rank_group), còn không thì để người duyệt.
+DOMINANT_PROB = 0.9
+
+
+def _dominant(confirmed: list):
+    if not confirmed:
+        return None
+    total = sum(p.prob for p in confirmed)
+    best = max(confirmed, key=lambda p: p.prob)
+    return best if total > 0 and best.prob / total >= DOMINANT_PROB else None
+
+
 def _reread_on_page(client: VisionClient, doc, record: dict, st: str, page: int, ids: dict, prompt, step: str,
-                    row_of) -> dict[str, str | None]:
+                    row_of, provider: str | None = None) -> dict[str, str | None]:
     """Hỏi các ô `ids` trên trang `page`; ô nào trả rỗng thì hỏi lại ở trang liền trước/sau của cùng báo cáo và, nếu
     thấy ở đó, ghi lại trang của dòng (row_of(ô) -> chỉ số dòng). Mô hình đôi khi đặt ranh giới trang lệch một khối
     (VPL bán niên 2026: mục II LCTT ghi trang 13, thật ra ở trang 12), khi đó đọc lại trên trang đã ghi luôn ra rỗng.
-    prompt(ids con) -> lời nhắc. Trả {mã ô: giá trị}."""
+    prompt(ids con) -> lời nhắc; provider: nhà cung cấp ưu tiên cho các lần gọi này. Trả {mã ô: giá trị}."""
     rows = record["raw"][st]["rows"]
     st_pages = {int(r["page"]) for r in rows if r.get("page")}
     out: dict[str, str | None] = {}
@@ -362,7 +375,8 @@ def _reread_on_page(client: VisionClient, doc, record: dict, st: str, page: int,
         if not todo:
             break
         result = client.json_from_images(prompt(todo), [(f"Trang {p}", render_sharp(doc, p, _rotation(record, p)))],
-                                         prompts.REREAD_SCHEMA, "reread_cells", step=step, detail=ORIGINAL)
+                                         prompts.REREAD_SCHEMA, "reread_cells", step=step, detail=ORIGINAL,
+                                         provider=provider)
         for ans in result.get("cells", []):
             cid = (ans.get("code") or "").strip()
             if cid in todo and (cid not in out or ans.get("value")):

@@ -95,14 +95,17 @@ def verify_document(conn: psycopg.Connection, document_id: int, cells: set[Cell]
                 (cid, None if key.startswith(("~", "b.")) else key,
                  _label_on_page(record, st, i, rows[i].get("label") or label), _asked_column(record, col))
                 for cid, (key, i, col, label) in sub.items()])
-            answers = _reread_on_page(client, doc, record, st, page, ids, asked, "verify_cells", lambda item: item[1])
+            # Kết luận "công ty sửa số" dựa vào việc đọc lại ra như lần đầu, nên lần đọc lại phải khác hãng với lần đọc
+            # đầu: cùng một mô hình thì lỗi có hệ thống (hai dòng tên gần giống bị đổi chỗ) lặp lại y hệt.
+            answers = _reread_on_page(client, doc, record, st, page, ids, asked, "verify_cells", lambda item: item[1],
+                                      provider=client.other_than(record.get("provider")))
             for cid, after in answers.items():
                 key, i, col, label = ids[cid]
                 before = rows[i]["values"][col]
                 added.append({"statement": st, "key": key, "label": label, "column_kind": col,
                               "page": int(rows[i]["page"]), "row": i,
                               "before": before, "after": after, "same": _same_amount(before, after, sep),
-                              "applied": False, "model": client.cfg.model,
+                              "applied": False, "model": client.last_model or client.cfg.model,
                               "at": datetime.now(timezone.utc).isoformat()})
     record.setdefault("cell_verifications", []).extend(added)
     decide(conn, document_id, record)

@@ -18,10 +18,12 @@ ngang nhau được trả về cùng nhau để đọc lại riêng từng ô (p
 from __future__ import annotations
 
 import copy
+import math
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from services.extraction.confusion import log_likelihood
 from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.rules import RULESETS
 from services.extraction.validate import Check, ExtractedStatement, Statement, group_rule_codes, validate
@@ -46,6 +48,9 @@ class Proposal:
     # Ô đi kèm khi hai ô cùng lệch một lượng nên phép cộng giữa chúng vẫn khớp (VHM quý 4/2025: "thu nhập khác" và
     # "lãi khác" cùng lệch 50.000, chỉ dòng tổng phía dưới lệch). Sửa một mình ô nào cũng làm lệch phép cộng giữa hai ô.
     partner: "Proposal | None" = None
+    # Xác suất trong nhóm phương án ngang nhau theo mô hình nhầm chữ số thật (confusion.py): ô nào có kiểu nhầm hay gặp
+    # hơn (6->8, 1->7) thì nhiều khả năng là ô đọc sai hơn. Phương án duy nhất: 1.
+    prob: float = 1.0
 
     @property
     def confidence(self) -> str:
@@ -195,7 +200,7 @@ def localize(extracted: list[ExtractedStatement], statements: dict[str, Statemen
         ties = [p for p in plausible[1:] if p.fixes == best.fixes
                 and p.digits_changed <= max(best.digits_changed, MAX_DIGITS_CHANGED)]
         if ties:
-            group = [best, *ties]
+            group = rank_group([best, *ties])
             for p in group:
                 p.alternatives = len(ties)
             out.ambiguous.append(group)
@@ -237,10 +242,25 @@ def _pair_moves(statements, template, failures, before_fix, after_fix, first, de
     return out
 
 
+def loglik(p: Proposal, table: dict | None = None) -> float:
+    """log xác suất ô (và ô đi kèm) bị đọc thành số đang thấy nếu số đúng là số đề xuất."""
+    return sum(log_likelihood(q.before, q.after, table) for q in (p, p.partner) if q is not None)
+
+
+def rank_group(group: list[Proposal], table: dict | None = None) -> list[Proposal]:
+    """Xếp nhóm phương án ngang nhau theo xác suất nhầm (cao trước) và gán xác suất chuẩn hóa trong nhóm."""
+    scored = sorted(((loglik(p, table), i, p) for i, p in enumerate(group)), key=lambda x: (-x[0], x[1]))
+    top = scored[0][0]
+    weights = [math.exp(ll - top) for ll, _, _ in scored]
+    for w, (_, _, p) in zip(weights, scored):
+        p.prob = w / sum(weights)
+    return [p for _, _, p in scored]
+
+
 def proposal_dict(p: Proposal) -> dict:
     return {"statement": p.statement, "code": p.code, "column_kind": p.column_kind, "row": p.row, "label": p.label,
             "before": p.before, "after": p.after, "fixes": p.fixes, "digits_changed": p.digits_changed,
-            "alternatives": p.alternatives, "confidence": p.confidence,
+            "alternatives": p.alternatives, "confidence": p.confidence, "prob": round(p.prob, 4),
             "partner": proposal_dict(p.partner) if p.partner else None}
 
 
@@ -323,6 +343,7 @@ def cross_proposals(evidence, extracted: list[ExtractedStatement], statements: d
             fixes = [f"X:{pc.kind}@{pc.column}", *sorted(base - after)]
             group.append(Proposal(st_name, code, col, row, ex.items[row].label, before, after_raw, new, fixes, n))
         if group:
+            group = rank_group(group)
             for p in group:
                 p.alternatives = len(group) - 1
             groups.append(group)

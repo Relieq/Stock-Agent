@@ -24,7 +24,8 @@ from services.db import connect
 from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.pipeline import _check, _load_record
 from services.extraction.evidence import document_evidence
-from services.extraction.repair import cross_proposals, localize
+from services.extraction.confusion import count_substitutions, error_pairs
+from services.extraction.repair import cross_proposals, localize, rank_group
 
 
 def truth_cells(record: dict) -> dict[tuple[str, int, str], tuple[str | None, str, str]]:
@@ -62,7 +63,7 @@ def _cells_in_failures(extracted, statements, template) -> set:
             for cell in _cells_of(c, template, statements)}
 
 
-def evaluate(record: dict, verbose: bool = False, conn=None) -> Counter:
+def evaluate(record: dict, verbose: bool = False, conn=None, table: dict | None = None) -> Counter:
     truth = truth_cells(record)
     tally: Counter = Counter()
     if not truth:
@@ -103,6 +104,9 @@ def evaluate(record: dict, verbose: bool = False, conn=None) -> Counter:
             result = "đúng"
         elif key in grouped and same(grouped[key].after, after):
             result = "cần đọc lại"
+            covers = lambda p: key in {(q.statement, q.row, q.column_kind) for q in (p, p.partner) if q is not None}
+            group = next(g for g in loc.ambiguous if any(covers(p) for p in g))
+            tally["xếp theo mô hình nhầm: ô đúng đứng đầu"] += covers(rank_group(list(group), table)[0])
         else:
             result = "sót" if in_scope else "ngoài tầm"
         if not in_scope and result != "ngoài tầm":
@@ -136,12 +140,17 @@ def main() -> None:
     with connect() as conn:
         ids = [r[0] for r in conn.execute(
             "SELECT id FROM documents WHERE status IN ('verified', 'approved', 'needs_review') ORDER BY id")]
+        records = {}
         for doc_id in ids:
             try:
-                record = _load_record(conn, doc_id)
+                records[doc_id] = _load_record(conn, doc_id)
             except RuntimeError:
                 continue
-            t = evaluate(record, args.verbose, conn)
+        pairs = {d: error_pairs(r) for d, r in records.items()}
+        for doc_id, record in records.items():
+            # Bảng nhầm học từ lỗi của các BCTC khác, để không chấm điểm trên chính dữ liệu đã học
+            table = count_substitutions([p for d, ps in pairs.items() if d != doc_id for p in ps])
+            t = evaluate(record, args.verbose, conn, table)
             if t:
                 docs += 1
                 total += t
@@ -153,6 +162,9 @@ def main() -> None:
         print(f"  {k:12s} {total[k]:4d}  ({total[k] / cells:.0%})" if cells else "")
     print(f"  đề xuất sai  {total['đề xuất sai']:4d}")
     print(f"  nhóm phương án ngang nhau: {total['nhóm cần đọc lại']}, tổng {total['ô phải đọc lại']} ô phải đọc lại")
+    if total["cần đọc lại"]:
+        print(f"  trong {total['cần đọc lại']} ô cần đọc lại, xếp theo mô hình nhầm (học từ BCTC khác) đưa ô đúng lên đầu "
+              f"{total['xếp theo mô hình nhầm: ô đúng đứng đầu']} lần")
     for k in sorted(k for k in total if ":" in k):
         print(f"    {k}: {total[k]}")
 

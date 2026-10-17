@@ -4,8 +4,13 @@
     python -m services.watcher --once               # chạy một lượt rồi dừng
     python -m services.watcher --interval 60 --year 2026
 
-Chỉ tự động đọc BCTC **phát hiện từ lúc bộ canh bắt đầu chạy** (--since, mặc định hôm nay), loại BCTC đầy đủ,
-bản hợp nhất hoặc báo cáo duy nhất. Dữ liệu lịch sử chạy bù bằng `python -m services.extraction run`.
+Chỉ tự động đọc BCTC **phát hiện từ đầu quý hiện tại** (--since; mùa BCTC quý trước rơi vào quý này), loại BCTC
+đầy đủ, bản hợp nhất hoặc báo cáo duy nhất. Trước đây mặc định là ngày khởi động, nên máy khởi động lại giữa mùa thì
+các BCTC đã phát hiện mà chưa đọc (ví dụ do hết tiền) bị bỏ qua. Dữ liệu lịch sử chạy bù bằng
+`python -m services.extraction run`.
+
+Mỗi lượt tạo kết nối mô hình mới: nhà cung cấp bị đánh dấu hỏng (quá tải, giới hạn lượt) được thử lại ở lượt sau, và
+lựa chọn trên trang quản trị có hiệu lực mà không phải khởi động lại. BCTC đọc lỗi được thử lại một lần ở lượt sau.
 """
 
 from __future__ import annotations
@@ -33,18 +38,28 @@ def _out_of_credit(e: Exception) -> bool:
     return "insufficient_quota" in str(e) or "credit_balance_exhausted" in str(e)
 
 
+def _quarter_start(today: date) -> date:
+    return date(today.year, 3 * ((today.month - 1) // 3) + 1, 1)
+
+
+_retried: set[int] = set()      # BCTC lỗi đã thử lại trong tiến trình này (mỗi BCTC thử lại một lần)
+
+
 def _pending_extraction(conn, since: date, year: int) -> list[tuple]:
-    return conn.execute(
+    rows = conn.execute(
         """
-        SELECT d.id, d.ticker, d.title_raw, d.source_listed_at, d.discovered_at
+        SELECT d.id, d.ticker, d.title_raw, d.source_listed_at, d.discovered_at, d.status
         FROM documents d
-        WHERE d.status = 'downloaded' AND d.content_kind = 'full' AND d.scope IN ('consolidated', 'standalone')
+        WHERE d.status IN ('downloaded', 'failed') AND d.content_kind = 'full' AND d.scope IN ('consolidated', 'standalone')
           AND d.discovered_at >= %s AND d.fiscal_year >= %s AND d.owner_user_id IS NULL
           AND EXISTS (SELECT 1 FROM companies c WHERE c.ticker = d.ticker AND c.tracked)
         ORDER BY d.discovered_at
         """,
         (datetime.combine(since, datetime.min.time(), VN_TZ), year),
     ).fetchall()
+    out = [r[:5] for r in rows if r[5] == "downloaded" or r[0] not in _retried]
+    _retried.update(r[0] for r in rows if r[5] == "failed")
+    return out
 
 
 def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
@@ -104,18 +119,17 @@ def main() -> None:
     p = argparse.ArgumentParser(prog="python -m services.watcher", description="Bộ canh BCTC")
     p.add_argument("--year", type=int, default=date.today().year)
     p.add_argument("--interval", type=int, default=15, help="Số phút giữa hai lượt")
-    p.add_argument("--since", type=date.fromisoformat, default=date.today(),
-                   help="Chỉ tự đọc BCTC phát hiện từ ngày này (YYYY-MM-DD)")
+    p.add_argument("--since", type=date.fromisoformat, default=_quarter_start(date.today()),
+                   help="Chỉ tự đọc BCTC phát hiện từ ngày này (YYYY-MM-DD), mặc định đầu quý hiện tại")
     p.add_argument("--once", action="store_true")
     args = p.parse_args()
 
-    try:
-        vision = VisionClient()
-    except RuntimeError as e:
-        print(f"Chưa cấu hình mô hình đọc ảnh ({e}); bộ canh chỉ thu thập, không đọc BCTC.")
-        vision = None
-
     while True:
+        try:
+            vision = VisionClient()
+        except RuntimeError as e:
+            print(f"Chưa cấu hình mô hình đọc ảnh ({e}); bộ canh chỉ thu thập, không đọc BCTC.")
+            vision = None
         try:
             one_pass(args.year, args.since, vision)
         except Exception:  # lỗi mạng, CSDL... thì báo và chờ lượt sau

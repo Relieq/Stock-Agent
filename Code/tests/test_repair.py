@@ -77,3 +77,28 @@ def test_helpers():
     assert agrees(p, "(8,374,366)", ".", 1)                      # lần đọc lại viết dấu phẩy
     assert agrees(p, "8.374.366", ".", 1)                        # lần đọc lại bỏ mất dấu ngoặc
     assert not agrees(p, "(8.334.366)", ".", 1)
+
+
+def test_confusion_model_ranks_common_misreads_first():
+    # Nhầm 6->8 hay gặp (10 lần), nhầm 9->2 chưa gặp: ô đọc "1.238" (đúng 1.236) đứng trước ô đọc "5.432" (đúng 5.439)
+    from decimal import Decimal
+    from services.extraction.confusion import count_substitutions, log_likelihood
+    from services.extraction.repair import Proposal, rank_group
+    table = count_substitutions([("1.238", "1.236")] * 10 + [("17", "11")] * 9)
+    assert table == {"6": {"8": 10}, "1": {"7": 9}}
+    assert log_likelihood("1.238", "1.236", table) > log_likelihood("5.432", "5.439", table)
+    assert log_likelihood("4.714.930", "471.930", table) > log_likelihood("4.714.930", "471.000", table)  # thừa 1 chữ số
+    a = Proposal("BS", "131", "end_period", 3, "a", "5.432", "5.439", Decimal(5439), ["BS_130@end_period"], 1)
+    b = Proposal("BS", "132", "end_period", 4, "b", "1.238", "1.236", Decimal(1236), ["BS_130@end_period"], 1)
+    ranked = rank_group([a, b], table)
+    assert ranked[0] is b and b.prob > 0.8 and abs(a.prob + b.prob - 1) < 1e-9
+
+
+def test_dominant_candidate_needs_clear_majority():
+    import types
+    from services.extraction.pipeline import _dominant
+    p = lambda prob: types.SimpleNamespace(prob=prob)
+    strong, weak = p(0.95), p(0.05)
+    assert _dominant([strong, weak]) is strong
+    assert _dominant([p(0.6), p(0.4)]) is None
+    assert _dominant([]) is None

@@ -324,7 +324,7 @@ class _FakeReader:
         self.by_step, self.step_providers, self.calls = by_step, step_providers, []
         self.cfg = types.SimpleNamespace(model="fake", provider="fake")
 
-    def json_from_images(self, prompt, images, schema, schema_name, step=None, detail=None):
+    def json_from_images(self, prompt, images, schema, schema_name, step=None, detail=None, provider=None):
         import re
         self.calls.append(step)
         printed = {"TÀI SẢN NGẮN HẠN": "60", "Tiền": "50"}
@@ -382,7 +382,7 @@ def test_reread_tries_neighbor_page_when_cell_not_found(monkeypatch):
         cfg = types.SimpleNamespace(model="fake")
         pages = []
 
-        def json_from_images(self, prompt, images, schema, schema_name, step=None, detail=None):
+        def json_from_images(self, prompt, images, schema, schema_name, step=None, detail=None, provider=None):
             page = images[0][1]
             self.pages.append(page)
             printed = {12: {"o1": "(12.752.505)"}, 13: {"o2": "20.272.517"}}[page]

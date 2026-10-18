@@ -100,3 +100,24 @@ def test_second_reading_of_full_period_report_matches_either_column_pair():
     h1 = _cells(3, "H1", {("CF", "b.cf1"): {"q_cur": 300}})
     second = _cells(3, "H1", {("CF", "b.cf1"): {"ytd_cur": 300}})
     assert cell_status(h1, [], second, "fs_semiannual")[("CF", "b.cf1", "q_cur")]["status"] == "second"
+
+
+def test_earnings_per_share_is_compared_only_with_the_second_reading():
+    q2 = _cells(2, "Q2", {("IS", "10"): {"q_cur": 120}})
+    q2.eps = {("IS", "eps70"): {"q_cur": D(1_234), "ytd_cur": D(2_000)}}
+    second = _cells(2, "Q2", {})
+    second.eps = {("IS", "eps70"): {"q_cur": D(1_234), "ytd_cur": D(2_600)}}
+    assert cell_status(q2, [])[("IS", "eps70", "q_cur")]["status"] == "none"
+    status = cell_status(q2, [], second)
+    assert status[("IS", "eps70", "q_cur")]["status"] == "second"
+    assert status[("IS", "eps70", "ytd_cur")]["status"] == "second_differs"
+    assert status[("IS", "eps70", "ytd_cur")]["second_printed"] == "2.600"
+
+
+def test_first_quarter_earnings_per_share_quarter_equals_year_to_date():
+    q1 = _cells(1, "Q1", {})
+    q1.eps = {("IS", "eps70"): {"q_cur": D(1_651), "ytd_cur": D(1_651), "q_prev_year": D(68), "ytd_prev_year": D(68)}}
+    second = _cells(1, "Q1", {})
+    second.eps = {("IS", "eps70"): {"q_cur": D(1_651), "ytd_cur": D(1_651), "q_prev_year": D(98), "ytd_prev_year": D(68)}}
+    status = cell_status(q1, [], second, "fs_quarter")
+    assert {status[("IS", "eps70", c)]["status"] for c in q1.eps[("IS", "eps70")]} == {"sum"}   # BSR quý 1/2026

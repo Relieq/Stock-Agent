@@ -48,6 +48,12 @@ class Cells:
     sum_evidence: dict[tuple[str, str, str], list[str]] = field(default_factory=dict)
     sum_conflicts: dict[tuple[str, str, str], list[str]] = field(default_factory=dict)
     verified: set[tuple[str, str, str]] = field(default_factory=set)   # ô đọc lại ở ảnh nét hơn vẫn ra như cũ
+    # Lãi trên cổ phiếu (đồng, không theo đơn vị của bảng): không đưa vào phép cộng hay đối chiếu kỳ (quý không bằng
+    # lũy kế trừ lũy kế, số kỳ trước hay được tính lại theo số cổ phiếu mới), chỉ so với lần đọc thứ hai
+    eps: dict[tuple[str, str], dict[str, Decimal]] = field(default_factory=dict)
+
+    def row(self, st: str, key: str) -> dict[str, Decimal]:
+        return self.values.get((st, key)) or self.eps.get((st, key), {})
 
 
 def label_key(label: str) -> str:
@@ -59,6 +65,7 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
     values: dict[tuple[str, str], dict[str, Decimal]] = {}
     labels: dict[tuple[str, str], str] = {}
     item_keys: dict[str, list[str | None]] = {}
+    eps: dict[tuple[str, str], dict[str, Decimal]] = {}
     mult = {st: s.multiplier for st, s in statements.items()}
     for ex in extracted:
         st = ex.statement
@@ -67,9 +74,18 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
         keys = item_keys.setdefault(st, [])
         for it in ex.items:
             keys.append(None)
-            if EPS.search(fold(clean_label(it.label))):
-                continue      # lãi trên cổ phiếu tính bằng đồng, không theo đơn vị của bảng
             code = normalize_code(it.code)
+            if EPS.search(fold(clean_label(it.label))):
+                # lãi trên cổ phiếu tính bằng đồng, không theo đơn vị của bảng
+                base = "eps" + (code or label_key(it.label))
+                seen_labels[base] = seen_labels.get(base, 0) + 1
+                key = base if seen_labels[base] == 1 else f"{base}#{seen_labels[base]}"
+                vals = {col: v for col, raw in it.values_raw.items() if (v := parse_amount(raw, sep)) is not None}
+                if vals:
+                    eps[(st, key)] = vals
+                    labels[(st, key)] = it.label
+                    keys[-1] = key
+                continue
             if code:
                 key = code
                 if (st, key) in values:
@@ -86,7 +102,7 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
                 keys[-1] = key
     restated = {(st, c.get("kind")) for st, raw in record["raw"].items() for c in raw.get("columns", [])
                 if RESTATED.search(c.get("header") or "")}
-    cells = Cells(document_id, period, values, labels, mult, restated, item_keys)
+    cells = Cells(document_id, period, values, labels, mult, restated, item_keys, eps=eps)
     cells.verified = {(v["statement"], v["key"], v["column_kind"]) for v in record.get("cell_verifications", [])
                       if v.get("same")}
 
@@ -273,7 +289,7 @@ TWIN = {"q_cur": "ytd_cur", "ytd_cur": "q_cur", "q_prev_year": "ytd_prev_year", 
 def second_value(cells: Cells, theirs: Cells, cell: tuple[str, str, str], doc_type: str | None) -> Decimal | None:
     """Số người đọc thứ hai chép cho ô `cell` của `cells` (None nếu không thấy)."""
     st, key, col = cell
-    got = theirs.values.get((st, key), {})
+    got = theirs.row(st, key)
     b = got.get(col)
     if b is None and doc_type in ("fs_semiannual", "fs_annual") and col in TWIN:
         b = got.get(TWIN[col])
@@ -339,6 +355,21 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | 
                     printed = b / cells.multiplier.get(st, Decimal(1))      # theo đơn vị in trên BCTC, để hiện trên web
                     entry["second_printed"] = (f"{printed:,.0f}".replace(",", ".") if printed == printed.to_integral()
                                                else str(printed))
+            out[cell] = entry
+    for (st, key), vals in cells.eps.items():
+        for col, a in vals.items():
+            cell = (st, key, col)
+            entry = {"status": "none", "sum": [], "period": [], "conflict": [], "differs": []}
+            # Quý 1: số quý và số lũy kế là hai cột in riêng của cùng một con số
+            twin = vals.get(TWIN.get(col, "")) if cells.period == "Q1" and doc_type in (None, "fs_quarter") else None
+            if twin is not None and twin == a:
+                entry.update(status="sum", sum=["Q1: quý = lũy kế"])
+                out[cell] = entry
+                continue
+            b = second_value(cells, second, cell, doc_type) if second is not None else None
+            if b is not None:
+                entry["status"] = "second" if a == b else "second_differs"
+                entry["second"], entry["second_printed"] = str(b), f"{b:,.0f}".replace(",", ".")
             out[cell] = entry
     return out
 

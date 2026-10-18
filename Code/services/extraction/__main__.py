@@ -136,7 +136,7 @@ def cmd_evidence(args) -> None:
                 for (st, key, col), x in ev.status.items():
                     if x["status"] == "second_differs":
                         print(f"    HAI LẦN ĐỌC KHÁC {st} {ev.cells.labels.get((st, key), key)[:50]} [{key}] {col}: "
-                              f"{ev.cells.values[(st, key)][col]:,.0f} vs {Decimal(x['second']):,.0f}")
+                              f"{ev.cells.row(st, key)[col]:,.0f} vs {Decimal(x['second']):,.0f}")
             for pc in ev.period_checks:
                 if not pc.passed and (args.all or pc.suspect_misread):
                     tag = "TRÌNH BÀY LẠI" if pc.restated else ("CẦN XEM" if pc.suspect_misread else "KHÁC")

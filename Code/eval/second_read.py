@@ -74,7 +74,7 @@ def probe(ids: list[int], provider: str) -> None:
                 group = "1-4" if cat <= 4 else "8" if cat == 8 else None
                 keys = mine.item_keys.get(st, [])
                 key = keys[row] if row < len(keys) else None
-                a = mine.values.get((st, key), {}).get(col) if key else None
+                a = mine.row(st, key).get(col) if key else None
                 if group is None or a is None:
                     continue
                 b = second_value(mine, theirs, (st, key, col), record.get("doc_type"))
@@ -123,8 +123,8 @@ def compare_document(conn, d: int, period: str) -> list[dict]:
         keys = mine.item_keys.get(st, [])
         key = keys[row] if row < len(keys) else None
         if key is None:
-            continue                # lãi trên cổ phiếu và dòng không xác định được khóa
-        a = mine.values.get((st, key), {}).get(col)
+            continue                # dòng không xác định được khóa
+        a = mine.row(st, key).get(col)
         if a is None:
             continue
         b = second_value(mine, theirs, (st, key, col), record.get("doc_type"))

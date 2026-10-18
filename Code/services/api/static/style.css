@@ -54,6 +54,8 @@ td.ev-sum, .legend .ev-sum, .chip.ev-sum { background:#eef7f0; }
 td.ev-none, .legend .ev-none, .chip.ev-none { background:#f1f2f4; color:#6b7480; }
 td.ev-restated, .legend .ev-restated, .chip.ev-restated { background:var(--warnbg); }
 td.ev-conflict, .legend .ev-conflict, .chip.ev-conflict { background:#f7b9b9; font-weight:600; }
+td.ev-second, .legend .ev-second, .chip.ev-second { background:#f6f7f2; }
+td.ev-second_differs, .legend .ev-second_differs, .chip.ev-second_differs { background:#fbe0c4; font-weight:600; }
 .legend span, .chip { padding:0 6px; border-radius:4px; margin-right:4px; white-space:nowrap; }
 td.ev-differs, .legend .ev-differs, .chip.ev-differs { background:#dfe9ff; }
 .nav { margin-left:auto; display:flex; gap:12px; }

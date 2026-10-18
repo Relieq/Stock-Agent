@@ -23,6 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from services.db import connect
 from services.extraction.pipeline import extract_document
+from services.extraction.second_read import after_extraction
 from services.ingestion.registry import discover, download_pending
 from services.ingestion.vietstock import VietstockClient
 from services.llm import VisionClient
@@ -96,11 +97,14 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             lag = datetime.now(timezone.utc) - listed_at if listed_at else None
             sent = notify_watchers(conn, doc_id)
             conn.commit()
+            # Sau khi đã báo người theo dõi: ô không phép kiểm nào phủ được nhà cung cấp còn lại đọc lần hai
+            second = after_extraction(conn, doc_id, vision)
             lines.append(
                 f"{ticker}: {title} -> {rec['status']} ({s['gate_checks'] - s['gate_failed']}/{s['gate_checks']} ràng buộc"
                 f" bắt buộc đạt); Vietstock đăng {listed_at.astimezone(VN_TZ):%d/%m %H:%M}"
                 + (f", xử lý xong sau {lag.total_seconds() / 60:.0f} phút" if lag else "")
                 + (f"; gửi {sent} email cho người theo dõi" if sent else "")
+                + (f"; {second}" if second else "")
             )
         # Yêu cầu của người dùng: mã ngoài danh sách, file tải lên
         lines += process_queue(conn, vision)

@@ -78,3 +78,25 @@ def test_digit_slip_includes_one_missing_digit():
     assert digit_slip(Decimal("1234567"), Decimal("1234867"))
     assert not digit_slip(Decimal("5980444"), Decimal("15980445"))
     assert not digit_slip(Decimal("100"), Decimal("250000"))
+
+
+def test_second_reading_only_for_cells_without_any_check():
+    q1 = _cells(1, "Q1", {("IS", "10"): {"q_cur": 100, "q_prev_year": 80}})
+    q2 = _cells(2, "Q2", {("IS", "10"): {"q_cur": 120, "q_prev_year": 90, "ytd_cur": 220, "ytd_prev_year": 170},
+                          ("BS", "b.ob1"): {"end_period": 5_000, "begin_year": 4_000},
+                          ("BS", "b.ob2"): {"end_period": 7_000}})
+    second = _cells(2, "Q2", {("IS", "10"): {"q_cur": 999},                 # có phép kiểm: không dùng lần đọc thứ hai
+                              ("BS", "b.ob1"): {"end_period": 5, "begin_year": 4_100},   # 5 nghìn: cùng chữ số
+                              })
+    status = cell_status(q2, compare_periods(q1, q2), second)
+    assert status[("IS", "10", "q_cur")]["status"] == "period"
+    assert status[("BS", "b.ob1", "end_period")]["status"] == "second"
+    assert status[("BS", "b.ob1", "begin_year")]["status"] == "second_differs"
+    assert status[("BS", "b.ob1", "begin_year")]["second_printed"] == "4.100"
+    assert status[("BS", "b.ob2", "end_period")]["status"] == "none"        # người đọc thứ hai không thấy dòng này
+
+
+def test_second_reading_of_full_period_report_matches_either_column_pair():
+    h1 = _cells(3, "H1", {("CF", "b.cf1"): {"q_cur": 300}})
+    second = _cells(3, "H1", {("CF", "b.cf1"): {"ytd_cur": 300}})
+    assert cell_status(h1, [], second, "fs_semiannual")[("CF", "b.cf1", "q_cur")]["status"] == "second"

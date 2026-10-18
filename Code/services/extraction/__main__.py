@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from decimal import Decimal
 
 from services.db import connect
 from services.extraction.pipeline import PIPELINE_VER, extract_document, recheck_document, reread_document
@@ -125,11 +126,17 @@ def cmd_evidence(args) -> None:
             for k, v in n.items():
                 total[k] += v
             cells = sum(n.values())
-            checked = cells - n["none"] - n["restated"]
+            checked = cells - n["none"] - n["restated"] - n["second"] - n["second_differs"]
             peers = ", ".join(f"{p}" for _, p, _ in ev.peers) or "không có kỳ liền kề"
             print(f"[{doc_id}] {ticker}: {cells} ô, đã kiểm {checked} ({checked / cells:.0%}); khớp giữa các kỳ "
                   f"{n['period'] + n['both']}; khác giữa hai BCTC {n['differs']}; cần xem lại {n['conflict']}; "
-                  f"trình bày lại {n['restated']} (đối chiếu: {peers})")
+                  f"trình bày lại {n['restated']}; chưa kiểm nhưng hai lần đọc trùng {n['second']}, khác "
+                  f"{n['second_differs']} (đối chiếu: {peers})")
+            if args.all:
+                for (st, key, col), x in ev.status.items():
+                    if x["status"] == "second_differs":
+                        print(f"    HAI LẦN ĐỌC KHÁC {st} {ev.cells.labels.get((st, key), key)[:50]} [{key}] {col}: "
+                              f"{ev.cells.values[(st, key)][col]:,.0f} vs {Decimal(x['second']):,.0f}")
             for pc in ev.period_checks:
                 if not pc.passed and (args.all or pc.suspect_misread):
                     tag = "TRÌNH BÀY LẠI" if pc.restated else ("CẦN XEM" if pc.suspect_misread else "KHÁC")
@@ -139,6 +146,22 @@ def cmd_evidence(args) -> None:
         cells = sum(total.values())
         if cells:
             print("Tổng: " + "; ".join(f"{STATUS_LABELS[k]} {v} ({v / cells:.0%})" for k, v in total.items()))
+
+
+def cmd_second_read(args) -> None:
+    from services.extraction.second_read import after_extraction, second_read_document
+    client = VisionClient()
+    with connect() as conn:
+        for doc_id in args.doc_id or _period_ids(conn, args.year, args.period):
+            ticker = conn.execute("SELECT ticker FROM documents WHERE id = %s", (doc_id,)).fetchone()[0]
+            if args.force:
+                second_read_document(conn, doc_id, client, force=True)
+                conn.commit()
+                print(f"[{doc_id}] {ticker}: đã đọc lại", flush=True)
+            else:
+                print(f"[{doc_id}] {ticker}: {after_extraction(conn, doc_id, client) or 'không cần đọc lần hai'}",
+                      flush=True)
+    print(f"Tổng {client.usage.calls} lần gọi, {client.usage.usd:.2f} USD")
 
 
 def _period_ids(conn, year: int, period: str) -> list[int]:
@@ -278,6 +301,13 @@ def main(argv: list[str] | None = None) -> None:
     v.add_argument("--period")
     v.add_argument("--redecide", action="store_true", help="Chỉ chọn lại số đọc lại nào được giữ, không gọi mô hình")
     v.set_defaults(func=cmd_verify)
+
+    sr = sub.add_parser("second-read", help="Nhà cung cấp khác hãng đọc lần hai các báo cáo còn ô chưa kiểm được")
+    sr.add_argument("--doc-id", type=int, nargs="+")
+    sr.add_argument("--year", type=int)
+    sr.add_argument("--period")
+    sr.add_argument("--force", action="store_true", help="Đọc lại cả khi đã có lần đọc thứ hai")
+    sr.set_defaults(func=cmd_second_read)
 
     f = sub.add_parser("fix", help="Sửa tay một ô sau khi đối chiếu ảnh gốc (có ghi lại)")
     f.add_argument("--doc-id", type=int, required=True)

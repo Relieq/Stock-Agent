@@ -24,6 +24,7 @@ from services.alerts import notify_watchers  # noqa: F401  (dùng ở bộ canh)
 from services.extraction import prompts
 from services.extraction.bank import fold
 from services.extraction.pipeline import LOCATE_LONG_SIDE, extract_document
+from services.extraction.second_read import after_extraction
 from services.extraction.sources import candidates, open_pdf, render_page
 from services.ingestion.registry import discover, download_pending, raw_data_dir
 from services.ingestion.vietstock import BASE_URL, VietstockClient
@@ -266,6 +267,8 @@ def process_queue(conn: psycopg.Connection, vision: VisionClient | None, limit: 
             processed = conn.execute("SELECT processed_at IS NOT NULL FROM documents WHERE id = %s", (doc_id,)).fetchone()[0]
             if not processed:
                 rec = extract_document(conn, doc_id, vision)
+                conn.commit()
+                after_extraction(conn, doc_id, vision)
                 note += f"Kết quả đọc: {'đã kiểm chứng' if rec['status'] == 'verified' else 'cần duyệt tay trước khi xuất bản'}."
             else:
                 note += "Có sẵn trong kho."

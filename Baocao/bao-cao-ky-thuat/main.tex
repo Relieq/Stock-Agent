@@ -1389,8 +1389,25 @@ số của người thứ hai vào; nếu làm lệch phép kiểm đang khớp 
 \end{itemize}
 
 Tổng cộng 71 số và 6 mã số ở 10 BCTC được sửa theo ảnh nhờ người đọc thứ hai. Sau khi sửa, ở nhóm chưa kiểm được không
-còn ô nào hai người đọc khác chữ số. Bước tiếp theo là đưa lần đọc thứ hai vào quy trình xử lý BCTC mới, cho các ô
-không có phép kiểm nào phủ.
+còn ô nào hai người đọc khác chữ số.
+
+\subsection{Đọc lần hai trong quy trình xử lý BCTC mới}
+Từ mùa BCTC quý 3/2026, lần đọc thứ hai là bước cuối của quy trình, chạy sau khi đã báo tin cho người theo dõi để không
+làm chậm thông báo. Hệ thống chỉ cho nhà cung cấp còn lại chép lại những báo cáo còn ô chưa được phép kiểm nào xác nhận;
+trên 119 BCTC hiện có, các báo cáo đó chiếm 321 trong 837 trang báo cáo, nên chi phí của bước này còn khoảng 40\% so
+với chép lại toàn bộ. Kết quả chỉ dùng cho ô chưa kiểm được, theo hai trạng thái mới trên giao diện:
+\begin{itemize}
+  \item \textbf{Hai lần đọc trùng nhau}: thêm một bằng chứng độc lập, nhưng không tính vào nhóm được phép kiểm xác nhận,
+        vì hai người đọc cùng sai thành một số tuy hiếm nhưng không bị loại trừ như với phép cộng. Trên 119 BCTC, 1.238
+        trong 1.923 ô chưa kiểm được (3,5\% tổng số ô) thuộc trạng thái này. 685 ô còn lại (2,0\%) phần lớn là lãi trên
+        cổ phiếu, tính bằng đồng chứ không theo đơn vị của bảng nên chưa so, và các ô người đọc thứ hai không chép.
+  \item \textbf{Hai lần đọc khác nhau}: ô được tô màu \enquote{cần xem lại} và đếm vào số ô cần xem của BCTC trong thư báo
+        quản trị, nhưng \textbf{không} làm BCTC mất trạng thái đạt kiểm chứng. Người đọc thứ hai không nhất thiết đọc tốt
+        hơn: với BCTC do Claude Haiku 5.5 đọc lần đầu, người đọc thứ hai là gpt-5.4-mini, mô hình hiện chỉ làm dự phòng.
+        Nếu chặn BCTC theo người đọc thứ hai, mỗi lỗi của chính người này sẽ giữ cả BCTC lại chờ duyệt.
+\end{itemize}
+Hai cột của BCTC bán niên và BCTC năm được so theo cả hai cách gán cột (cả kỳ hoặc lũy kế), và ô cùng dãy chữ số nhưng
+hai bên hiểu đơn vị tính khác nhau được coi là trùng, vì đơn vị do code xác định và đã có phép kiểm riêng.
 
 \section{Chi phí}
 \subsection{Cách tính}
@@ -1661,7 +1678,6 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Tìm nguyên nhân biến động trong thuyết minh và công văn giải trình}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam
-\subsection{Đọc lần thứ hai bằng nhà cung cấp khác cho ô không có phép kiểm, trong quy trình xử lý BCTC mới}\chualam
 \subsection{Xác suất đúng cho từng ô và bước kiểm chứng tự chọn công cụ theo lợi ích trên chi phí}\chualam
 \subsection{Đo độ đúng trên BCTC xuất thẳng từ phần mềm (lớp chữ làm đáp án) theo chất lượng ảnh}\chualam
 \subsection{Sàng lọc doanh nghiệp tăng trưởng và kiểm định lịch sử (backtest)}\chualam

@@ -11,6 +11,8 @@ phải đã được người đối chiếu với ảnh gốc; chỉ nhóm "s�
   5 cần xem lại: phép cộng hoặc BCTC kỳ khác chỉ ra nghi sai, chưa xử lý
   6 chưa kiểm được: không nằm trong phép kiểm nào (kể cả ô khác BCTC kỳ khác mà không có phép cộng nào xác nhận)
   7 lệch do chính BCTC: phép kiểm vẫn lệch nhưng người đã đối chiếu ảnh và duyệt BCTC (in sai trong bản công bố)
+  8 chưa có phép kiểm nhưng người đọc thứ hai (mô hình khác hãng, services/extraction/second_read.py) đọc ra cùng số;
+    ô hai lần đọc khác nhau vào nhóm 5. Nhóm 8 không tính vào "được xác nhận": trùng nhau không phải phép kiểm.
 """
 
 from __future__ import annotations
@@ -28,7 +30,8 @@ from services.extraction.pipeline import _check_cached, _load_record
 NAMES = {1: "đúng ngay lần đọc đầu, có ràng buộc xác nhận", 2: "đọc lại riêng ô rồi mới khớp",
          3: "thuộc báo cáo phải chép lại trang", 4: "sửa tay sau khi đối chiếu ảnh",
          5: "cần xem lại (nghi sai, chưa xử lý)", 6: "chưa kiểm được",
-         7: "lệch do chính BCTC (đã đối chiếu ảnh, duyệt tay)"}
+         7: "lệch do chính BCTC (đã đối chiếu ảnh, duyệt tay)",
+         8: "chưa có phép kiểm, hai lần đọc độc lập trùng nhau"}
 
 
 def _digits(s: str | None) -> str:
@@ -71,6 +74,10 @@ def classify(conn, document_id: int) -> list[tuple[int, str, int, str, str, str]
                     cat = 3
                 elif status == "conflict":
                     cat = 7 if approved else 5
+                elif status == "second_differs":
+                    cat = 5
+                elif status == "second":
+                    cat = 8
                 elif status == "none" or (status in ("differs", "restated") and not s.get("sum")):
                     cat = 6
                 else:
@@ -92,7 +99,7 @@ def main() -> None:
         for d, ticker, period in docs:
             for cat, st, row, col, template, label in classify(conn, d):
                 tally[cat] += 1
-                if cat == 6:
+                if cat in (6, 8):
                     by_template[template] += 1
                 if cat == 5:
                     review.append(f"{ticker} {period} (doc {d}) {st} dòng {row} {label[:40]} {col}")
@@ -102,7 +109,7 @@ def main() -> None:
         print(f"  {cat}. {NAMES[cat]}: {tally[cat]:,} ({100 * tally[cat] / n:.1f}%)")
     confirmed = tally[1] + tally[2] + tally[3] + tally[4]
     print(f"Được ràng buộc xác nhận (nhóm 1-4): {confirmed:,} ({100 * confirmed / n:.1f}%)")
-    print("Chưa kiểm được theo mẫu:", dict(by_template))
+    print("Chưa kiểm được (nhóm 6 và 8) theo mẫu:", dict(by_template))
     if args.list_review:
         for r in review:
             print("  cần xem lại:", r)

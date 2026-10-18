@@ -10,6 +10,9 @@ Hai nguồn bằng chứng, đều không gọi mô hình:
     Hai lần đọc độc lập cùng sai thành một con số giống hệt nhau là rất khó, nên khớp giữa các kỳ là bằng chứng mạnh,
     và bắt được cả ô không thuộc ràng buộc cộng tổng nào.
 
+Nguồn thứ ba cho ô chưa có hai nguồn trên (services/extraction/second_read.py): một mô hình khác hãng chép lại cả báo
+cáo; hai lần đọc trùng nhau là bằng chứng yếu hơn phép kiểm, khác nhau thì ô cần xem lại nhưng không chặn BCTC.
+
 Ô được nhận diện theo mã số (doanh nghiệp thường, CTCK) hoặc mã chuẩn b.* (ngân hàng); dòng không có mã thì theo tên
 chỉ tiêu đã bỏ dấu. Số liệu năm trước BCTC ghi "trình bày lại" thì lệch giữa các kỳ được ghi là trình bày lại, không
 coi là lỗi đọc.
@@ -258,12 +261,35 @@ STATUS_LABELS = {
     "period": "Khớp giữa các kỳ",
     "sum": "Khớp cộng tổng",
     "restated": "Khác kỳ trước do trình bày lại",
+    "second": "Chưa có phép kiểm; hai lần đọc độc lập trùng nhau",
+    "second_differs": "Chưa có phép kiểm; hai lần đọc khác nhau, cần xem lại",
     "none": "Chưa kiểm được",
 }
 
+# BCTC bán niên/năm chỉ in một cặp cột cả kỳ; mỗi lần chép có thể ghi vào q_* hoặc ytd_*
+TWIN = {"q_cur": "ytd_cur", "ytd_cur": "q_cur", "q_prev_year": "ytd_prev_year", "ytd_prev_year": "q_prev_year"}
 
-def cell_status(cells: Cells, period_checks: list[PeriodCheck]) -> dict[tuple[str, str, str], dict]:
-    """Trạng thái từng ô (báo cáo, khóa, cột) của tài liệu `cells`."""
+
+def second_value(cells: Cells, theirs: Cells, cell: tuple[str, str, str], doc_type: str | None) -> Decimal | None:
+    """Số người đọc thứ hai chép cho ô `cell` của `cells` (None nếu không thấy)."""
+    st, key, col = cell
+    got = theirs.values.get((st, key), {})
+    b = got.get(col)
+    if b is None and doc_type in ("fs_semiannual", "fs_annual") and col in TWIN:
+        b = got.get(TWIN[col])
+    return b
+
+
+def same_reading(a: Decimal, b: Decimal) -> bool:
+    """Hai lần đọc ra cùng một số, kể cả cùng dãy chữ số nhưng hiểu đơn vị tính khác nhau (đơn vị là việc của code,
+    không phải lỗi đọc chữ số; lệch đơn vị cả bảng đã có phép kiểm riêng)."""
+    return a == b or (b != 0 and any(a == b * Decimal(1000) ** k or b == a * Decimal(1000) ** k for k in (1, 2, 3)))
+
+
+def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | None = None,
+                doc_type: str | None = None) -> dict[tuple[str, str, str], dict]:
+    """Trạng thái từng ô (báo cáo, khóa, cột) của tài liệu `cells`. `second`: lần đọc thứ hai của chính tài liệu này,
+    chỉ dùng cho ô không có phép kiểm nào."""
     period_ok: dict[tuple, list[str]] = {}
     period_bad: dict[tuple, list[str]] = {}
     period_restated: set[tuple] = set()
@@ -303,8 +329,17 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck]) -> dict[tuple[st
                 status = "restated"
             else:
                 status = "none"
-            out[cell] = {"status": status, "sum": sums, "period": per, "conflict": bad_sum + bad_per,
-                         "differs": period_differs.get(cell, [])}
+            entry = {"status": status, "sum": sums, "period": per, "conflict": bad_sum + bad_per,
+                     "differs": period_differs.get(cell, [])}
+            if status == "none" and second is not None:
+                b = second_value(cells, second, cell, doc_type)
+                if b is not None:
+                    entry["status"] = "second" if same_reading(vals[col], b) else "second_differs"
+                    entry["second"] = str(b)
+                    printed = b / cells.multiplier.get(st, Decimal(1))      # theo đơn vị in trên BCTC, để hiện trên web
+                    entry["second_printed"] = (f"{printed:,.0f}".replace(",", ".") if printed == printed.to_integral()
+                                               else str(printed))
+            out[cell] = entry
     return out
 
 
@@ -378,11 +413,12 @@ def document_evidence(conn, document_id: int, load=None, cells_fn=None) -> Docum
         except RuntimeError:
             return None
 
-    period = conn.execute("SELECT fiscal_period FROM documents WHERE id = %s", (document_id,)).fetchone()
+    period = conn.execute("SELECT fiscal_period, doc_type FROM documents WHERE id = %s", (document_id,)).fetchone()
     record = _load(document_id)
     if period is None or record is None:
         return None
     cells = cells_fn(document_id, period[0], record)
+    second = second_cells(document_id, period[0], record, cells_fn)
     checks: list[PeriodCheck] = []
     peers = neighbours(conn, document_id)
     for peer_id, peer_period, relation in peers:
@@ -395,4 +431,14 @@ def document_evidence(conn, document_id: int, load=None, cells_fn=None) -> Docum
                    "prev_year_end": lambda: compare_year_start(peer, cells),
                    "next_year_start": lambda: compare_year_start(cells, peer),
                    }[relation]()
-    return DocumentEvidence(cells, checks, cell_status(cells, checks), peers)
+    return DocumentEvidence(cells, checks, cell_status(cells, checks, second, period[1]), peers)
+
+
+def second_cells(document_id: int, period: str, record: dict, cells_fn=None) -> Cells | None:
+    """Ô theo lần đọc thứ hai đã lưu trong bản ghi (record["second_read"]["raw"]), cùng cách nhận diện ô như lần đầu."""
+    second = record.get("second_read")
+    if not second or not second.get("raw"):
+        return None
+    other = {k: v for k, v in record.items() if k not in ("second_read", "raw", "cell_verifications")}
+    other["raw"] = second["raw"]
+    return (cells_fn or cells_of)(document_id, period, other)

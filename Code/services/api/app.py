@@ -265,7 +265,9 @@ def index(request: Request, year: int | None = None, period: str | None = None, 
         if ev:
             n = ev.counts()
             total = sum(n.values())
-            cov = {"checked": (total - n["none"] - n["restated"]) / total if total else 0, "conflict": n["conflict"],
+            unchecked = n["none"] + n["restated"] + n["second"] + n["second_differs"]
+            cov = {"checked": (total - unchecked) / total if total else 0,
+                   "conflict": n["conflict"] + n["second_differs"],
                    "peers": ", ".join(p for _, p, _ in ev.peers)}
         docs.append({"id": r[0], "ticker": r[1], "name": r[2], "kind": r[3], "scope": r[4], "status": r[5],
                      "template": r[6], "title": r[7], "listed_at": r[8], "processed_at": r[9], "gate": r[10],

@@ -6,16 +6,24 @@ from services.ingestion.titles import parse_title
 from services.ingestion.vietstock import parse_dotnet_date
 
 FIXTURE = Path(__file__).parent / "fixtures" / "vietstock_titles_vn30_2025_2026.txt"
+EXPLANATIONS = Path(__file__).parent / "fixtures" / "vietstock_explanation_titles_vn30_2025_2026.txt"
 
 
-def _real_titles() -> list[str]:
-    lines = FIXTURE.read_text(encoding="utf-8").splitlines()
+def _real_titles(path: Path = FIXTURE) -> list[str]:
+    lines = path.read_text(encoding="utf-8").splitlines()
     return [line for line in lines if line and not line.startswith("#")]
 
 
 @pytest.mark.parametrize("title", _real_titles())
 def test_every_real_title_is_recognized(title):
-    assert parse_title(title).is_recognized, title
+    info = parse_title(title)
+    assert info.is_recognized and info.doc_type != "explanation", title
+
+
+@pytest.mark.parametrize("title", _real_titles(EXPLANATIONS))
+def test_every_real_explanation_title_is_recognized(title):
+    info = parse_title(title)
+    assert info.is_recognized and info.doc_type == "explanation" and info.content_kind == "explanation", title
 
 
 @pytest.mark.parametrize(
@@ -39,6 +47,10 @@ def test_every_real_title_is_recognized(title):
          ("cash_flow", "fs_quarter", 2025, "Q1", "consolidated", "none", True)),
         ("Thuyết minh BCTC Hợp nhất Kiểm toán năm 2025 (điều chỉnh)",
          ("notes", "fs_annual", 2025, "FY", "consolidated", "audited", True)),
+        ("Giải trình kết quả kinh doanh Hợp nhất quý 2 năm 2026 ",
+         ("explanation", "explanation", 2026, "Q2", "consolidated", "none", False)),
+        ("Giải trình kết quả kinh doanh Soát xét 6 tháng đầu năm 2026",
+         ("explanation", "explanation", 2026, "H1", "standalone", "reviewed", False)),
     ],
 )
 def test_parse_title(title, expected):

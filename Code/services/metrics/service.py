@@ -65,8 +65,20 @@ def card_for(conn: psycopg.Connection, document_id: int) -> tuple[Card, dict] | 
             "reviewed": {"fs_semiannual": "Đã soát xét", "fs_annual": "Đã kiểm toán"}.get(doc_type, "Chưa soát xét"),
             "listed_at": listed, "processed_at": processed, "source_url": url, "title": title,
             "gate": (s.get("gate_checks", 0) - s.get("gate_failed", 0), s.get("gate_checks", 0)),
-            "manual_fixes": len(rec.get("manual_fixes", []))}
+            "manual_fixes": len(rec.get("manual_fixes", [])),
+            "explanation": explanation(conn, ticker, year, period, scope)}
     return card, info
+
+
+def explanation(conn: psycopg.Connection, ticker: str, year: int, period: str, scope: str) -> dict | None:
+    """Công văn giải trình kết quả kinh doanh của công ty cho cùng kỳ (ưu tiên cùng phạm vi BCTC), bản đăng sau cùng."""
+    row = conn.execute(
+        """SELECT title_raw, source_url FROM documents
+           WHERE ticker = %s AND fiscal_year = %s AND fiscal_period = %s AND doc_type = 'explanation'
+             AND owner_user_id IS NULL
+           ORDER BY (scope = %s) DESC, source_listed_at DESC NULLS LAST LIMIT 1""",
+        (ticker, year, period, scope)).fetchone()
+    return {"title": row[0].strip(), "url": row[1]} if row else None
 
 
 def quarter_document(conn: psycopg.Connection, ticker: str, year: int, period: str) -> int | None:

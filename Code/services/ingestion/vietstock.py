@@ -16,6 +16,7 @@ import requests
 
 BASE_URL = "https://finance.vietstock.vn"
 DOC_TYPE_FINANCIAL_STATEMENTS = 1  # tham số `type` của Vietstock cho BCTC
+DOC_TYPE_EXPLANATIONS = 8          # mục "Giải trình KQKD": công văn giải trình biến động lợi nhuận
 
 _USER_AGENT = "Mozilla/5.0"
 _TOKEN_RE = re.compile(r"name=__RequestVerificationToken[^>]*value=([^\s>]+)")
@@ -57,8 +58,15 @@ class VietstockClient:
         return m.group(1).strip("\"'")
 
     def list_financial_statements(self, ticker: str, year: int | None = None, max_pages: int = 30) -> list[SourceDocument]:
+        return self.list_documents(ticker, DOC_TYPE_FINANCIAL_STATEMENTS, year, max_pages)
+
+    def list_explanations(self, ticker: str, year: int | None = None, max_pages: int = 30) -> list[SourceDocument]:
+        return self.list_documents(ticker, DOC_TYPE_EXPLANATIONS, year, max_pages)
+
+    def list_documents(self, ticker: str, doc_type: int, year: int | None = None,
+                       max_pages: int = 30) -> list[SourceDocument]:
         ticker = ticker.upper()
-        page_url = f"{BASE_URL}/{ticker}/tai-tai-lieu.htm?doctype={DOC_TYPE_FINANCIAL_STATEMENTS}"
+        page_url = f"{BASE_URL}/{ticker}/tai-tai-lieu.htm?doctype={doc_type}"
         token = self._token(page_url)
         headers = {"X-Requested-With": "XMLHttpRequest", "Referer": page_url}
 
@@ -68,7 +76,7 @@ class VietstockClient:
             payload: dict[str, object] = {
                 "code": ticker,
                 "page": page,
-                "type": DOC_TYPE_FINANCIAL_STATEMENTS,
+                "type": doc_type,
                 "__RequestVerificationToken": token,
             }
             if year is not None:

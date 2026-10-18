@@ -182,7 +182,7 @@ ràng buộc đòi hỏi. Chỉ số liệu đã qua kiểm chứng mới đư�
 báo và xếp hạng. Mỗi con số trên giao diện đều mở được đúng trang BCTC gốc.
 
 Đến ngày 14/10/2026, trên nhóm VN30, hệ thống đã đọc 120 BCTC (quý 4/2025, quý 1 và quý 2/2026, bán niên 2026). Trong
-đó 119 BCTC đạt kiểm chứng hoặc được duyệt tay, và 94,4\% trong khoảng 35.000 ô số được phép kiểm kế toán xác nhận (chưa phải đối chiếu từng ô với ảnh gốc). Chi phí gọi mô hình để đọc một BCTC trung bình
+đó 119 BCTC đạt kiểm chứng hoặc được duyệt tay, và 94,6\% trong khoảng 35.000 ô số được phép kiểm kế toán xác nhận (chưa phải đối chiếu từng ô với ảnh gốc). Chi phí gọi mô hình để đọc một BCTC trung bình
 khoảng 0,12 USD (trung vị 0,08 USD), chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
 trong chính BCTC. Các phần agent phân tích, chỉ số tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho
 người dùng thật được liệt kê ở Chương~\ref{chap:ketluan} dưới dạng đề mục, sẽ hoàn thiện ở các giai đoạn sau.
@@ -870,6 +870,12 @@ Việt, bộ luật nhận dạng xác định bộ khóa: mã, loại báo cáo
 kỳ, phạm vi (hợp nhất, riêng, duy nhất), trạng thái soát xét hay kiểm toán, và có phải bản điều chỉnh hay không.
 Bộ luật được kiểm thử trên toàn bộ tiêu đề thật của VN30 năm 2025--2026. Lần chạy đầu nhận dạng đúng 174/174 tài liệu.
 
+Cùng lượt quét, watcher lấy cả mục \enquote{Giải trình KQKD} của Vietstock: công văn công ty phải gửi khi lợi nhuận
+biến động từ 10\% so với cùng kỳ hoặc khi số sau soát xét, kiểm toán khác số tự lập. Công văn được lưu như một loại tài
+liệu riêng, gắn với kỳ BCTC mà nó giải trình, không đi vào bước đọc số; thẻ KQKD của kỳ đó dẫn tới công văn. Năm
+2025--2026 có 91 công văn của 20/30 mã VN30, phần lớn là bản scan dài hai trang. Đây là nguồn dữ liệu cho phần tìm nguyên
+nhân biến động ở giai đoạn sau.
+
 \subsection{Lưu trữ và phiên bản}
 \begin{itemize}
   \item Mỗi file được băm SHA-256. Cùng khóa nhưng khác hash là phiên bản mới, không ghi đè bản cũ.
@@ -1302,18 +1308,18 @@ thì ước lượng bằng một người đọc thứ hai độc lập (mục~
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 \textbf{Loại} & \textbf{Số ô} & \textbf{Tỷ lệ} \\ \midrule
-Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 31.473 & 89,7\% \\
+Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 31.519 & 89,8\% \\
 Thuộc báo cáo phải chép lại trang, sau đó có phép kiểm xác nhận & 1.443 & 4,1\% \\
 Đọc lại riêng ô (định vị ô sai, đối chiếu kỳ) rồi mới khớp & 57 & 0,2\% \\
 Người duyệt sửa sau khi đối chiếu ảnh gốc & 151 & 0,4\% \\
 Phép kiểm vẫn lệch, người duyệt đã đối chiếu ảnh: chính BCTC in lệch & 33 & 0,1\% \\
-Chưa kiểm được: dòng không thuộc phép cộng nào của mẫu biểu & 815 & 2,3\% \\
+Chưa kiểm được: dòng không thuộc phép cộng nào của mẫu biểu & 769 & 2,2\% \\
 Chưa kiểm được: dòng có phép cộng nhưng hệ thống chưa khai báo & 1.108 & 3,2\% \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Như vậy 94,4\% số ô được phép kiểm xác nhận. Nhóm chưa kiểm được tách làm hai. Phần thứ nhất là các dòng mà mẫu biểu không
+Như vậy 94,6\% số ô được phép kiểm xác nhận. Nhóm chưa kiểm được tách làm hai. Phần thứ nhất là các dòng mà mẫu biểu không
 đặt vào phép cộng nào: mục ngoài bảng của ngân hàng (cam kết, bảo lãnh, nợ khó đòi đã xử lý), lãi trên cổ phiếu và các
 dòng \enquote{trong đó}; chúng chỉ được xác nhận khi có BCTC kỳ khác để đối chiếu, và phép tính của chúng nằm trong thuyết
 minh (hướng mở rộng ở chương~\ref{chap:ketluan}). Phần thứ hai là các dòng có phép cộng mà hệ thống chưa khai báo, chủ yếu
@@ -1398,9 +1404,11 @@ trên 119 BCTC hiện có, các báo cáo đó chiếm 321 trong 837 trang báo 
 với chép lại toàn bộ. Kết quả chỉ dùng cho ô chưa kiểm được, theo hai trạng thái mới trên giao diện:
 \begin{itemize}
   \item \textbf{Hai lần đọc trùng nhau}: thêm một bằng chứng độc lập, nhưng không tính vào nhóm được phép kiểm xác nhận,
-        vì hai người đọc cùng sai thành một số tuy hiếm nhưng không bị loại trừ như với phép cộng. Trên 119 BCTC, 1.238
-        trong 1.923 ô chưa kiểm được (3,5\% tổng số ô) thuộc trạng thái này. 685 ô còn lại (2,0\%) phần lớn là lãi trên
-        cổ phiếu, tính bằng đồng chứ không theo đơn vị của bảng nên chưa so, và các ô người đọc thứ hai không chép.
+        vì hai người đọc cùng sai thành một số tuy hiếm nhưng không bị loại trừ như với phép cộng. Trên 119 BCTC, 1.498
+        trong 1.877 ô chưa kiểm được (4,3\% tổng số ô) thuộc trạng thái này, gồm 266/282 ô lãi trên cổ phiếu (so theo
+        đồng, không theo đơn vị của bảng) và 345/372 ô ngoài bảng của ngân hàng. 379 ô còn lại (1,1\%) chủ yếu là ô
+        người đọc thứ hai không chép. Lãi trên cổ phiếu của BCTC quý 1 có thêm phép kiểm riêng: số quý và số lũy kế in ở
+        hai cột khác nhau nhưng phải bằng nhau.
   \item \textbf{Hai lần đọc khác nhau}: ô được tô màu \enquote{cần xem lại} và đếm vào số ô cần xem của BCTC trong thư báo
         quản trị, nhưng \textbf{không} làm BCTC mất trạng thái đạt kiểm chứng. Người đọc thứ hai không nhất thiết đọc tốt
         hơn: với BCTC do Claude Haiku 5.5 đọc lần đầu, người đọc thứ hai là gpt-5.4-mini, mô hình hiện chỉ làm dự phòng.
@@ -1657,7 +1665,7 @@ nhầm dòng}. Vì vậy đối chiếu nguồn ngoài đã trở thành bước
 \section{Kết luận}
 Đến giữa tháng 10/2026, Soi đã có đủ chuỗi xử lý: thu thập BCTC, đọc bằng mô hình thị giác, kiểm chứng bằng ràng buộc kế
 toán, tự định vị và sửa ô đọc sai, tính thẻ KQKD có cờ cảnh báo, và giao diện web. Trên VN30, 119/120 BCTC (quý và bán niên) đạt
-kiểm chứng hoặc được duyệt tay, 94,4\% số ô được phép kiểm kế toán xác nhận, với chi phí đọc trung bình khoảng 0,12 USD
+kiểm chứng hoặc được duyệt tay, 94,6\% số ô được phép kiểm kế toán xác nhận, với chi phí đọc trung bình khoảng 0,12 USD
 mỗi BCTC (khoảng 3--3,5 USD cho
 cả nhóm VN30 mỗi mùa BCTC quý). Đối chiếu với nguồn ngoài cho thấy số liệu khớp ở 208/211 ô, và cả 3 ô
 lệch đều có lời giải thích từ chính BCTC.

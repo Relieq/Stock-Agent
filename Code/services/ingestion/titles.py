@@ -6,6 +6,7 @@ Luật viết theo tiêu đề thực tế của Vietstock (526 tài liệu năm
     "BCTC Kiểm toán năm 2025"                       (công ty không có công ty con)
     "KQKD Hợp nhất Soát xét quý 3 năm 2025"         (chỉ có báo cáo KQKD)
     "Thuyết minh BCTC Hợp nhất quý 1 năm 2025 (điều chỉnh)"
+    "Giải trình kết quả kinh doanh Hợp nhất quý 2 năm 2026"   (công văn giải trình biến động lợi nhuận, mục riêng)
 
 Trường nào không nhận dạng được thì để None; không đoán.
 """
@@ -26,8 +27,12 @@ DOC_TYPE_BY_PERIOD = {
     "FY": "fs_annual",
 }
 
+# Công văn giải trình không phải BCTC: loại tài liệu riêng, kỳ là kỳ BCTC được giải trình
+EXPLANATION = "explanation"
+
 # Thứ tự quan trọng: "thuyết minh bctc" phải đứng trước "bctc"
 _CONTENT_PREFIXES = [
+    ("giải trình", EXPLANATION),
     ("thuyết minh bctc", "notes"),
     ("bctc", "full"),
     ("kqkd", "income_statement"),
@@ -99,7 +104,8 @@ def parse_title(title: str) -> TitleInfo:
 
     return TitleInfo(
         content_kind=content_kind,
-        doc_type=DOC_TYPE_BY_PERIOD.get(fiscal_period) if fiscal_period else None,
+        doc_type=(EXPLANATION if content_kind == EXPLANATION
+                  else DOC_TYPE_BY_PERIOD.get(fiscal_period) if fiscal_period else None),
         fiscal_year=fiscal_year,
         fiscal_period=fiscal_period,
         scope=scope,

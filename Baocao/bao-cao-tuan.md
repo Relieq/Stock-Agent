@@ -31,14 +31,15 @@ Dạ em xin báo cáo tiến độ tuần 5 để thầy nắm ạ:
 - **Người đọc thứ hai độc lập:** cho mô hình khác hãng chép lại cả 119 BCTC (1,39 USD) rồi so từng ô. Ở nhóm đã được phép kiểm xác nhận, chỉ 5 ô do lần đọc đầu sai (khoảng 0,02%). Ở nhóm chưa có phép kiểm, mọi chỗ hai bên khác nhau đều do lần đọc đầu sai, trong đó có 3 khối dòng bị lệch một dòng (SSB, MBB, SSI). Em đã đối chiếu ảnh và sửa 71 số, 6 mã số.
 - **Đưa lần đọc thứ hai vào quy trình chạy thật:** sau khi đọc xong một BCTC mới và báo tin cho người theo dõi, nhà cung cấp còn lại chép lại những báo cáo còn ô chưa có phép kiểm. Ô hai lần đọc trùng nhau có thêm bằng chứng; ô khác nhau được tô "cần xem lại" nhưng không chặn BCTC, vì người đọc thứ hai (gpt-5.4-mini khi Haiku đọc đầu) có thể sai.
 - **Công ty chứng khoán:** tách phần lưu chuyển tiền của khách hàng (đánh mã lại từ 01, trước đây bị cộng nhầm vào phần của công ty) và thêm 11 công thức LCTT; các công thức mới tìm ra thêm 3 ô đọc sai.
-- **Chuẩn bị mùa quý 3:** bộ canh chạy lại trên Docker (sửa lỗi bộ canh chuyển hẳn sang nhà dự phòng sau một lần quá tải và lỗi bỏ sót BCTC khi máy khởi động lại), sao lưu CSDL hằng ngày.
+- **Công văn giải trình kết quả kinh doanh:** bộ canh lấy thêm mục "Giải trình KQKD" trên Vietstock (công văn công ty gửi khi lợi nhuận biến động từ 10%), lưu riêng và gắn vào thẻ KQKD cùng kỳ. Đã tải 91 công văn năm 2025–2026 của 20 mã, làm dữ liệu cho phần tìm nguyên nhân biến động.
+- **Chuẩn bị mùa quý 3:** bộ canh chạy lại trên Docker (sửa lỗi bộ canh chuyển hẳn sang nhà dự phòng sau một lần quá tải và lỗi bỏ sót BCTC khi máy khởi động lại), sao lưu CSDL hằng ngày (tự đưa lên Google Drive), email báo BCTC mới và báo lỗi cho quản trị.
 
 **Kết quả:**
-- **94,4% số ô được phép kiểm xác nhận** (tuần trước 92,8%). Phần chưa kiểm được: 2,3% là dòng mà mẫu biểu không đặt vào phép cộng nào (mục ngoài bảng của ngân hàng, lãi trên cổ phiếu, dòng "trong đó"), 3,2% là dòng có phép cộng nhưng hệ thống chưa khai báo. Trong 5,5% này, 3,5% (tính trên tổng số ô) đã có hai lần đọc độc lập trùng nhau; còn 2,0% chưa có bằng chứng nào, phần lớn là lãi trên cổ phiếu.
+- **94,6% số ô được phép kiểm xác nhận** (tuần trước 92,8%). Phần chưa kiểm được: 2,2% là dòng mà mẫu biểu không đặt vào phép cộng nào (mục ngoài bảng của ngân hàng, lãi trên cổ phiếu, dòng "trong đó"), 3,2% là dòng có phép cộng nhưng hệ thống chưa khai báo. Trong 5,4% này, 4,3% (tính trên tổng số ô) đã có hai lần đọc độc lập trùng nhau; chỉ còn 1,1% chưa có bằng chứng nào.
 - Báo cáo kỹ thuật thêm hai mục: phép thử cấy lỗi và người đọc thứ hai (61 trang).
 
 **Vướng mắc:**
-- Lãi trên cổ phiếu và các dòng không có phép cộng mới chỉ có bằng chứng từ lần đọc thứ hai; phép kiểm thật cho chúng phải lấy từ thuyết minh.
+- Các dòng không có phép cộng (mục ngoài bảng, lãi trên cổ phiếu) mới chỉ có bằng chứng từ lần đọc thứ hai; phép kiểm thật cho chúng phải lấy từ thuyết minh.
 
 **Kế hoạch tuần tới:**
 - Chạy mùa BCTC quý 3/2026 cho VN30.

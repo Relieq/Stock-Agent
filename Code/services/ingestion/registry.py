@@ -73,20 +73,24 @@ def upsert_document(conn: psycopg.Connection, doc: SourceDocument, source: str =
 
 
 def discover(conn: psycopg.Connection, client: VietstockClient, tickers: list[str], year: int | None) -> dict[str, int]:
-    """Lấy danh sách BCTC của từng mã từ Vietstock và ghi vào bảng documents."""
-    stats = {"seen": 0, "new": 0, "errors": 0}
+    """Lấy danh sách BCTC và công văn giải trình kết quả kinh doanh của từng mã từ Vietstock, ghi vào bảng
+    documents (công văn giải trình: doc_type 'explanation', kỳ là kỳ BCTC được giải trình)."""
+    stats = {"seen": 0, "new": 0, "errors": 0, "explanations_new": 0}
     for ticker in tickers:
         try:
             docs = client.list_financial_statements(ticker, year=year)
+            explanations = client.list_explanations(ticker, year=year)
         except Exception as e:  # một mã lỗi không làm dừng cả lượt
             print(f"  {ticker}: lỗi khi lấy danh sách: {e}")
             stats["errors"] += 1
             continue
         with conn.transaction():
             new = sum(upsert_document(conn, d) for d in docs)
+            new_expl = sum(upsert_document(conn, d) for d in explanations)
         stats["seen"] += len(docs)
         stats["new"] += new
-        print(f"  {ticker}: {len(docs)} tài liệu, {new} mới")
+        stats["explanations_new"] += new_expl
+        print(f"  {ticker}: {len(docs)} tài liệu, {new} mới; {len(explanations)} công văn giải trình, {new_expl} mới")
     return stats
 
 

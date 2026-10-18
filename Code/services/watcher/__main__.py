@@ -65,10 +65,15 @@ def _pending_extraction(conn, since: date, year: int) -> list[tuple]:
 
 def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
     vs = VietstockClient()
+    started = datetime.now(timezone.utc)
     with connect() as conn:
         tickers = [r[0] for r in conn.execute("SELECT ticker FROM companies WHERE tracked ORDER BY ticker")]
         stats = discover(conn, vs, tickers, year)
         conn.commit()
+        # Công văn giải trình kết quả kinh doanh: chỉ tải về (cùng lượt tải bên dưới) và báo, chưa đọc nội dung
+        new_explanations = [f"{t}: {title.strip()} (công văn giải trình, đã lưu)" for t, title in conn.execute(
+            "SELECT ticker, title_raw FROM documents WHERE doc_type = 'explanation' AND discovered_at >= %s"
+            " ORDER BY ticker", (started,))]
         # Luôn thử tải các tài liệu chưa có file (kể cả lượt trước tải lỗi); chỉ là một truy vấn nếu không có gì
         for period in ("Q1", "Q2", "Q3", "Q4", "H1", "9M", "FY"):
             download_pending(conn, vs, year=year, period=period, doc_type=None, tickers=None)
@@ -108,13 +113,17 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             )
         # Yêu cầu của người dùng: mã ngoài danh sách, file tải lên
         lines += process_queue(conn, vision)
+        lines += new_explanations
     stamp = datetime.now(VN_TZ).strftime("%d/%m %H:%M")
     print(f"[{stamp}] {stats['seen']} tài liệu trong danh sách, {stats['new']} mới, {len(pending)} BCTC mới đã xử lý")
     if lines:
         body = "\n".join(lines)
         print(body)
         n_review = sum("needs_review" in l or "LỖI" in l for l in lines)
-        notify_admin(f"[Soi] {len(lines)} BCTC mới" + (f", {n_review} cần duyệt" if n_review else ""), body)
+        n_docs = len(lines) - len(new_explanations)
+        parts = ([f"{n_docs} BCTC mới" + (f", {n_review} cần duyệt" if n_review else "")] if n_docs else []) + (
+            [f"{len(new_explanations)} công văn giải trình"] if new_explanations else [])
+        notify_admin("[Soi] " + ", ".join(parts), body)
 
 
 def main() -> None:

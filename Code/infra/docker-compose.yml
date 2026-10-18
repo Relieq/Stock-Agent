@@ -57,8 +57,9 @@ services:
     command: python -u -m services.watcher --interval 15
     restart: unless-stopped
 
-  # Sao lưu hằng ngày (infra/backup.sh). Thư mục đích: biến SOI_BACKUP_DIR trong infra/.env (ví dụ một thư mục Google
-  # Drive đồng bộ trên máy), mặc định Data/backup.
+  # Sao lưu hằng ngày (infra/backup.sh). Thư mục đích: biến SOI_BACKUP_DIR trong infra/.env, mặc định Data/backup.
+  # Không trỏ vào ổ ảo của Google Drive for desktop (G:): Docker Desktop ghi vào một thư mục riêng trong máy ảo, Windows
+  # và Drive không thấy file. Muốn đưa lên Drive thì dùng tính năng sao lưu thư mục của ứng dụng Drive cho Data/backup.
   backup:
     image: pgvector/pgvector:pg16
     container_name: soi-backup

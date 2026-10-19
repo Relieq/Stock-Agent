@@ -182,8 +182,8 @@ ràng buộc đòi hỏi. Chỉ số liệu đã qua kiểm chứng mới đư�
 báo và xếp hạng. Mỗi con số trên giao diện đều mở được đúng trang BCTC gốc.
 
 Trên 119 BCTC của VN30 (quý 4/2025 đến bán niên 2026, khoảng 35.000 ô số), \textbf{97 BCTC (81,5\%) được hệ thống
-xử lý trọn mà không cần người}, và ước tính \textbf{khoảng 99,5\% ô số đúng mà không cần người sửa}; trong đó 94,1\% có
-phép kiểm kế toán tự động xác nhận, 4,3\% có hai lần đọc độc lập của hai mô hình khác hãng trùng nhau. Người chỉ phải
+xử lý trọn mà không cần người}, và ước tính \textbf{khoảng 99,5\% ô số đúng mà không cần người sửa}; trong đó 94,2\% có
+phép kiểm kế toán tự động xác nhận, 4,2\% có hai lần đọc độc lập của hai mô hình khác hãng trùng nhau. Người chỉ phải
 sửa 152 ô (0,4\%), trung bình 8 ô ở mỗi BCTC cần sửa. Chi phí gọi mô hình để đọc một BCTC trung bình
 khoảng 0,12 USD (trung vị 0,08 USD), chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
 trong chính BCTC. Các phần agent phân tích, chỉ số tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho
@@ -1299,8 +1299,8 @@ BCTC người chỉ cần xem ảnh rồi duyệt (chính BCTC in lệch, số �
 BCTC người phải sửa ít nhất một ô & 19/119 \\ \midrule
 \multicolumn{2}{@{}l}{\textit{Theo ô số}} \\
 Ô đúng mà không cần người sửa (ước tính) & \textbf{khoảng 99,5\%} \\
-\quad trong đó có phép kiểm tự động xác nhận & 94,1\% \\
-\quad trong đó chưa có phép kiểm, hai lần đọc độc lập trùng nhau & 4,3\% \\
+\quad trong đó có phép kiểm tự động xác nhận & 94,2\% \\
+\quad trong đó chưa có phép kiểm, hai lần đọc độc lập trùng nhau & 4,2\% \\
 \quad trong đó chỉ có một lần đọc, chưa có bằng chứng nào & 1,1\% \\
 \quad trong đó đọc đúng nhưng chính BCTC in lệch, người xem ảnh xác nhận & 0,1\% \\
 Ô người phải sửa sau khi xem ảnh gốc & 152 (0,4\%) \\ \midrule
@@ -1311,16 +1311,16 @@ Chi phí gọi mô hình để đọc một BCTC & 0,12 USD \\
 
 Cách hiểu từng dòng:
 \begin{itemize}
-  \item \textbf{94,1\% ô có phép kiểm tự động xác nhận} là phần chắc chắn nhất: số khớp một phép cộng của chính BCTC hoặc
-        khớp BCTC kỳ khác, không cần người. Phép thử cấy lỗi (mục~\ref{sec:caloi}) cho thấy phép kiểm bắt được 92\% lỗi
+  \item \textbf{94,2\% ô có phép kiểm tự động xác nhận} là phần chắc chắn nhất: số khớp một phép cộng của chính BCTC hoặc
+        khớp BCTC kỳ khác, không cần người. Phép thử cấy lỗi (mục~\ref{sec:caloi}) cho thấy phép kiểm bắt được 92,5\% lỗi
         nhầm một chữ số và gần như toàn bộ lỗi mất dấu âm hay thiếu chữ số; phần lọt gần như chỉ là chữ số hàng đơn vị,
         nhỏ hơn sai số làm tròn của chính BCTC. Một người đọc khác hãng chép lại toàn bộ (mục~\ref{sec:nguoidoc2}) chỉ
         tìm thêm được 5 ô sai trong nhóm này, khoảng 0,02\%, và các ô đó đã được sửa.
-  \item \textbf{4,3\% ô chưa có phép kiểm nhưng hai lần đọc độc lập trùng nhau}: hai mô hình của hai hãng khác nhau cùng
+  \item \textbf{4,2\% ô chưa có phép kiểm nhưng hai lần đọc độc lập trùng nhau}: hai mô hình của hai hãng khác nhau cùng
         đọc sai thành đúng một con số là rất hiếm, nên các ô này được coi là đúng.
-  \item \textbf{1,1\% ô (377 ô) chỉ có một lần đọc}: chủ yếu là ô người đọc thứ hai không chép. Ở nhóm chưa có phép kiểm,
-        người đọc thứ hai đã tìm ra lỗi ở khoảng 3\% số ô; nếu nhóm 377 ô này sai cùng tỷ lệ thì còn khoảng 10--15 ô
-        sai. Con số 99,5\% ở trên đã trừ phần ước tính này. Kể cả khi giả định cả 377 ô đều sai, tỷ lệ đúng vẫn không
+  \item \textbf{1,1\% ô (373 ô) chỉ có một lần đọc}: chủ yếu là ô người đọc thứ hai không chép. Ở nhóm chưa có phép kiểm,
+        người đọc thứ hai đã tìm ra lỗi ở khoảng 3\% số ô; nếu nhóm 373 ô này sai cùng tỷ lệ thì còn khoảng 10--15 ô
+        sai. Con số 99,5\% ở trên đã trừ phần ước tính này. Kể cả khi giả định cả 373 ô đều sai, tỷ lệ đúng vẫn không
         dưới 98,5\%.
   \item \textbf{152 ô người phải sửa} nằm ở 18 BCTC (cộng một BCTC chỉ sửa mã số của dòng). Có hai nguồn:
         \begin{itemize}
@@ -1334,6 +1334,12 @@ Cách hiểu từng dòng:
         (Hai nhóm cộng lại là 158 ô; 6 ô trong đó là số bị chép nhầm vào ô vốn để trống nên sau khi sửa không còn
         là ô số. 2 BCTC có ô thuộc cả hai nhóm.)
 \end{itemize}
+
+Con số 99,5\% đo công việc của người vận hành: trong tất cả số đã đọc, bao nhiêu không cần người sửa. Với
+\textbf{người dùng xem thẻ KQKD}, điều cần biết là số hiện trên thẻ thuộc nhóm nào. Trên 119 BCTC, thẻ hiện 1.460 số;
+1.339 số lấy thẳng từ một ô đều có phép kiểm xác nhận hoặc đã được đọc lại xác nhận, 5 số là chỗ chính BCTC in lệch
+mà người duyệt đã xem ảnh, 116 số còn lại được code cộng từ nhiều ô của BCTC. Không số nào lấy thẳng từ một ô thuộc nhóm chỉ
+có một lần đọc. Các ô chưa có bằng chứng chỉ nằm ở bảng chi tiết của trang tài liệu và được tô màu riêng.
 
 Hai con số 81,5\% và 99,5\% khác nhau vì đơn vị đếm khác nhau. Một BCTC có khoảng 300 ô; chỉ cần một ô phải sửa
 (hoặc người phải xem ảnh rồi duyệt) là cả BCTC bị tính \enquote{cần người}. Lỗi lại dồn vào một số ít BCTC khó: riêng
@@ -1385,18 +1391,18 @@ thì ước lượng bằng một người đọc thứ hai độc lập (mục~
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 \textbf{Loại} & \textbf{Số ô} & \textbf{Tỷ lệ} \\ \midrule
-Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 31.520 & 89,9\% \\
+Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 31.540 & 89,9\% \\
 Thuộc báo cáo phải chép lại trang, sau đó có phép kiểm xác nhận & 1.443 & 4,1\% \\
 Đọc lại riêng ô (định vị ô sai, đối chiếu kỳ) rồi mới khớp & 57 & 0,2\% \\
 Người duyệt sửa sau khi đối chiếu ảnh gốc & 152 & 0,4\% \\
 Phép kiểm vẫn lệch, người duyệt đã đối chiếu ảnh: chính BCTC in lệch & 33 & 0,1\% \\
 Chưa kiểm được: dòng không thuộc phép cộng nào của mẫu biểu & 767 & 2,2\% \\
-Chưa kiểm được: dòng có phép cộng nhưng hệ thống chưa khai báo & 1.108 & 3,2\% \\
+Chưa kiểm được: dòng có phép cộng nhưng hệ thống chưa khai báo & 1.088 & 3,1\% \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Như vậy 94,6\% số ô được phép kiểm xác nhận, hay 94,1\% nếu không tính 152 ô người sửa (con số dùng ở
+Như vậy 94,6\% số ô được phép kiểm xác nhận, hay 94,2\% nếu không tính 152 ô người sửa (con số dùng ở
 mục~\ref{sec:ketquachinh}). Nhóm chưa kiểm được tách làm hai. Phần thứ nhất là các dòng mà mẫu biểu không
 đặt vào phép cộng nào: mục ngoài bảng của ngân hàng (cam kết, bảo lãnh, nợ khó đòi đã xử lý), lãi trên cổ phiếu và các
 dòng \enquote{trong đó}. Mục ngoài bảng và dòng \enquote{trong đó} chỉ được xác nhận khi có BCTC kỳ khác để đối chiếu;
@@ -1432,10 +1438,10 @@ thật dùng để học tần suất, nửa còn lại dùng để sinh lỗi c
 \begin{tabularx}{\linewidth}{@{}Xrrrr@{}}
 \toprule
 \textbf{Kiểu lỗi} & \textbf{Số lỗi} & \textbf{Phép cộng bắt buộc} & \textbf{Thêm phép kiểm khác} & \textbf{Tổng} \\ \midrule
-Nhầm một chữ số & 2.000 & 81,9\% & 10,4\% & 92,3\% \\
-Mất dấu âm (số trong ngoặc thành số dương) & 500 & 91,0\% & 8,6\% & 99,6\% \\
+Nhầm một chữ số & 2.000 & 81,8\% & 10,7\% & 92,5\% \\
+Mất dấu âm (số trong ngoặc thành số dương) & 500 & 90,6\% & 9,0\% & 99,6\% \\
 Thiếu một chữ số & 500 & 90,0\% & 9,8\% & 99,8\% \\
-Đổi chỗ hai dòng cùng thuộc một phép cộng & 500 & 41,2\% & 42,6\% & 83,8\% \\
+Đổi chỗ hai dòng cùng thuộc một phép cộng & 500 & 41,8\% & 42,2\% & 84,0\% \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -1450,10 +1456,10 @@ Thiếu một chữ số & 500 & 90,0\% & 9,8\% & 99,8\% \\
         trước). Lỗi này chỉ lọt khi không có BCTC kỳ khác của cùng công ty.
 \end{itemize}
 
-Với các lỗi nhầm chữ số bị phép cộng bắt, bước định vị lỗi chỉ ra đúng một ô và đúng số ở 31\% trường hợp; ở 68\%
-trường hợp ô đúng nằm trong một nhóm trung bình 6 ô cùng làm khớp phép cộng, cần đọc lại để chọn; chỉ 1 trong 1.638 lần
-đề xuất nhầm ô. Khi xếp nhóm này theo tần suất nhầm thật thay vì theo số chữ số phải đổi, ô đúng đứng đầu 68\% so với
-36\%; trên các lỗi thật đã sửa (mỗi BCTC dùng tần suất học từ các BCTC khác) tỷ lệ này là 22/33. Xác suất này được dùng để chọn khi lần
+Với các lỗi nhầm chữ số bị phép cộng bắt, bước định vị lỗi chỉ ra đúng một ô và đúng số ở 29\% trường hợp; ở 70\%
+trường hợp ô đúng nằm trong một nhóm trung bình 6 ô cùng làm khớp phép cộng, cần đọc lại để chọn; không lần nào đề xuất
+nhầm ô. Khi xếp nhóm này theo tần suất nhầm thật thay vì theo số chữ số phải đổi, ô đúng đứng đầu 69\% so với
+38\%; trên các lỗi thật đã sửa (mỗi BCTC dùng tần suất học từ các BCTC khác) tỷ lệ này là 22/33. Xác suất này được dùng để chọn khi lần
 đọc lại xác nhận nhiều hơn một ô trong nhóm, và để gợi ý ô cần xem trước cho người duyệt.
 
 \section{Người đọc thứ hai}\label{sec:nguoidoc2}
@@ -1463,7 +1469,7 @@ gpt-5.4-mini đọc), rồi so từng ô với số đang lưu. Chi phí 1,39 US
 số của người thứ hai vào; nếu làm lệch phép kiểm đang khớp thì người thứ hai đọc sai), phần còn lại đối chiếu ảnh gốc.
 
 \begin{itemize}
-  \item \textbf{Nhóm đã được phép kiểm xác nhận} (33.170 ô): hai lần đọc trùng ở 97,8\%; 274 ô người thứ hai không chép. Phần lớn chỗ khác là
+  \item \textbf{Nhóm đã được phép kiểm xác nhận} (33.190 ô): hai lần đọc trùng ở 97,8\%; 274 ô người thứ hai không chép. Phần lớn chỗ khác là
         người thứ hai hiểu sai đơn vị tính của cả bảng ở hai BCTC ngân hàng (cùng dãy chữ số); các chỗ khác chữ số đều
         do người thứ hai đọc sai, trừ 5 ô do lần đọc đầu sai (hai ô ở chữ số hàng đơn vị nằm dưới con dấu, đúng kiểu lỗi
         mà phép thử cấy lỗi chỉ ra là lọt). Tỷ lệ sai của nhóm đã xác nhận vì vậy vào khoảng 5/33.000, tức 0,02\%.
@@ -1486,9 +1492,9 @@ trên 119 BCTC hiện có, các báo cáo đó chiếm 395 trong 837 trang báo 
 với chép lại toàn bộ. Kết quả chỉ dùng cho ô chưa kiểm được, theo hai trạng thái mới trên giao diện:
 \begin{itemize}
   \item \textbf{Hai lần đọc trùng nhau}: thêm một bằng chứng độc lập, nhưng không tính vào nhóm được phép kiểm xác nhận,
-        vì hai người đọc cùng sai thành một số tuy hiếm nhưng không bị loại trừ như với phép cộng. Trên 119 BCTC, 1.498
-        trong 1.875 ô chưa kiểm được (4,3\% tổng số ô) thuộc trạng thái này, gồm 266/281 ô lãi trên cổ phiếu (so theo
-        đồng, không theo đơn vị của bảng) và 345/371 ô ngoài bảng của ngân hàng. 377 ô còn lại (1,1\%) chủ yếu là ô
+        vì hai người đọc cùng sai thành một số tuy hiếm nhưng không bị loại trừ như với phép cộng. Trên 119 BCTC, 1.482
+        trong 1.855 ô chưa kiểm được (4,2\% tổng số ô) thuộc trạng thái này, gồm 266/281 ô lãi trên cổ phiếu (so theo
+        đồng, không theo đơn vị của bảng) và 345/371 ô ngoài bảng của ngân hàng. 373 ô còn lại (1,1\%) chủ yếu là ô
         người đọc thứ hai không chép. Lãi trên cổ phiếu của BCTC quý 1 có thêm phép kiểm riêng: số quý và số lũy kế in ở
         hai cột khác nhau nhưng phải bằng nhau.
   \item \textbf{Hai lần đọc khác nhau}: ô được tô màu \enquote{cần xem lại} và đếm vào số ô cần xem của BCTC trong thư báo
@@ -1752,7 +1758,7 @@ nhầm dòng}. Vì vậy đối chiếu nguồn ngoài đã trở thành bước
 Đến giữa tháng 10/2026, Soi đã có đủ chuỗi xử lý: thu thập BCTC, đọc bằng mô hình thị giác, kiểm chứng bằng ràng buộc kế
 toán, tự định vị và sửa ô đọc sai, đọc lần hai bằng mô hình khác hãng, tính thẻ KQKD có cờ cảnh báo, và giao diện web.
 Trên 119 BCTC của VN30, hệ thống tự xử lý trọn 97 BCTC (81,5\%) mà không cần người, và ước tính khoảng 99,5\% ô số đúng
-mà không cần người sửa (94,1\% có phép kiểm tự động xác nhận). Người chỉ phải sửa 152 ô, trung bình 8 ô ở mỗi BCTC cần
+mà không cần người sửa (94,2\% có phép kiểm tự động xác nhận). Người chỉ phải sửa 152 ô, trung bình 8 ô ở mỗi BCTC cần
 sửa thay vì nhập lại khoảng 300 ô. Chi phí đọc trung bình khoảng 0,12 USD mỗi BCTC (khoảng 3--3,5 USD cho
 cả nhóm VN30 mỗi mùa BCTC quý). Đối chiếu với nguồn ngoài cho thấy số liệu khớp ở 208/211 ô, và cả 3 ô
 lệch đều có lời giải thích từ chính BCTC.

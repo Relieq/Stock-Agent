@@ -11,6 +11,9 @@ các BCTC đã phát hiện mà chưa đọc (ví dụ do hết tiền) bị b�
 
 Mỗi lượt tạo kết nối mô hình mới: nhà cung cấp bị đánh dấu hỏng (quá tải, giới hạn lượt) được thử lại ở lượt sau, và
 lựa chọn trên trang quản trị có hiệu lực mà không phải khởi động lại. BCTC đọc lỗi được thử lại một lần ở lượt sau.
+
+Sau mỗi lượt bộ canh ghi thời điểm vào Data/raw/watcher_heartbeat.txt. Khi khởi động mà lượt trước đã cách quá hai lượt
+thì gửi thư cho quản trị: tối 18/10/2026 Docker dừng, bộ canh nằm im gần một ngày mà không ai biết.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from datetime import date, datetime, timedelta, timezone
 from services.db import connect
 from services.extraction.pipeline import extract_document
 from services.extraction.second_read import after_extraction
-from services.ingestion.registry import discover, download_pending
+from services.ingestion.registry import discover, download_pending, raw_data_dir
 from services.ingestion.vietstock import VietstockClient
 from services.llm import VisionClient
 from services.alerts import notify_watchers
@@ -44,6 +47,36 @@ def _quarter_start(today: date) -> date:
 
 
 _retried: set[int] = set()      # BCTC lỗi đã thử lại trong tiến trình này (mỗi BCTC thử lại một lần)
+
+
+def _heartbeat_path():
+    return raw_data_dir() / "watcher_heartbeat.txt"
+
+
+def _last_heartbeat() -> datetime | None:
+    try:
+        return datetime.fromisoformat(_heartbeat_path().read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _beat() -> None:
+    try:
+        _heartbeat_path().write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def downtime_notice(last: datetime | None, now: datetime, interval_min: int) -> str | None:
+    """Nội dung thư báo bộ canh vừa chạy lại sau một thời gian dừng; None nếu không cần báo. Khoảng lặng chỉ hơn một
+    lượt (khởi động lại sau khi sửa code) thì không báo."""
+    if last is None or now - last <= timedelta(minutes=2 * interval_min + 5):
+        return None
+    minutes = int((now - last).total_seconds() // 60)
+    return (f"Bộ canh chạy lại lúc {now.astimezone(VN_TZ):%H:%M %d/%m}; lượt trước kết thúc lúc "
+            f"{last.astimezone(VN_TZ):%H:%M %d/%m}, tức đã dừng khoảng {minutes // 60} giờ {minutes % 60} phút "
+            "(máy tắt, ngủ hoặc Docker dừng). BCTC đăng trong thời gian này được đọc ngay ở lượt đầu; thời gian xử lý "
+            "của chúng sẽ dài hơn bình thường.")
 
 
 def _pending_extraction(conn, since: date, year: int) -> list[tuple]:
@@ -137,6 +170,10 @@ def main() -> None:
     p.add_argument("--once", action="store_true")
     args = p.parse_args()
 
+    notice = downtime_notice(_last_heartbeat(), datetime.now(timezone.utc), args.interval)
+    if notice:
+        print(notice)
+        notify_admin("[Soi] Bộ canh vừa chạy lại sau khi dừng", notice)
     while True:
         try:
             vision = VisionClient()
@@ -149,6 +186,7 @@ def main() -> None:
             err = traceback.format_exc()
             print(err)
             notify_admin("[Soi] Bộ canh gặp lỗi", err)
+        _beat()
         if args.once:
             break
         time.sleep(args.interval * 60)

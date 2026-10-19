@@ -27,3 +27,12 @@ def test_failed_document_is_retried_once(monkeypatch):
     assert [r[0] for r in watcher._pending_extraction(_Conn(rows), date(2026, 10, 1), 2026)] == [1, 2]
     # Lượt sau: BCTC 2 vẫn lỗi thì không thử nữa
     assert [r[0] for r in watcher._pending_extraction(_Conn(rows[1:]), date(2026, 10, 1), 2026)] == []
+
+
+def test_downtime_notice_only_after_more_than_two_passes():
+    from datetime import datetime, timedelta, timezone
+    now = datetime(2026, 10, 19, 16, 0, tzinfo=timezone.utc)
+    assert watcher.downtime_notice(None, now, 15) is None                         # lần chạy đầu tiên
+    assert watcher.downtime_notice(now - timedelta(minutes=20), now, 15) is None   # khởi động lại sau khi sửa code
+    text = watcher.downtime_notice(now - timedelta(hours=17, minutes=17), now, 15)
+    assert "17 giờ 17 phút" in text and "23:00 19/10" in text

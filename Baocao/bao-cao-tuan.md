@@ -37,8 +37,9 @@ Dạ em xin báo cáo tiến độ tuần 5 để thầy nắm ạ:
 - **Chuẩn bị mùa quý 3:** bộ canh chạy lại trên Docker (sửa lỗi bộ canh chuyển hẳn sang nhà dự phòng sau một lần quá tải và lỗi bỏ sót BCTC khi máy khởi động lại), sao lưu CSDL hằng ngày (tự đưa lên Google Drive), email báo BCTC mới và báo lỗi cho quản trị.
 
 **Kết quả:**
+- **Lợi ích chính:** trên 119 BCTC, 97 BCTC (81,5%) hệ thống tự xử lý trọn không cần người; ước tính khoảng 99,5% ô số đúng mà không cần người sửa (94,1% có phép kiểm tự động xác nhận, 4,3% có hai lần đọc độc lập trùng nhau). Người chỉ phải sửa 152 ô, trung bình 8 ô ở mỗi BCTC cần sửa thay vì nhập lại khoảng 300 ô; chi phí khoảng 0,12 USD mỗi BCTC.
 - **94,6% số ô được phép kiểm xác nhận** (tuần trước 92,8%). Phần chưa kiểm được: 2,2% là dòng mà mẫu biểu không đặt vào phép cộng nào (mục ngoài bảng của ngân hàng, lãi trên cổ phiếu, dòng "trong đó"), 3,2% là dòng có phép cộng nhưng hệ thống chưa khai báo. Trong phần chưa kiểm được này, 4,3% (tính trên tổng số ô) đã có hai lần đọc độc lập trùng nhau; chỉ còn 1,1% chưa có bằng chứng nào.
-- Báo cáo kỹ thuật thêm hai mục: phép thử cấy lỗi và người đọc thứ hai (62 trang).
+- Báo cáo kỹ thuật: chương kết quả mở đầu bằng lợi ích chính ở trên; thêm hai mục phép thử cấy lỗi và người đọc thứ hai (63 trang).
 
 **Vướng mắc:**
 - Các dòng không có phép cộng (mục ngoài bảng, lãi trên cổ phiếu) mới chỉ có bằng chứng từ lần đọc thứ hai; phép kiểm thật cho chúng phải lấy từ thuyết minh.

@@ -72,8 +72,46 @@ def _value_columns(rows, ncols: int) -> list[float]:
     return centers[-ncols:] if len(centers) >= ncols else centers
 
 
+def _table_rows(page, page_no: int, ncols: int) -> list[TruthRow]:
+    """Bảng có kẻ ô (PLC): dùng bộ nhận diện bảng của thư viện PDF; tên chỉ tiêu xuống dòng và số in ở dòng cuối của ô
+    vẫn nằm trong cùng một hàng. Cột giá trị là ncols cột cuối."""
+    out: list[TruthRow] = []
+    try:
+        tables = page.find_tables().tables
+    except Exception:
+        return out
+    for t in tables:
+        if t.col_count < ncols + 1 or t.row_count < 5:
+            continue
+        grid = [[" ".join((c or "").split()) for c in cells] for cells in t.extract()]
+        keep = [j for j in range(t.col_count) if any(r[j] for r in grid)]      # bỏ cột trống hoàn toàn (PLC)
+        if len(keep) < ncols + 1:
+            continue
+        for cells, row in zip(grid, t.rows):
+            cells = [cells[j] for j in keep]
+            vals = cells[-ncols:]
+            if any(v and not all(_is_amount(x) for x in v.split()) for v in vals):
+                continue                 # hàng tiêu đề cột
+            code = next((c for c in cells[1:-ncols] if CODE.match(c)), None)
+            values = {i: v for i, v in enumerate(vals) if v}
+            out.append(TruthRow(page_no, (row.bbox[1] + row.bbox[3]) / 2, code, cells[0], values))
+    return out
+
+
 def truth_rows(page, page_no: int, ncols: int) -> list[TruthRow]:
-    rows = _visual_rows(page.get_text("words"))
+    table = _table_rows(page, page_no, ncols)
+    return table if len(table) >= 5 else line_rows(page, page_no, ncols)
+
+
+def line_rows(page, page_no: int, ncols: int) -> list[TruthRow]:
+    """Bảng không kẻ ô (GVR, VPB, ACB): gom chữ thành hàng theo tung độ, số xếp vào cột theo mép phải."""
+    words = page.get_text("words")
+    if page.rotation:
+        # trang đặt xoay (TIG quý 2/2026: 270 độ): đổi tọa độ chữ sang hướng đọc
+        import pymupdf
+        m = page.rotation_matrix
+        words = [(*(pymupdf.Rect(w[:4]) * m).normalize(), *w[4:]) for w in words]
+    rows = _visual_rows(words)
     cols = _value_columns(rows, ncols)
     if len(cols) < ncols:
         return []
@@ -134,6 +172,81 @@ def compare_document(conn, doc_id: int, verbose: bool = False) -> Counter | None
     return compare_record(record, open_record_pdf(conn, record), doc_id, verbose)
 
 
+def _compare_statement(st, raw, truth, kinds, manual, sep, truth_sep, doc_id) -> tuple[Counter, list[str]]:
+    tally, msgs = Counter(), []
+    used: set[tuple[int, int]] = set()
+    last_y: dict[int, float] = {}         # dòng ghép được gần nhất trên mỗi trang: các dòng sau phải nằm dưới nó
+    for i, row in enumerate(raw["rows"]):
+        vals = {k: v for k, v in row["values"].items() if v not in (None, "")}
+        if not vals and not any(manual.get((st, i, k)) for k in kinds):
+            continue
+        cands = list(enumerate(truth.get(int(row["page"] or 0), [])))
+        code = normalize_code(row.get("code"))
+        best = None
+        if code:
+            same = [(j, t) for j, t in cands if t.code and normalize_code(t.code) == code]
+            hits = [(j, t) for j, t in same if (row["page"], j) not in used]
+            if len(hits) == 1:
+                best = hits[0]
+            elif not hits and len(same) == 1:
+                tally["dòng đọc lặp"] += 1      # mô hình chép một dòng hai lần; cùng mã cùng số nên code gộp lại
+                continue
+        if best is None:
+            # Tên trùng nhau (ngân hàng: "Chứng khoán kinh doanh" ở dòng mục và dòng con) thì lấy dòng đầu tiên nằm dưới
+            # dòng vừa ghép
+            y0 = last_y.get(int(row["page"] or 0), -1.0)
+            scored = sorted(((_sim(row.get("label") or "", t.label), j, t) for j, t in cands
+                             if (row["page"], j) not in used),
+                            key=lambda x: (-round(x[0], 2), x[2].y <= y0, x[2].y))
+            if scored and scored[0][0] >= 0.8:
+                best = (scored[0][1], scored[0][2])
+            elif not _core(row.get("label") or ""):
+                # dòng đọc ra không có tên (thường là dòng tổng): lấy dòng đáp án có số kế tiếp
+                below = [(j, t) for j, t in cands if (row["page"], j) not in used and t.y > y0 and t.values]
+                best = min(below, key=lambda x: x[1].y) if below else None
+        if best is None:
+            tally["dòng không ghép được"] += 1
+            if True:
+                msgs.append(f"  [{doc_id}] {st} dòng {i} không ghép được: {row.get('code')} {row.get('label', '')[:50]} "
+                      f"{vals}")
+            continue
+        used.add((row["page"], best[0]))
+        t = best[1]
+        last_y[int(row["page"])] = t.y
+        for ci, kind in enumerate(kinds):
+            truth_raw = t.values.get(ci)
+            tv = None if truth_raw is None or truth_raw.strip() in DASH else parse_amount(truth_raw, truth_sep)
+            tv = None if tv == 0 else tv            # "0" và "-" (ô trống) cùng nghĩa trên BCTC
+            for level, raw_value in (("cuối cùng", row["values"].get(kind)),
+                                     ("tự động", manual.get((st, i, kind), row["values"].get(kind)))):
+                v = None if raw_value in (None, "") or str(raw_value).strip() in DASH else parse_amount(str(raw_value), sep)
+                v = None if v == 0 else v
+                if tv is None and v is None:
+                    continue
+                result = "đúng" if tv == v else ("thiếu" if v is None else "thừa" if tv is None else "sai")
+                tally[f"{level}: {result}"] += 1
+                if result != "đúng" and level == "tự động":
+                    msgs.append(f"  [{doc_id}] {st} dòng {i} {row.get('code') or ''} {row.get('label', '')[:40]} {kind}: "
+                          f"đọc {raw_value} / đáp án {truth_raw}")
+    # Chiều ngược lại: dòng có số trong đáp án mà hệ thống không đọc ra (bỏ sót dòng). Chỉ xét phần trang nằm giữa
+    # dòng đầu và dòng cuối đã ghép được, để không tính tiêu đề trang, ngày tháng, chữ ký.
+    for p, rows_p in truth.items():
+        ys = [rows_p[j].y for (pp, j) in used if pp == p]
+        if not ys:
+            continue
+        for j, t in enumerate(rows_p):
+            if (p, j) in used or not (min(ys) < t.y < max(ys)):
+                continue
+            n = sum(1 for v in t.values.values() if v.strip() not in DASH and parse_amount(v, truth_sep) not in (None, 0))
+            if n:
+                tally["tự động: thiếu"] += n
+                tally["cuối cùng: thiếu"] += n
+                tally["dòng đáp án bị bỏ sót"] += 1
+                if True:
+                    msgs.append(f"  [{doc_id}] {st} trang {p}: dòng đáp án không có dòng đọc tương ứng: {t.label[:50]} {t.values}")
+    return tally, msgs
+
+
 def compare_record(record: dict, doc, doc_id, verbose: bool = False, truth_sep: str | None = None) -> Counter:
     """So các ô của bản ghi trích xuất `record` với lớp chữ gốc của `doc` (file có chữ gốc cùng số trang)."""
     texts = page_texts(doc)
@@ -147,75 +260,18 @@ def compare_record(record: dict, doc, doc_id, verbose: bool = False, truth_sep: 
         if not kinds or not pages or not all(texts[p - 1].usable for p in pages if p - 1 < len(texts)):
             tally["báo cáo không có chữ gốc"] += 1
             continue
-        truth = {p: truth_rows(doc[p - 1], p, len(kinds)) for p in pages}
-        used: set[tuple[int, int]] = set()
-        last_y: dict[int, float] = {}         # dòng ghép được gần nhất trên mỗi trang: các dòng sau phải nằm dưới nó
-        for i, row in enumerate(raw["rows"]):
-            vals = {k: v for k, v in row["values"].items() if v not in (None, "")}
-            if not vals and not any(manual.get((st, i, k)) for k in kinds):
-                continue
-            cands = list(enumerate(truth.get(int(row["page"] or 0), [])))
-            code = normalize_code(row.get("code"))
-            best = None
-            if code:
-                same = [(j, t) for j, t in cands if t.code and normalize_code(t.code) == code]
-                hits = [(j, t) for j, t in same if (row["page"], j) not in used]
-                if len(hits) == 1:
-                    best = hits[0]
-                elif not hits and len(same) == 1:
-                    tally["dòng đọc lặp"] += 1      # mô hình chép một dòng hai lần; cùng mã cùng số nên code gộp lại
-                    continue
-            if best is None:
-                # Tên trùng nhau (ngân hàng: "Chứng khoán kinh doanh" ở dòng mục và dòng con) thì lấy dòng đầu tiên nằm dưới
-                # dòng vừa ghép
-                y0 = last_y.get(int(row["page"] or 0), -1.0)
-                scored = sorted(((_sim(row.get("label") or "", t.label), j, t) for j, t in cands
-                                 if (row["page"], j) not in used),
-                                key=lambda x: (-round(x[0], 2), x[2].y <= y0, x[2].y))
-                if scored and scored[0][0] >= 0.8:
-                    best = (scored[0][1], scored[0][2])
-                elif not _core(row.get("label") or ""):
-                    # dòng đọc ra không có tên (thường là dòng tổng): lấy dòng đáp án có số kế tiếp
-                    below = [(j, t) for j, t in cands if (row["page"], j) not in used and t.y > y0 and t.values]
-                    best = min(below, key=lambda x: x[1].y) if below else None
-            if best is None:
-                tally["dòng không ghép được"] += 1
-                if verbose:
-                    print(f"  [{doc_id}] {st} dòng {i} không ghép được: {row.get('code')} {row.get('label', '')[:50]} "
-                          f"{vals}")
-                continue
-            used.add((row["page"], best[0]))
-            t = best[1]
-            last_y[int(row["page"])] = t.y
-            for ci, kind in enumerate(kinds):
-                truth_raw = t.values.get(ci)
-                tv = None if truth_raw is None or truth_raw.strip() in DASH else parse_amount(truth_raw, truth_sep)
-                for level, raw_value in (("cuối cùng", row["values"].get(kind)),
-                                         ("tự động", manual.get((st, i, kind), row["values"].get(kind)))):
-                    v = None if raw_value in (None, "") or str(raw_value).strip() in DASH else parse_amount(str(raw_value), sep)
-                    if tv is None and v is None:
-                        continue
-                    result = "đúng" if tv == v else ("thiếu" if v is None else "thừa" if tv is None else "sai")
-                    tally[f"{level}: {result}"] += 1
-                    if verbose and result != "đúng" and level == "tự động":
-                        print(f"  [{doc_id}] {st} dòng {i} {row.get('code') or ''} {row.get('label', '')[:40]} {kind}: "
-                              f"đọc {raw_value} / đáp án {truth_raw}")
-        # Chiều ngược lại: dòng có số trong đáp án mà hệ thống không đọc ra (bỏ sót dòng). Chỉ xét phần trang nằm giữa
-        # dòng đầu và dòng cuối đã ghép được, để không tính tiêu đề trang, ngày tháng, chữ ký.
-        for p, rows_p in truth.items():
-            ys = [rows_p[j].y for (pp, j) in used if pp == p]
-            if not ys:
-                continue
-            for j, t in enumerate(rows_p):
-                if (p, j) in used or not (min(ys) < t.y < max(ys)):
-                    continue
-                n = sum(1 for v in t.values.values() if v.strip() not in DASH)
-                if n:
-                    tally["tự động: thiếu"] += n
-                    tally["cuối cùng: thiếu"] += n
-                    tally["dòng đáp án bị bỏ sót"] += 1
-                    if verbose:
-                        print(f"  [{doc_id}] {st} trang {p}: dòng đáp án không có dòng đọc tương ứng: {t.label[:50]} {t.values}")
+        # Hai cách dựng đáp án: bảng có kẻ ô (bộ nhận diện bảng) và gom chữ theo hàng. Giữ cách ghép được nhiều dòng
+        # hơn; chỉ xét việc ghép dòng, không xét số khớp hay không, để cách chọn không thiên về kết quả tốt
+        options = []
+        for name, fn in (("hàng", line_rows), ("bảng", _table_rows)):
+            truth = {pg: fn(doc[pg - 1], pg, len(kinds)) for pg in pages}
+            t, msgs = _compare_statement(st, raw, truth, kinds, manual, sep, truth_sep, doc_id)
+            options.append((t["dòng không ghép được"] + t["dòng đáp án bị bỏ sót"], name != "hàng", t, msgs))
+        _, _, t, msgs = min(options, key=lambda x: (x[0], x[1]))
+        tally.update(t)
+        if verbose:
+            for msg in msgs:
+                print(msg)
     return tally
 
 
@@ -262,26 +318,24 @@ def degrade(src, level: Level):
     return out
 
 
-def run_degraded(conn, client, doc_id: int, level_key: str) -> dict:
-    """Đọc lại BCTC `doc_id` từ bản đã làm mờ: chép bảng, kiểm tra và leo thang như quy trình thật (không ghi CSDL).
-    Dùng lại kết quả định vị trang của lần đọc gốc để chỉ đo phần đọc số."""
+def read_pdf(client, src, base: dict, chosen: dict | None, level_key: str, out_name: str) -> dict:
+    """Đọc `src` (level_key "goc": nguyên file; mức khác: bản làm mờ) bằng quy trình thật: chép bảng, kiểm tra, leo
+    thang (không ghi CSDL). `chosen`: kết quả định vị trang có sẵn; None thì định vị trên nguyên file."""
     import json
-    from dataclasses import asdict
 
     from services.extraction import prompts
-    from services.extraction.pipeline import (_check, _escalate, _extract_detail, _extract_image, _rotation,
-                                              fix_row_pages)
+    from services.extraction.pipeline import (LOCATE_MAX_PAGES, _check, _escalate, _extract_detail, _extract_image,
+                                              _locate, _rotation, _statement_pages, fix_row_pages)
     from services.ingestion.registry import raw_data_dir
 
-    original = _load_record(conn, doc_id)
-    src = open_record_pdf(conn, original)
-    doc = degrade(src, LEVELS[level_key])
-    chosen = next(c for c in original["candidates"] if c["name"] == original["chosen"])
-    record = {"document_id": doc_id, "ticker": original["ticker"], "doc_type": original.get("doc_type"),
-              "company_template": original["company_template"], "model": client.cfg.model,
-              "provider": client.cfg.provider, "candidates": [dict(chosen, name="degraded")], "chosen": "degraded",
-              "level": level_key, "raw": {}}
-    before = asdict(client.usage)["usd"]
+    usd0 = client.usage.usd
+    if chosen is None:
+        pages = _locate(client, src, LOCATE_MAX_PAGES)
+        chosen = {"pages": pages, "statement_pages": _statement_pages(pages),
+                  "rotations": {p["page"]: p.get("rotation", 0) for p in pages}}
+    doc = src if level_key == "goc" else degrade(src, LEVELS[level_key])
+    record = dict(base, model=client.cfg.model, provider=client.cfg.provider, level=level_key, raw={},
+                  candidates=[dict(chosen, name="eval")], chosen="eval")
     for st, pages in chosen["statement_pages"].items():
         pages = [int(p) for p in pages]
         images = [(f"Trang {p}", _extract_image(doc, p, _rotation(record, p))) for p in pages]
@@ -292,11 +346,20 @@ def run_degraded(conn, client, doc_id: int, level_key: str) -> dict:
     _, _, sep, template, checks = _check(record)
     record["thousands_sep"] = sep
     record["gate_failed"] = sum(c.gate and not c.passed for c in checks)
-    record["usd"] = client.usage.usd - before
-    out = raw_data_dir() / "born_digital" / "runs" / f"{doc_id}_{level_key}.json"
+    record["usd"] = client.usage.usd - usd0
+    out = raw_data_dir() / "born_digital" / "runs" / f"{out_name}_{level_key}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(record, ensure_ascii=False, default=str), encoding="utf-8")
     return record
+
+
+def run_degraded(conn, client, doc_id: int, level_key: str) -> dict:
+    """BCTC đã có trong kho: dùng lại kết quả định vị trang của lần đọc thật để chỉ đo phần đọc số."""
+    original = _load_record(conn, doc_id)
+    chosen = next(c for c in original["candidates"] if c["name"] == original["chosen"])
+    base = {"document_id": doc_id, "ticker": original["ticker"], "doc_type": original.get("doc_type"),
+            "company_template": original["company_template"]}
+    return read_pdf(client, open_record_pdf(conn, original), base, chosen, level_key, str(doc_id))
 
 
 def main() -> None:
@@ -310,7 +373,15 @@ def main() -> None:
     r.add_argument("--doc-id", type=int, nargs="+", required=True)
     r.add_argument("--level", nargs="+", default=list(LEVELS), choices=list(LEVELS))
     r.add_argument("--verbose", action="store_true")
+    f = sub.add_parser("files", help="BCTC có chữ gốc chưa có trong kho (Data/raw/born_digital/set.json): đọc ở "
+                                     "bản gốc và các mức làm mờ, chấm bằng lớp chữ gốc")
+    f.add_argument("--level", nargs="+", default=["goc", *LEVELS], choices=["goc", *LEVELS])
+    f.add_argument("--only", nargs="+", help="chỉ các tên, ví dụ PLC_Q2_2025")
+    f.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
+    if args.cmd == "files":
+        files_main(args)
+        return
     if args.cmd == "degraded":
         degraded_main(args)
         return
@@ -363,6 +434,63 @@ def degraded_main(args) -> None:
         ok = t["tự động: đúng"]
         if n:
             print(f"{LEVELS[lv].name}: {ok}/{n} ô đúng ({100 * ok / n:.2f}%)")
+    if client:
+        print(f"Tổng chi phí lần chạy này: {client.usage.usd:.3f} USD")
+
+
+def _infer_sep(doc) -> str:
+    """Dấu phân cách hàng nghìn của lớp chữ gốc."""
+    text = " ".join(page.get_text() for page in doc)
+    dots, commas = len(re.findall(r"\d\.\d{3}(?!\d)", text)), len(re.findall(r"\d,\d{3}(?!\d)", text))
+    return "." if dots >= commas else ","
+
+
+def files_main(args) -> None:
+    import json
+
+    from services.extraction.sources import candidates, open_pdf
+    from services.ingestion.registry import raw_data_dir
+    from services.llm import VisionClient
+
+    root = raw_data_dir() / "born_digital"
+    entries = json.loads((root / "set.json").read_text(encoding="utf-8"))
+    template_of = {"bank": "bank", "corporate": "corporate", "securities": "securities"}
+    client = None
+    totals: dict[str, Counter] = {}
+    for e in entries:
+        name = f"{e['ticker']}_{e['period']}_{e['year']}"
+        if (args.only and name not in args.only) or (not args.only and e.get("excluded")):
+            continue
+        src = open_pdf(candidates(root / "pdf" / e["file"])[0])
+        sep = _infer_sep(src)
+        base = {"document_id": name, "ticker": e["ticker"], "doc_type": e["doc_type"],
+                "company_template": template_of[e["template"]]}
+        chosen = None
+        for lv in ["goc", *[x for x in args.level if x != "goc"]]:
+            if lv not in args.level and lv != "goc":
+                continue
+            path = root / "runs" / f"{name}_{lv}.json"
+            if path.exists():
+                rec = json.loads(path.read_text(encoding="utf-8"))
+            else:
+                client = client or VisionClient()
+                rec = read_pdf(client, src, base, chosen, lv, name)
+            chosen = {k: v for k, v in rec["candidates"][0].items() if k != "name"}
+            if lv not in args.level:
+                continue
+            t = compare_record(rec, src, name, args.verbose, truth_sep=sep)
+            n = sum(v for k, v in t.items() if k.startswith("tự động"))
+            ok = t["tự động: đúng"]
+            label = "bản gốc" if lv == "goc" else LEVELS[lv].name
+            print(f"[{name}] {label}: {ok}/{n} ô đúng" + (f" ({100 * ok / n:.2f}%)" if n else "")
+                  + f"; ràng buộc bắt buộc lệch {rec.get('gate_failed')}; {rec.get('usd', 0):.3f} USD; {dict(t)}",
+                  flush=True)
+            totals.setdefault(lv, Counter()).update(t)
+    for lv, t in totals.items():
+        n = sum(v for k, v in t.items() if k.startswith("tự động"))
+        if n:
+            print(f"{'bản gốc' if lv == 'goc' else LEVELS[lv].name}: {t['tự động: đúng']}/{n} ô đúng "
+                  f"({100 * t['tự động: đúng'] / n:.2f}%)")
     if client:
         print(f"Tổng chi phí lần chạy này: {client.usage.usd:.3f} USD")
 

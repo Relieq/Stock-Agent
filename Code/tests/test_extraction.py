@@ -237,6 +237,24 @@ def test_parent_and_minority_rows_without_codes_get_61_62_from_labels():
     assert all(c.passed for c in validate(statements, "TT200") if c.rule_id == "IS_60_split")
 
 
+def test_net_profit_row_without_code_gets_60_from_label():
+    # GVR quý 4/2025: dòng LNST chung không in mã 60, nên LNST công ty mẹ trên thẻ không phép kiểm nào phủ
+    from services.extraction.pipeline import _label_split_codes
+    is_ = ExtractedStatement("IS", "VND", [
+        ExtractedItem("50", "Tổng lợi nhuận kế toán trước thuế", {"q_cur": "1.407"}),
+        ExtractedItem("51", "Chi phí thuế thu nhập doanh nghiệp hiện hành", {"q_cur": "290"}),
+        ExtractedItem("52", "Chi phí thuế thu nhập doanh nghiệp hoãn lại", {"q_cur": "(19)"}),
+        ExtractedItem(None, "Lợi nhuận sau thuế thu nhập doanh nghiệp", {"q_cur": "1.136"}),
+        ExtractedItem("61", "Lợi nhuận sau thuế của Công ty mẹ", {"q_cur": "1.001"}),
+        ExtractedItem("62", "Lợi nhuận sau thuế của cổ đông không kiểm soát", {"q_cur": "135"}),
+    ])
+    statements, _ = normalize([is_])
+    assert [d["code"] for d in _label_split_codes([is_], statements)] == ["60"]
+    statements, _ = normalize([is_])
+    checks = [c for c in validate(statements, "TT200") if c.rule_id in ("IS_60", "IS_60_split")]
+    assert len(checks) == 2 and all(c.passed for c in checks)
+
+
 def test_output_limits_per_step():
     from services.llm import output_limit
     assert output_limit("statement_BS") == 24_000

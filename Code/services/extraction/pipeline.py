@@ -566,7 +566,10 @@ def _check_cached(record: dict):
 # Dòng chia LNST theo công ty mẹ / cổ đông không kiểm soát mà BCTC không in mã số (VIC quý 1/2026): gán mã 61/62 theo
 # tên để ràng buộc 61 + 62 = 60 kiểm được chúng. Thiếu bước này thì thẻ lấy nhầm dòng 60 (gồm cả phần cổ đông không
 # kiểm soát) làm LNST công ty mẹ: VIC quý 1/2026 hiện 5.611 tỷ thay vì 7.276 tỷ.
-_SPLIT_LABELS = (("61", re.compile(r"sau thuế (thu nhập doanh nghiệp )?(của )?(cổ đông )?(của )?công ty mẹ|chủ sở hữu (của )?công ty mẹ")),
+# Dòng LNST chung không in mã 60 (GVR quý 4/2025): thiếu mã này thì cả 60 = 50 - 51 - 52 lẫn 61 + 62 = 60 không kiểm được,
+# và LNST công ty mẹ trên thẻ chỉ còn bằng chứng từ lần đọc thứ hai
+_NPAT_LABEL = re.compile(r"^([0-9ivx]+\.?\s*)?(tổng )?lợi nhuận (kế toán )?sau thuế( thu nhập doanh nghiệp| tndn)?\s*(\(.*\))?$")
+_SPLIT_LABELS = (("61",re.compile(r"sau thuế (thu nhập doanh nghiệp )?(của )?(cổ đông )?(của )?công ty mẹ|chủ sở hữu (của )?công ty mẹ")),
                  ("62", re.compile(r"cổ đông không kiểm soát|cổ đông thiểu số|lợi ích (của )?cổ đông không")))
 
 
@@ -576,11 +579,21 @@ _CF_PBT_LABEL = re.compile(r"^(1\.?\s*)?lợi nhuận (kế toán )?trước thu
 
 
 def _label_split_codes(extracted, statements) -> list[dict]:
-    """Gán mã theo tên dòng cho các dòng quan trọng mà BCTC không in mã: 61/62 trên KQKD, 01 trên LCTT gián tiếp."""
+    """Gán mã theo tên dòng cho các dòng quan trọng mà BCTC không in mã: 60/61/62 trên KQKD, 01 trên LCTT gián tiếp."""
     out = []
     st = statements.get("IS")
     ex = next((e for e in extracted if e.statement == "IS"), None)
-    if st is not None and ex is not None and "60" in st.values and "61" not in st.values and "62" not in st.values:
+    has_60 = st is not None and "60" in st.values
+    if st is not None and ex is not None and not has_60 and "50" in st.values:
+        hit = next((it for it in ex.items if normalize_code(it.code) is None
+                    and _NPAT_LABEL.search(unicodedata.normalize("NFC", it.label or "").strip().casefold())
+                    and not any(p.search(unicodedata.normalize("NFC", it.label or "").casefold()) for _, p in _SPLIT_LABELS)
+                    and any(v not in (None, "", "-") for v in it.values_raw.values())), None)
+        if hit is not None:
+            hit.code = "60"
+            has_60 = True
+            out.append({"statement": "IS", "code": "60", "label": hit.label, "rule": "label"})
+    if st is not None and ex is not None and has_60 and "61" not in st.values and "62" not in st.values:
         for code, pattern in _SPLIT_LABELS:
             hit = next((it for it in ex.items if normalize_code(it.code) is None
                         and pattern.search(unicodedata.normalize("NFC", it.label or "").casefold())

@@ -134,12 +134,15 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--listed-before", help="chỉ tính BCTC Vietstock đăng trước ngày này (YYYY-MM-DD), để số liệu báo cáo "
+                                            "giữ đúng phạm vi đã ghi")
     args = ap.parse_args()
     total: Counter = Counter()
     docs = 0
     with connect() as conn:
         ids = [r[0] for r in conn.execute(
-            "SELECT id FROM documents WHERE status IN ('verified', 'approved', 'needs_review') ORDER BY id")]
+            "SELECT id FROM documents WHERE status IN ('verified', 'approved', 'needs_review') "
+            "AND (%s::date IS NULL OR source_listed_at < %s::date) ORDER BY id", (args.listed_before, args.listed_before))]
         records = {}
         for doc_id in ids:
             try:

@@ -29,9 +29,11 @@ from services.ingestion.registry import raw_data_dir
 from services.llm import VisionClient
 
 
-def _documents(conn, ids: list[int] | None) -> list[tuple[int, str, str]]:
+def _documents(conn, ids: list[int] | None, listed_before: str | None = None) -> list[tuple[int, str, str]]:
     rows = conn.execute("SELECT id, ticker, fiscal_period || '/' || fiscal_year FROM documents WHERE owner_user_id IS NULL "
-                        "AND status IN ('verified', 'approved', 'needs_review') ORDER BY id").fetchall()
+                        "AND status IN ('verified', 'approved', 'needs_review') "
+                        "AND (%s::date IS NULL OR source_listed_at < %s::date) ORDER BY id",
+                        (listed_before, listed_before)).fetchall()
     return [r for r in rows if ids is None or r[0] in ids]
 
 
@@ -142,12 +144,12 @@ def compare_document(conn, d: int, period: str) -> list[dict]:
     return out
 
 
-def compare(list_n: int) -> None:
+def compare(list_n: int, listed_before: str | None = None) -> None:
     tally: dict[int, Counter] = {}
     docs, gate_ok, usd = 0, 0, 0.0
     differ = []
     with connect() as conn:
-        for d, ticker, period in _documents(conn, None):
+        for d, ticker, period in _documents(conn, None, listed_before):
             rows = compare_document(conn, d, period.split("/")[0])
             if not rows:
                 continue
@@ -183,6 +185,7 @@ def main() -> None:
     pr.add_argument("--provider", required=True)
     c = sub.add_parser("compare")
     c.add_argument("--list", type=int, default=0, help="in N ô khác nhau đầu tiên")
+    c.add_argument("--listed-before", help="chỉ tính BCTC Vietstock đăng trước ngày này (YYYY-MM-DD), để số liệu báo cáo giữ đúng phạm vi đã ghi")
     args = ap.parse_args()
     if args.cmd == "run":
         run(args.doc_id, args.limit)
@@ -191,7 +194,7 @@ def main() -> None:
     elif args.cmd == "import":
         import_files()
     else:
-        compare(args.list)
+        compare(args.list, args.listed_before)
 
 
 if __name__ == "__main__":

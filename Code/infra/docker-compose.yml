@@ -4,6 +4,8 @@
 #   docker compose -f infra/docker-compose.yml run --rm app python -m services.extraction cost   # lệnh chạy một lần
 # Trên máy phát triển, thư mục Code/ và Data/raw/ được gắn vào container: sửa code có hiệu lực ngay, không cần build lại
 # (web cần khởi động lại: docker compose ... restart web).
+# restart: always (không phải unless-stopped): khi Docker Desktop tắt theo máy, các dịch vụ bị coi là đã dừng tay và
+# unless-stopped không bật lại; bộ canh từng nằm im gần một ngày (18-19/10/2026) vì vậy.
 
 x-app: &app
   build: ..
@@ -37,7 +39,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    restart: unless-stopped
+    restart: always
 
   web:
     <<: *app
@@ -49,13 +51,13 @@ services:
       DEV_LOGIN_LINK: "1"          # chỉ trên máy phát triển: hiện link đăng nhập ngay trên trang khi chưa có SMTP
     ports:
       - "127.0.0.1:8765:8765"     # chỉ mở cho chính máy này
-    restart: unless-stopped
+    restart: always
 
   watcher:
     <<: *app
     container_name: soi-watcher
     command: python -u -m services.watcher --interval 15
-    restart: unless-stopped
+    restart: always
 
   # Sao lưu hằng ngày (infra/backup.sh). Thư mục đích: biến SOI_BACKUP_DIR trong infra/.env, mặc định Data/backup.
   # Không trỏ vào ổ ảo của Google Drive for desktop (G:): Docker Desktop ghi vào một thư mục riêng trong máy ảo, Windows
@@ -74,7 +76,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    restart: unless-stopped
+    restart: always
 
   # Lệnh chạy một lần: docker compose -f infra/docker-compose.yml run --rm app <lệnh>
   app:

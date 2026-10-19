@@ -40,17 +40,20 @@ def _digits(s: str | None) -> str:
 
 
 class Corpus:
-    def __init__(self, conn):
+    def __init__(self, conn, listed_before: str | None = None):
         self.conn = conn
         self.records: dict[int, dict] = {}
         self.cells: dict[int, list[tuple[str, int, str]]] = {}
         self.base_fail: dict[int, set] = {}
         self.base_soft: dict[int, set] = {}
         pairs = []
+        scope = "AND (%s::date IS NULL OR source_listed_at < %s::date)"
         for (d,) in conn.execute("SELECT id FROM documents WHERE owner_user_id IS NULL "
-                                 "AND status IN ('verified', 'approved', 'needs_review')"):
+                                 f"AND status IN ('verified', 'approved', 'needs_review') {scope}",
+                                 (listed_before, listed_before)):
             pairs += error_pairs(self.load(d))
-        for (d,) in conn.execute("SELECT id FROM documents WHERE owner_user_id IS NULL AND status = 'verified' ORDER BY id"):
+        for (d,) in conn.execute(f"SELECT id FROM documents WHERE owner_user_id IS NULL AND status = 'verified' {scope} "
+                                 "ORDER BY id", (listed_before, listed_before)):
             rec = self.load(d)
             ok = [(st, row, col) for cat, st, row, col, _, _ in classify(conn, d) if cat == 1]
             ok = [x for x in ok if len(_digits(rec["raw"][x[0]]["rows"][x[1]]["values"][x[2]])) >= 4]
@@ -142,10 +145,11 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=2000, help="số lỗi nhầm chữ số (các kiểu khác: n/4)")
     ap.add_argument("--seed", type=int, default=20261018)
     ap.add_argument("--no-cross", action="store_true", help="bỏ bước đối chiếu kỳ khác (nhanh hơn)")
+    ap.add_argument("--listed-before", help="chỉ tính BCTC Vietstock đăng trước ngày này (YYYY-MM-DD), để số liệu báo cáo giữ đúng phạm vi đã ghi")
     args = ap.parse_args()
     rng = random.Random(args.seed)
     with connect() as conn:
-        corpus = Corpus(conn)
+        corpus = Corpus(conn, args.listed_before)
         pairs = list(corpus.pairs)
         rng.shuffle(pairs)
         fit_table = count_substitutions(pairs[::2])

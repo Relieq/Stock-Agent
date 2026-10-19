@@ -90,12 +90,14 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--list-review", action="store_true", help="liệt kê các ô nhóm 5 (cần xem lại)")
+    ap.add_argument("--listed-before", help="chỉ tính BCTC Vietstock đăng trước ngày này (YYYY-MM-DD), để số liệu báo cáo giữ đúng phạm vi đã ghi")
     args = ap.parse_args()
     tally, by_template, review = Counter(), Counter(), []
     with connect() as conn:
         docs = conn.execute("SELECT id, ticker, fiscal_period || '/' || fiscal_year FROM documents "
                             "WHERE owner_user_id IS NULL AND status IN ('verified', 'approved', 'needs_review') "
-                            "ORDER BY id").fetchall()
+                            "AND (%s::date IS NULL OR source_listed_at < %s::date) ORDER BY id",
+                            (args.listed_before, args.listed_before)).fetchall()
         for d, ticker, period in docs:
             for cat, st, row, col, template, label in classify(conn, d):
                 tally[cat] += 1

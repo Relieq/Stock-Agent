@@ -188,6 +188,10 @@ def _escalate(record: dict, client: VisionClient, doc, conn: psycopg.Connection 
         if not _reread_failed(record, client, doc):
             break
     if _reextract_failed_statements(record, client, doc):
+        # Chép lại xong thì định vị ô sai lại từ đầu: lỗi cũ có thể che lỗi đọc thật, và _reread_failed chỉ tìm dòng theo
+        # mã in trên BCTC nên bỏ qua ngân hàng (VPB quý 3/2026: trang KQKD lộn ngược, chép lại đúng chiều còn đúng một ô
+        # đọc sai mà không bước nào đọc lại)
+        _repair_by_constraints(record, client, doc, conn)
         _reread_failed(record, client, doc)
 
 

@@ -362,8 +362,11 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | 
             entry = {"status": "none", "sum": [], "period": [], "conflict": [], "differs": []}
             # Quý 1: số quý và số lũy kế là hai cột in riêng của cùng một con số
             twin = vals.get(TWIN.get(col, "")) if cells.period == "Q1" and doc_type in (None, "fs_quarter") else None
-            if twin is not None and twin == a:
-                entry.update(status="sum", sum=["Q1: quý = lũy kế"])
+            if twin is not None:
+                if twin == a:
+                    entry.update(status="sum", sum=["Q1: quý = lũy kế"])
+                else:
+                    entry.update(status="conflict", conflict=["Q1: quý ≠ lũy kế"])
                 out[cell] = entry
                 continue
             b = second_value(cells, second, cell, doc_type) if second is not None else None

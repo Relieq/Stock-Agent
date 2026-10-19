@@ -807,7 +807,7 @@ vuông là điều kiện. Chỉ \code{verified} và \code{approved} được hi
 \centering
 \resizebox{\linewidth}{!}{\sffamily%
 \begin{sequencediagram}
-  \renewcommand{\unitfactor}{0.85}
+  \renewcommand{\unitfactor}{0.7}
   \newthread{w}{:Bộ canh}
   \newinst[1.6]{v}{:Vietstock}
   \newinst[1.6]{p}{:Pipeline}
@@ -829,8 +829,16 @@ vuông là điều kiện. Chỉ \code{verified} và \code{approved} được hi
   \begin{sdblock}{opt}{[đã kiểm chứng]}
     \mess{w}{gửi thẻ KQKD cho người theo dõi}{e}
   \end{sdblock}
+  \begin{sdblock}{opt}{[còn ô chưa có phép kiểm]}
+    \begin{call}{w}{đọc lần hai(id)}{p}{số ô hai lần đọc khác nhau}
+      \begin{call}{p}{chép lại(hãng khác)}{m}{bảng (JSON)}\end{call}
+      \begin{call}{p}{lưu lần đọc thứ hai}{d}{}\end{call}
+    \end{call}
+  \end{sdblock}
+  \mess{w}{thư báo quản trị}{e}
 \end{sequencediagram}}
-\caption{Biểu đồ tuần tự khi một BCTC mới xuất hiện. Mũi tên liền đầu đặc là lời gọi, mũi tên đứt là giá trị trả về,
+\caption{Biểu đồ tuần tự khi một BCTC mới xuất hiện (tài liệu mới gồm BCTC và công văn giải trình; công văn chỉ được
+tải về). Mũi tên liền đầu đặc là lời gọi, mũi tên đứt là giá trị trả về,
 mũi tên đầu hở là thông điệp không chờ trả lời; khung \code{opt} là đoạn chỉ chạy khi điều kiện trong ngoặc vuông
 đúng.}\label{fig:tuantu}
 \end{figure}
@@ -886,7 +894,8 @@ nhân biến động ở giai đoạn sau.
   \item Lưu thời điểm Vietstock đăng (\code{source\_listed\_at}) và thời điểm hệ thống thấy (\code{discovered\_at}). Giờ
         công bố chính thức (\code{published\_at}) sẽ lấy từ HOSE, HNX ở giai đoạn sau.
 \end{itemize}
-Kho hiện có 532 tài liệu của 31 mã (VN30 và một mã người dùng yêu cầu thêm), trong đó 120 BCTC đã được đọc. Người dùng
+Kho hiện có 635 tài liệu của 31 mã (VN30 và một mã người dùng yêu cầu thêm), trong đó 120 BCTC đã được đọc và 91 công
+văn giải trình. Người dùng
 được mời cũng có thể tải lên BCTC riêng; tài liệu tải lên chỉ người đó thấy, không xuất hiện trong dữ liệu công khai.
 
 \section{Đọc và kiểm chứng BCTC}
@@ -1029,7 +1038,8 @@ chiếu ảnh phóng to, người duyệt sửa 33 ô số và 2 mã, và BCTC �
 \subsection{Bằng chứng cho từng ô}
 Sau khi kiểm chứng, mỗi ô số được xếp vào một loại bằng chứng: khớp cả phép cộng lẫn giữa các kỳ; chỉ khớp giữa các kỳ;
 chỉ khớp phép cộng; hai BCTC in khác nhau (doanh nghiệp hoặc kiểm toán sửa số); khác kỳ trước do trình bày lại; cần xem
-lại; hoặc chưa kiểm được. Giao diện tô màu từng ô theo loại này (Hình~\ref{fig:webtailieu}).
+lại; hoặc chưa kiểm được. Ô chưa kiểm được còn được so với lần đọc thứ hai (mục~\ref{sec:nguoidoc2}) và tách thành hai
+lần đọc trùng nhau hoặc khác nhau. Giao diện tô màu từng ô theo loại này (Hình~\ref{fig:webtailieu}).
 
 \begin{figure}[H]
 \centering
@@ -1298,7 +1308,7 @@ có cấu trúc trang khác thường.
 Tỷ lệ BCTC đạt kiểm chứng chưa cho biết bao nhiêu ô số được xác nhận, vì một ô chỉ được kiểm khi nó nằm trong ít nhất
 một phép kiểm. Bảng~\ref{tab:theoo} chia toàn bộ 35.080 ô số của 119 BCTC đã kiểm chứng hoặc đã duyệt theo cách ô đó được
 xác nhận. \enquote{Được xác nhận} nghĩa là số khớp ít nhất một phép kiểm (phép cộng trong chính BCTC, hoặc đối chiếu với
-BCTC kỳ khác), \emph{không} có nghĩa là đã được người đối chiếu với ảnh gốc: chỉ 151 ô sửa tay là đã đối chiếu ảnh. Phép
+BCTC kỳ khác), \emph{không} có nghĩa là đã được người đối chiếu với ảnh gốc: chỉ 152 ô sửa tay là đã đối chiếu ảnh. Phép
 kiểm bắt được bao nhiêu phần trăm lỗi đọc thì đo riêng bằng cách cấy lỗi (mục~\ref{sec:caloi}); số ô thật sự sai còn lại
 thì ước lượng bằng một người đọc thứ hai độc lập (mục~\ref{sec:nguoidoc2}).
 
@@ -1308,12 +1318,12 @@ thì ước lượng bằng một người đọc thứ hai độc lập (mục~
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 \textbf{Loại} & \textbf{Số ô} & \textbf{Tỷ lệ} \\ \midrule
-Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 31.519 & 89,8\% \\
+Đúng ngay lần đọc đầu, có phép kiểm xác nhận & 31.520 & 89,9\% \\
 Thuộc báo cáo phải chép lại trang, sau đó có phép kiểm xác nhận & 1.443 & 4,1\% \\
 Đọc lại riêng ô (định vị ô sai, đối chiếu kỳ) rồi mới khớp & 57 & 0,2\% \\
-Người duyệt sửa sau khi đối chiếu ảnh gốc & 151 & 0,4\% \\
+Người duyệt sửa sau khi đối chiếu ảnh gốc & 152 & 0,4\% \\
 Phép kiểm vẫn lệch, người duyệt đã đối chiếu ảnh: chính BCTC in lệch & 33 & 0,1\% \\
-Chưa kiểm được: dòng không thuộc phép cộng nào của mẫu biểu & 769 & 2,2\% \\
+Chưa kiểm được: dòng không thuộc phép cộng nào của mẫu biểu & 767 & 2,2\% \\
 Chưa kiểm được: dòng có phép cộng nhưng hệ thống chưa khai báo & 1.108 & 3,2\% \\
 \bottomrule
 \end{tabularx}
@@ -1321,8 +1331,11 @@ Chưa kiểm được: dòng có phép cộng nhưng hệ thống chưa khai bá
 
 Như vậy 94,6\% số ô được phép kiểm xác nhận. Nhóm chưa kiểm được tách làm hai. Phần thứ nhất là các dòng mà mẫu biểu không
 đặt vào phép cộng nào: mục ngoài bảng của ngân hàng (cam kết, bảo lãnh, nợ khó đòi đã xử lý), lãi trên cổ phiếu và các
-dòng \enquote{trong đó}; chúng chỉ được xác nhận khi có BCTC kỳ khác để đối chiếu, và phép tính của chúng nằm trong thuyết
-minh (hướng mở rộng ở chương~\ref{chap:ketluan}). Phần thứ hai là các dòng có phép cộng mà hệ thống chưa khai báo, chủ yếu
+dòng \enquote{trong đó}. Mục ngoài bảng và dòng \enquote{trong đó} chỉ được xác nhận khi có BCTC kỳ khác để đối chiếu;
+lãi trên cổ phiếu không đối chiếu được như vậy (số quý không bằng lũy kế trừ lũy kế, số kỳ trước hay được tính lại theo
+số cổ phiếu mới), chỉ có phép kiểm số quý bằng số lũy kế ở BCTC quý 1. Phép tính đầy đủ của các dòng này nằm trong thuyết
+minh (hướng mở rộng ở chương~\ref{chap:ketluan}); trong lúc chờ, chúng được so với lần đọc thứ hai
+(mục~\ref{sec:nguoidoc2}). Phần thứ hai là các dòng có phép cộng mà hệ thống chưa khai báo, chủ yếu
 là dòng chi tiết của công ty chứng khoán. 33 ô vẫn lệch phép kiểm sau khi người duyệt đối chiếu ảnh và thấy chính BCTC
 in lệch (BSR, VHM, VPL, SSB quý 4/2025). Không còn ô nào bị phép kiểm chỉ ra nghi sai mà chưa xử lý: với các ô chỉ khác
 BCTC kỳ khác vài chữ số, hệ thống đọc lại ô ở cả hai BCTC; khi cả hai lần đọc lại đều ra đúng số cũ, chênh lệch được ghi
@@ -1351,10 +1364,10 @@ thật dùng để học tần suất, nửa còn lại dùng để sinh lỗi c
 \begin{tabularx}{\linewidth}{@{}Xrrrr@{}}
 \toprule
 \textbf{Kiểu lỗi} & \textbf{Số lỗi} & \textbf{Phép cộng bắt buộc} & \textbf{Thêm phép kiểm khác} & \textbf{Tổng} \\ \midrule
-Nhầm một chữ số & 2.000 & 83,5\% & 9,9\% & 93,4\% \\
-Mất dấu âm (số trong ngoặc thành số dương) & 500 & 90,8\% & 8,8\% & 99,6\% \\
-Thiếu một chữ số & 500 & 90,2\% & 9,6\% & 99,8\% \\
-Đổi chỗ hai dòng cùng thuộc một phép cộng & 500 & 41,2\% & 43,6\% & 84,8\% \\
+Nhầm một chữ số & 2.000 & 81,9\% & 10,4\% & 92,3\% \\
+Mất dấu âm (số trong ngoặc thành số dương) & 500 & 91,0\% & 8,6\% & 99,6\% \\
+Thiếu một chữ số & 500 & 90,0\% & 9,8\% & 99,8\% \\
+Đổi chỗ hai dòng cùng thuộc một phép cộng & 500 & 41,2\% & 42,6\% & 83,8\% \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -1369,10 +1382,10 @@ Thiếu một chữ số & 500 & 90,2\% & 9,6\% & 99,8\% \\
         trước). Lỗi này chỉ lọt khi không có BCTC kỳ khác của cùng công ty.
 \end{itemize}
 
-Với các lỗi nhầm chữ số bị phép cộng bắt, bước định vị lỗi chỉ ra đúng một ô và đúng số ở 30\% trường hợp; 69\% còn lại
-ô đúng nằm trong một nhóm trung bình 6 ô cùng làm khớp phép cộng, cần đọc lại để chọn; chỉ 1 trong 1.670 lần đề xuất nhầm
-ô. Khi xếp nhóm này theo tần suất nhầm thật thay vì theo số chữ số phải đổi, ô đúng đứng đầu 69\% so với 43\%; trên các
-lỗi thật đã sửa (mỗi BCTC dùng tần suất học từ các BCTC khác) tỷ lệ này là 22/32. Xác suất này được dùng để chọn khi lần
+Với các lỗi nhầm chữ số bị phép cộng bắt, bước định vị lỗi chỉ ra đúng một ô và đúng số ở 31\% trường hợp; ở 68\%
+trường hợp ô đúng nằm trong một nhóm trung bình 6 ô cùng làm khớp phép cộng, cần đọc lại để chọn; chỉ 1 trong 1.638 lần
+đề xuất nhầm ô. Khi xếp nhóm này theo tần suất nhầm thật thay vì theo số chữ số phải đổi, ô đúng đứng đầu 68\% so với
+36\%; trên các lỗi thật đã sửa (mỗi BCTC dùng tần suất học từ các BCTC khác) tỷ lệ này là 22/33. Xác suất này được dùng để chọn khi lần
 đọc lại xác nhận nhiều hơn một ô trong nhóm, và để gợi ý ô cần xem trước cho người duyệt.
 
 \section{Người đọc thứ hai}\label{sec:nguoidoc2}
@@ -1382,7 +1395,7 @@ gpt-5.4-mini đọc), rồi so từng ô với số đang lưu. Chi phí 1,39 US
 số của người thứ hai vào; nếu làm lệch phép kiểm đang khớp thì người thứ hai đọc sai), phần còn lại đối chiếu ảnh gốc.
 
 \begin{itemize}
-  \item \textbf{Nhóm đã được phép kiểm xác nhận} (33.112 ô so được): hai lần đọc trùng ở 97,8\%. Phần lớn chỗ khác là
+  \item \textbf{Nhóm đã được phép kiểm xác nhận} (33.170 ô): hai lần đọc trùng ở 97,8\%; 274 ô người thứ hai không chép. Phần lớn chỗ khác là
         người thứ hai hiểu sai đơn vị tính của cả bảng ở hai BCTC ngân hàng (cùng dãy chữ số); các chỗ khác chữ số đều
         do người thứ hai đọc sai, trừ 5 ô do lần đọc đầu sai (hai ô ở chữ số hàng đơn vị nằm dưới con dấu, đúng kiểu lỗi
         mà phép thử cấy lỗi chỉ ra là lọt). Tỷ lệ sai của nhóm đã xác nhận vì vậy vào khoảng 5/33.000, tức 0,02\%.
@@ -1394,19 +1407,20 @@ số của người thứ hai vào; nếu làm lệch phép kiểm đang khớp 
         BCTC vẫn đạt kiểm chứng.
 \end{itemize}
 
-Tổng cộng 71 số và 6 mã số ở 10 BCTC được sửa theo ảnh nhờ người đọc thứ hai. Sau khi sửa, ở nhóm chưa kiểm được không
+Tổng cộng 72 số và 6 mã số ở 11 BCTC được sửa theo ảnh nhờ người đọc thứ hai. Ca thứ 11 (ACB quý 1/2026) cũng bị phép kiểm lãi trên cổ phiếu quý 1 nói ở dưới chỉ ra: BCTC chỉ in lãi trên cổ phiếu ở
+hai cột lũy kế, lần đọc đầu chép số của năm nay sang cột quý năm trước. Sau khi sửa, ở nhóm chưa kiểm được không
 còn ô nào hai người đọc khác chữ số.
 
 \subsection{Đọc lần hai trong quy trình xử lý BCTC mới}
 Từ mùa BCTC quý 3/2026, lần đọc thứ hai là bước cuối của quy trình, chạy sau khi đã báo tin cho người theo dõi để không
 làm chậm thông báo. Hệ thống chỉ cho nhà cung cấp còn lại chép lại những báo cáo còn ô chưa được phép kiểm nào xác nhận;
-trên 119 BCTC hiện có, các báo cáo đó chiếm 321 trong 837 trang báo cáo, nên chi phí của bước này còn khoảng 40\% so
+trên 119 BCTC hiện có, các báo cáo đó chiếm 395 trong 837 trang báo cáo, nên chi phí của bước này chưa tới một nửa so
 với chép lại toàn bộ. Kết quả chỉ dùng cho ô chưa kiểm được, theo hai trạng thái mới trên giao diện:
 \begin{itemize}
   \item \textbf{Hai lần đọc trùng nhau}: thêm một bằng chứng độc lập, nhưng không tính vào nhóm được phép kiểm xác nhận,
         vì hai người đọc cùng sai thành một số tuy hiếm nhưng không bị loại trừ như với phép cộng. Trên 119 BCTC, 1.498
-        trong 1.877 ô chưa kiểm được (4,3\% tổng số ô) thuộc trạng thái này, gồm 266/282 ô lãi trên cổ phiếu (so theo
-        đồng, không theo đơn vị của bảng) và 345/372 ô ngoài bảng của ngân hàng. 379 ô còn lại (1,1\%) chủ yếu là ô
+        trong 1.875 ô chưa kiểm được (4,3\% tổng số ô) thuộc trạng thái này, gồm 266/281 ô lãi trên cổ phiếu (so theo
+        đồng, không theo đơn vị của bảng) và 345/371 ô ngoài bảng của ngân hàng. 377 ô còn lại (1,1\%) chủ yếu là ô
         người đọc thứ hai không chép. Lãi trên cổ phiếu của BCTC quý 1 có thêm phép kiểm riêng: số quý và số lũy kế in ở
         hai cột khác nhau nhưng phải bằng nhau.
   \item \textbf{Hai lần đọc khác nhau}: ô được tô màu \enquote{cần xem lại} và đếm vào số ô cần xem của BCTC trong thư báo
@@ -1481,7 +1495,7 @@ VN100 & khoảng 100 & 10--12 & 60--72 \\
 
 \section{Định vị ô đọc sai}\label{sec:evalrepair}
 \subsection{Bộ đề và cách thử}
-Trong các lần chạy, hệ thống đã gặp \textbf{87 ô số bị đọc sai} ở 16 BCTC mà ta biết cả số sai lẫn số đúng: hoặc người
+Trong các lần chạy, hệ thống đã gặp \textbf{165 ô số bị đọc sai} ở 25 BCTC mà ta biết cả số sai lẫn số đúng: hoặc người
 duyệt đã sửa tay sau khi xem ảnh gốc, hoặc lần đọc lại đã ra số đúng và BCTC sau đó đạt kiểm chứng. Thí nghiệm như sau:
 lấy từng BCTC, \textbf{đặt lại số sai vào đúng ô cũ}, chạy bước định vị (chỉ dùng phép tính trên các ràng buộc, không gọi
 mô hình), rồi so đề xuất với số đúng.
@@ -1509,29 +1523,31 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[font=\small\sffamily]
-  \node[box=40mm] (all) at (0,0) {87 ô đã biết là đọc sai\\(16 BCTC)};
-  \node[box=34mm,draw=soigray,fill=lightgray] (out) at (5.6,0) {8 ô ngoài tầm\\(không phép cộng nào lệch)};
-  \node[box=40mm] (in) at (0,-2.0) {79 ô trong tầm};
-  \node[gbox=34mm] (ok) at (-4.4,-4.4) {\textbf{13 ô} (16\%)\\đúng ngay, chỉ bằng phép tính};
-  \node[gbox=34mm] (grp) at (0,-4.4) {\textbf{32 ô} (41\%)\\thu hẹp về nhóm, máy tự đọc lại để chọn};
-  \node[rbox=34mm] (miss) at (4.4,-4.4) {\textbf{34 ô} (43\%)\\sót, chuyển sang chép lại trang, duyệt tay};
+  \node[box=40mm] (all) at (0,0) {165 ô đã biết là đọc sai\\(25 BCTC)};
+  \node[box=34mm,draw=soigray,fill=lightgray] (out) at (5.6,0) {75 ô ngoài tầm\\(không phép cộng nào lệch)};
+  \node[box=40mm] (in) at (0,-2.0) {90 ô trong tầm};
+  \node[gbox=34mm] (ok) at (-4.4,-4.4) {\textbf{13 ô} (14\%)\\đúng ngay, chỉ bằng phép tính};
+  \node[gbox=34mm] (grp) at (0,-4.4) {\textbf{33 ô} (37\%)\\thu hẹp về nhóm, máy tự đọc lại để chọn};
+  \node[rbox=34mm] (miss) at (4.4,-4.4) {\textbf{44 ô} (49\%)\\sót, chuyển sang chép lại trang, duyệt tay};
   \draw[arr] (all) -- (out); \draw[arr] (all) -- (in);
   \draw[arr] (in) -- (ok); \draw[arr] (in) -- (grp); \draw[arr] (in) -- (miss);
   \draw[soigreen,very thick,decorate] ($(ok.south west)+(0,-0.25)$) -- ($(grp.south east)+(0,-0.25)$)
-     node[midway,below=1mm,font=\small\sffamily\bfseries,color=soigreen] {45/79 ô (57\%) tự định vị được};
+     node[midway,below=1mm,font=\small\sffamily\bfseries,color=soigreen] {46/90 ô (51\%) tự định vị được};
 \end{tikzpicture}
-\caption{Kết quả định vị ô đọc sai trên bộ đề 87 ô. Trong 42 nhóm cần đọc lại có tổng cộng 172 ô, khoảng 4 ô mỗi nhóm;
-đọc lại vài ô tốn khoảng 0,003 USD mỗi BCTC. Nếu bỏ BCTC bán niên của GVR (file 72 dpi, xem mục dưới), tỷ lệ tự
-định vị được là 29/46 ô (63\%).}\label{fig:evalrepair}
+\caption{Kết quả định vị ô đọc sai trên bộ đề 165 ô. Trong 42 nhóm cần đọc lại có tổng cộng 191 ô, khoảng 4--5 ô mỗi
+nhóm; đọc lại vài ô tốn khoảng 0,003 USD mỗi BCTC. Nếu bỏ BCTC bán niên của GVR (file 72 dpi, xem mục dưới), tỷ lệ tự
+định vị được là 30/57 ô (53\%).}\label{fig:evalrepair}
 \end{figure}
 
 \subsection{Phân tích các ca ngoài tầm, ca sót và đề xuất sai}
 \begin{itemize}
-  \item \textbf{8 ô ngoài tầm} là các dòng chi tiết không thuộc phép cộng bắt buộc nào, hoặc chỉ lệch so với BCTC kỳ khác.
-        Người duyệt tìm ra chúng nhờ màu bằng chứng trên trang tài liệu (\enquote{cần xem lại}, \enquote{chưa kiểm được}).
+  \item \textbf{75 ô ngoài tầm} là các dòng chi tiết không thuộc phép cộng bắt buộc nào, hoặc chỉ lệch so với BCTC kỳ khác.
+        Phần lớn do người đọc thứ hai tìm ra (mục~\ref{sec:nguoidoc2}); riêng hai khối lệch dòng ở phần ngoài bảng của
+        SSB bán niên 2026 và LCTT của MBB quý 1/2026 đã chiếm 42 ô. Số còn lại người duyệt tìm ra nhờ màu bằng chứng trên
+        trang tài liệu (\enquote{cần xem lại}, \enquote{chưa kiểm được}).
         Các chỉ tiêu dùng trên thẻ KQKD đều nằm trong phép cộng bắt buộc, nên đọc sai thì phép cộng sẽ lệch và hệ thống
         không công bố.
-  \item \textbf{34 ô sót} phần lớn rơi vào trường hợp \textbf{nhiều ô sai cùng lúc trong cùng một phép cộng}, trái với giả
+  \item \textbf{44 ô sót} phần lớn rơi vào trường hợp \textbf{nhiều ô sai cùng lúc trong cùng một phép cộng}, trái với giả
         thiết của bước định vị là mỗi phép cộng chỉ có một ô sai (hoặc hai ô lệch cùng một lượng):
   \begin{itemize}
     \item 17 ô của BCTC bán niên 2026 của GVR. File chỉ có độ phân giải 72 dpi, nên mô hình đọc sai nhiều chữ số trên cùng
@@ -1543,6 +1559,8 @@ phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì
           (mục~\ref{sec:evalanh}).
     \item 8 ô của BCTC quý 1 và quý 2/2026 của VHM, trong đó 2 ô mô hình chép số của một dòng khác (số khác hẳn, không
           phải nhầm 1--2 chữ số).
+    \item 8 ô ở đoạn cuối khúc kinh doanh LCTT của SSI quý 2/2026: cả đoạn lệch một dòng nên nhiều ô của cùng một phép
+          cộng sai một lúc. 2 ô còn lại (SSI bán niên, TCX quý 1/2026) là số bị chép sang cột hoặc dòng khác.
   \end{itemize}
   \item \textbf{5 đề xuất sai} đều ở các BCTC của VHM có nhiều ô sai cùng lúc nói trên. Không đề xuất sai nào được nhận
         trong các lần chạy thật, vì số đề xuất chỉ được nhận khi lần đọc lại ảnh ra đúng số đó.

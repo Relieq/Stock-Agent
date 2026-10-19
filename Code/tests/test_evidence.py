@@ -121,3 +121,5 @@ def test_first_quarter_earnings_per_share_quarter_equals_year_to_date():
     second.eps = {("IS", "eps70"): {"q_cur": D(1_651), "ytd_cur": D(1_651), "q_prev_year": D(98), "ytd_prev_year": D(68)}}
     status = cell_status(q1, [], second, "fs_quarter")
     assert {status[("IS", "eps70", c)]["status"] for c in q1.eps[("IS", "eps70")]} == {"sum"}   # BSR quý 1/2026
+    q1.eps[("IS", "eps70")]["q_prev_year"] = D(98)
+    assert cell_status(q1, [], second, "fs_quarter")[("IS", "eps70", "q_prev_year")]["status"] == "conflict"

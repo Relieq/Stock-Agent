@@ -131,9 +131,14 @@ def _sim(a: str, b: str) -> float:
 
 def compare_document(conn, doc_id: int, verbose: bool = False) -> Counter | None:
     record = _load_record(conn, doc_id)
-    doc = open_record_pdf(conn, record)
+    return compare_record(record, open_record_pdf(conn, record), doc_id, verbose)
+
+
+def compare_record(record: dict, doc, doc_id, verbose: bool = False, truth_sep: str | None = None) -> Counter:
+    """So các ô của bản ghi trích xuất `record` với lớp chữ gốc của `doc` (file có chữ gốc cùng số trang)."""
     texts = page_texts(doc)
     sep = record.get("thousands_sep") or "."
+    truth_sep = truth_sep or sep
     tally = Counter()
     manual = {(m["statement"], m["row"], m["column_kind"]): m.get("before") for m in record.get("manual_fixes", [])}
     for st, raw in record["raw"].items():
@@ -153,9 +158,13 @@ def compare_document(conn, doc_id: int, verbose: bool = False) -> Counter | None
             code = normalize_code(row.get("code"))
             best = None
             if code:
-                hits = [(j, t) for j, t in cands if t.code and normalize_code(t.code) == code and (row["page"], j) not in used]
+                same = [(j, t) for j, t in cands if t.code and normalize_code(t.code) == code]
+                hits = [(j, t) for j, t in same if (row["page"], j) not in used]
                 if len(hits) == 1:
                     best = hits[0]
+                elif not hits and len(same) == 1:
+                    tally["dòng đọc lặp"] += 1      # mô hình chép một dòng hai lần; cùng mã cùng số nên code gộp lại
+                    continue
             if best is None:
                 # Tên trùng nhau (ngân hàng: "Chứng khoán kinh doanh" ở dòng mục và dòng con) thì lấy dòng đầu tiên nằm dưới
                 # dòng vừa ghép
@@ -180,7 +189,7 @@ def compare_document(conn, doc_id: int, verbose: bool = False) -> Counter | None
             last_y[int(row["page"])] = t.y
             for ci, kind in enumerate(kinds):
                 truth_raw = t.values.get(ci)
-                tv = None if truth_raw is None or truth_raw.strip() in DASH else parse_amount(truth_raw, sep)
+                tv = None if truth_raw is None or truth_raw.strip() in DASH else parse_amount(truth_raw, truth_sep)
                 for level, raw_value in (("cuối cùng", row["values"].get(kind)),
                                          ("tự động", manual.get((st, i, kind), row["values"].get(kind)))):
                     v = None if raw_value in (None, "") or str(raw_value).strip() in DASH else parse_amount(str(raw_value), sep)
@@ -210,6 +219,86 @@ def compare_document(conn, doc_id: int, verbose: bool = False) -> Counter | None
     return tally
 
 
+@dataclass
+class Level:
+    name: str
+    dpi: int
+    blur: float
+    angle: float
+    noise: float
+    jpeg: int
+
+
+# Mức chất lượng ảnh mô phỏng bản scan: "xấu" gần với file 72 dpi của GVR bán niên 2026
+LEVELS = {"tot": Level("scan tốt", 200, 0.0, 0.3, 0.0, 80),
+          "vua": Level("scan trung bình", 120, 0.5, 0.7, 6.0, 55),
+          "xau": Level("scan xấu", 72, 0.7, 1.2, 10.0, 35)}
+
+
+def degrade(src, level: Level):
+    """PDF chỉ gồm ảnh (như bản scan) dựng lại từ `src` ở mức chất lượng `level`."""
+    import io
+    import random
+
+    import pymupdf
+    from PIL import Image, ImageFilter
+
+    rng = random.Random(20261020)
+    out = pymupdf.open()
+    for page in src:
+        pix = page.get_pixmap(dpi=level.dpi, colorspace=pymupdf.csGRAY)
+        img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
+        if level.blur:
+            img = img.filter(ImageFilter.GaussianBlur(level.blur))
+        if level.angle:
+            img = img.rotate(rng.uniform(-level.angle, level.angle), resample=Image.BICUBIC, fillcolor=255)
+        if level.noise:
+            noise = Image.effect_noise(img.size, level.noise)
+            img = Image.blend(img, noise, 0.08)
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=level.jpeg)
+        new = out.new_page(width=page.rect.width, height=page.rect.height)
+        new.insert_image(new.rect, stream=buf.getvalue())
+    return out
+
+
+def run_degraded(conn, client, doc_id: int, level_key: str) -> dict:
+    """Đọc lại BCTC `doc_id` từ bản đã làm mờ: chép bảng, kiểm tra và leo thang như quy trình thật (không ghi CSDL).
+    Dùng lại kết quả định vị trang của lần đọc gốc để chỉ đo phần đọc số."""
+    import json
+    from dataclasses import asdict
+
+    from services.extraction import prompts
+    from services.extraction.pipeline import (_check, _escalate, _extract_detail, _extract_image, _rotation,
+                                              fix_row_pages)
+    from services.ingestion.registry import raw_data_dir
+
+    original = _load_record(conn, doc_id)
+    src = open_record_pdf(conn, original)
+    doc = degrade(src, LEVELS[level_key])
+    chosen = next(c for c in original["candidates"] if c["name"] == original["chosen"])
+    record = {"document_id": doc_id, "ticker": original["ticker"], "doc_type": original.get("doc_type"),
+              "company_template": original["company_template"], "model": client.cfg.model,
+              "provider": client.cfg.provider, "candidates": [dict(chosen, name="degraded")], "chosen": "degraded",
+              "level": level_key, "raw": {}}
+    before = asdict(client.usage)["usd"]
+    for st, pages in chosen["statement_pages"].items():
+        pages = [int(p) for p in pages]
+        images = [(f"Trang {p}", _extract_image(doc, p, _rotation(record, p))) for p in pages]
+        record["raw"][st] = fix_row_pages(client.json_from_images(prompts.extract_prompt(st), images,
+                                                                  prompts.extract_schema(st), f"statement_{st}",
+                                                                  detail=_extract_detail(doc, pages)), pages)
+    _escalate(record, client, doc, None)
+    _, _, sep, template, checks = _check(record)
+    record["thousands_sep"] = sep
+    record["gate_failed"] = sum(c.gate and not c.passed for c in checks)
+    record["usd"] = client.usage.usd - before
+    out = raw_data_dir() / "born_digital" / "runs" / f"{doc_id}_{level_key}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(record, ensure_ascii=False, default=str), encoding="utf-8")
+    return record
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -217,7 +306,14 @@ def main() -> None:
     m = sub.add_parser("measure")
     m.add_argument("--doc-id", type=int, nargs="+", required=True)
     m.add_argument("--verbose", action="store_true")
+    r = sub.add_parser("degraded", help="đọc lại từ ảnh làm mờ (gọi mô hình) rồi chấm; đã có kết quả thì chỉ chấm")
+    r.add_argument("--doc-id", type=int, nargs="+", required=True)
+    r.add_argument("--level", nargs="+", default=list(LEVELS), choices=list(LEVELS))
+    r.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
+    if args.cmd == "degraded":
+        degraded_main(args)
+        return
     total = Counter()
     with connect() as conn:
         for d in args.doc_id:
@@ -234,6 +330,41 @@ def main() -> None:
                   f"thiếu {total[f'{level}: thiếu']}, thừa {total[f'{level}: thừa']}")
     print(f"dòng không ghép được: {total['dòng không ghép được']}; báo cáo không có chữ gốc: "
           f"{total['báo cáo không có chữ gốc']}")
+
+
+def degraded_main(args) -> None:
+    import json
+
+    from services.ingestion.registry import raw_data_dir
+    from services.llm import VisionClient
+
+    client = None
+    totals: dict[str, Counter] = {}
+    with connect() as conn:
+        for d in args.doc_id:
+            original = _load_record(conn, d)
+            src = open_record_pdf(conn, original)
+            for lv in args.level:
+                path = raw_data_dir() / "born_digital" / "runs" / f"{d}_{lv}.json"
+                if path.exists():
+                    rec = json.loads(path.read_text(encoding="utf-8"))
+                else:
+                    client = client or VisionClient()
+                    rec = run_degraded(conn, client, d, lv)
+                t = compare_record(rec, src, d, args.verbose, truth_sep=original.get("thousands_sep"))
+                n = sum(v for k, v in t.items() if k.startswith("tự động"))
+                ok = t["tự động: đúng"]
+                print(f"[{d}] {original['ticker']} {LEVELS[lv].name}: {ok}/{n} ô đúng"
+                      + (f" ({100 * ok / n:.2f}%)" if n else "") + f"; ràng buộc bắt buộc lệch {rec.get('gate_failed')}; "
+                      f"{rec.get('usd', 0):.3f} USD; {dict(t)}", flush=True)
+                totals.setdefault(lv, Counter()).update(t)
+    for lv, t in totals.items():
+        n = sum(v for k, v in t.items() if k.startswith("tự động"))
+        ok = t["tự động: đúng"]
+        if n:
+            print(f"{LEVELS[lv].name}: {ok}/{n} ô đúng ({100 * ok / n:.2f}%)")
+    if client:
+        print(f"Tổng chi phí lần chạy này: {client.usage.usd:.3f} USD")
 
 
 if __name__ == "__main__":

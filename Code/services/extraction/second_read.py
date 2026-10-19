@@ -20,6 +20,7 @@ from services.extraction.pipeline import (
     _finalize,
     _load_record,
     _rotation,
+    fix_row_pages,
     open_record_pdf,
     track_usage,
 )
@@ -71,9 +72,9 @@ def read(record: dict, client: VisionClient, doc, statements: set[str] | None = 
         if statements is not None and st not in statements:
             continue
         images = [(f"Trang {p}", _extract_image(doc, p, _rotation(record, p))) for p in pages]
-        raw[st] = client.json_from_images(prompts.extract_prompt(st), images, prompts.extract_schema(st),
-                                          f"statement_{st}", step=f"second_read_{st}",
-                                          detail=_extract_detail(doc, pages), provider=provider)
+        raw[st] = fix_row_pages(client.json_from_images(prompts.extract_prompt(st), images, prompts.extract_schema(st),
+                                                        f"statement_{st}", step=f"second_read_{st}",
+                                                        detail=_extract_detail(doc, pages), provider=provider), pages)
         models.add(client.last_model)
     return {"first_reader": f"{record.get('provider')}/{record.get('model')}", "second_reader": sorted(models),
             "usd": client.usage.usd - usd_before, "at": datetime.now(timezone.utc).isoformat(), "raw": raw}

@@ -90,6 +90,28 @@ def _statement_pages(pages: list[dict]) -> dict[str, list[int]]:
     return out
 
 
+def fix_row_pages(raw: dict, pages: list[int]) -> dict:
+    """Mô hình đôi khi ghi số trang in ở chân trang BCTC thay cho nhãn "Trang N" của ảnh đã gửi (VPB quý 2/2026 ảnh
+    trang 5-7 ghi thành 3-5; MSN, STB quý 2/2026). Số trang sai làm bước đọc lại mở nhầm trang. Nếu các số trang ghi ra
+    không thuộc các trang đã gửi thì đổi theo thứ tự (cùng số trang) hoặc theo độ lệch không đổi."""
+    pages = sorted(int(p) for p in pages)
+    got = sorted({int(r["page"]) for r in raw.get("rows", []) if str(r.get("page") or "").isdigit()})
+    if not got or set(got) <= set(pages):
+        return raw
+    if len(pages) == 1:
+        mapping = {g: pages[0] for g in got}
+    elif len(got) == len(pages):
+        mapping = dict(zip(got, pages))
+    elif all(g + pages[0] - got[0] in pages for g in got):
+        mapping = {g: g + pages[0] - got[0] for g in got}
+    else:
+        return raw
+    for r in raw.get("rows", []):
+        if str(r.get("page") or "").isdigit():
+            r["page"] = mapping.get(int(r["page"]), r["page"])
+    return raw
+
+
 def _to_extracted(statement: str, raw: dict) -> ExtractedStatement:
     return ExtractedStatement(
         statement=statement,
@@ -156,8 +178,8 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
         if not pages:
             continue
         images = [(f"Trang {p}", _extract_image(doc, p, _rotation(record, p))) for p in pages]
-        raw = client.json_from_images(prompts.extract_prompt(st), images, prompts.extract_schema(st), f"statement_{st}",
-                                      detail=_extract_detail(doc, pages))
+        raw = fix_row_pages(client.json_from_images(prompts.extract_prompt(st), images, prompts.extract_schema(st),
+                                                    f"statement_{st}", detail=_extract_detail(doc, pages)), pages)
         record["raw"][st] = raw
     record["company_template"] = company_template
 
@@ -427,9 +449,9 @@ def _extend_balance_sheet(record: dict, client: VisionClient, doc) -> bool:
     if page > doc.page_count or page in used:
         return False
     image = _extract_image(doc, page, _rotation(record, page))
-    extra = client.json_from_images(prompts.extract_prompt("BS"), [(f"Trang {page}", image)],
-                                    prompts.extract_schema("BS"), "statement_BS", step="extend_BS",
-                                    detail=_extract_detail(doc, [page]))
+    extra = fix_row_pages(client.json_from_images(prompts.extract_prompt("BS"), [(f"Trang {page}", image)],
+                                                  prompts.extract_schema("BS"), "statement_BS", step="extend_BS",
+                                                  detail=_extract_detail(doc, [page])), [page])
     before = record["raw"]["BS"]
     record["raw"]["BS"] = before | {"rows": before.get("rows", []) + extra.get("rows", [])}
     _, _, _, _, checks = _check(record)
@@ -491,9 +513,9 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
         def read(page: int, rotation: int) -> dict:
             if (page, rotation) not in cache:
                 image = render_sharp(doc, page, rotation)
-                cache[(page, rotation)] = client.json_from_images(
+                cache[(page, rotation)] = fix_row_pages(client.json_from_images(
                     prompts.extract_prompt(st), [(f"Trang {page}", image)], prompts.extract_schema(st),
-                    f"statement_{st}", step=f"reextract_{st}", detail=ORIGINAL)
+                    f"statement_{st}", step=f"reextract_{st}", detail=ORIGINAL), [page])
             return cache[(page, rotation)]
 
         # Lần 1 giữ hướng trang như bước định vị; chưa ổn thì xoay thêm 180 độ TỪNG trang một (VHM quý 1/2026: chỉ

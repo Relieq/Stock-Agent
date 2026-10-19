@@ -435,3 +435,13 @@ def test_ctck_client_section_codes_are_not_summed_into_company_section():
     checks = {c.rule_id: c.passed for c in validate(statements, "CTCK")}
     assert checks["CF_kh_20"] and checks["CF_kh_40"]
     assert _ctck_client_codes([_cf([("01", "Lợi nhuận trước thuế", "1")])]) == 0
+
+
+def test_row_pages_written_as_printed_page_numbers_are_mapped_back():
+    from services.extraction.pipeline import fix_row_pages
+    raw = {"rows": [{"page": 3}, {"page": 4}, {"page": 5}]}      # ảnh gửi là trang 5-7, mô hình ghi số in ở chân trang
+    assert [r["page"] for r in fix_row_pages(raw, [5, 6, 7])["rows"]] == [5, 6, 7]
+    raw = {"rows": [{"page": 2}, {"page": 2}]}
+    assert [r["page"] for r in fix_row_pages(raw, [9])["rows"]] == [9, 9]
+    raw = {"rows": [{"page": 5}, {"page": 6}]}
+    assert [r["page"] for r in fix_row_pages(raw, [5, 6, 7])["rows"]] == [5, 6]      # đúng sẵn thì giữ nguyên

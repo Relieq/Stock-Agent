@@ -1304,6 +1304,6 @@ def _finalize(conn: psycopg.Connection, record: dict) -> dict:
                 (file_id, c.rule_id, c.column_kind, c.passed, c.lhs, c.rhs,
                  json.dumps({"gate": c.gate, "tolerance": str(c.tolerance), "missing": c.missing}), PIPELINE_VER),
             )
-        conn.execute("UPDATE documents SET template_ver = %s, status = %s, processed_at = COALESCE(processed_at, now())"
+        conn.execute("UPDATE documents SET template_ver = %s, status = %s, processed_at = COALESCE(processed_at, clock_timestamp())"
                      " WHERE id = %s", (template, status, document_id))
     return record

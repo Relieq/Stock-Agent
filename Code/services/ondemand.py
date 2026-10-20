@@ -188,11 +188,19 @@ def identify_upload(path: Path, vision: VisionClient) -> dict:
     """Đọc 2 trang đầu (ảnh nhỏ) để biết file là BCTC của công ty nào, kỳ nào. Khoảng 0,002 USD một file."""
     doc = open_pdf(candidates(path)[0])
     images = [(f"Trang {p}", render_page(doc, p, LOCATE_LONG_SIDE)) for p in range(1, min(doc.page_count, 2) + 1)]
-    return vision.json_from_images(prompts.IDENTIFY_PROMPT, images, prompts.IDENTIFY_SCHEMA, "identify_upload")
+    found = vision.json_from_images(prompts.IDENTIFY_PROMPT, images, prompts.IDENTIFY_SCHEMA, "identify_upload")
+    for key in ("period", "scope"):
+        if found.get(key) == "unknown":
+            found[key] = None
+    found["is_financial_statement"] = found.get("document_kind") == "financial_statement"
+    return found
 
 
 def check_upload(found: dict, ticker: str, company_name: str, year: int, period: str) -> str | None:
     """Lý do từ chối nếu file không khớp với mã và kỳ người dùng khai; None nếu khớp."""
+    if found.get("document_kind") == "explanation_letter":
+        return ("File là công văn giải trình kết quả kinh doanh, không phải BCTC. Trang này chỉ nhận BCTC; công văn giải "
+                "trình được hệ thống tự lấy từ Vietstock và gắn vào thẻ KQKD cùng kỳ")
     if not found.get("is_financial_statement"):
         return "File không phải báo cáo tài chính"
     printed_ticker = (found.get("ticker") or "").strip().upper()
@@ -249,7 +257,16 @@ def process_queue(conn: psycopg.Connection, vision: VisionClient | None, limit: 
                 found = identify_upload(raw_data_dir() / key, vision)
                 name = conn.execute("SELECT name FROM companies WHERE ticker = %s", (ticker,)).fetchone()[0]
                 if (reason := check_upload(found, ticker, name, year, period)) is not None:
-                    _finish(conn, rid, "rejected", reason + ". Kiểm tra lại mã và kỳ rồi tải lên lại.")
+                    if found.get("document_kind") == "explanation_letter":
+                        have = conn.execute(
+                            "SELECT 1 FROM documents WHERE ticker = %s AND doc_type = 'explanation' AND fiscal_year = %s"
+                            " AND fiscal_period = %s LIMIT 1", (ticker, year, period)).fetchone()
+                        reason += (f" (công văn của {ticker} {period}/{year} đã có sẵn)." if have else ".")
+                    elif found.get("is_financial_statement"):
+                        reason += ". Kiểm tra lại mã và kỳ rồi tải lên lại."
+                    else:
+                        reason += ": trang này chỉ nhận file BCTC."
+                    _finish(conn, rid, "rejected", reason)
                     lines.append(f"yêu cầu {rid}: từ chối file tải lên: {reason}")
                     continue
             doc_id = _official_document(conn, vs, ticker, year, period)

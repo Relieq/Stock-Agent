@@ -69,26 +69,30 @@ ORIENT_PROMPT = """Hai ảnh A và B là cùng một trang báo cáo tài chính
 rõ."""
 
 
+# Trường liệt kê không dùng kiểu "chuỗi hoặc null": API của Anthropic từ chối enum có giá trị null (lỗi 400 làm mọi file
+# tải lên đều hỏng sau khi Haiku thành nhà chính 17/10/2026); dùng giá trị "unknown" rồi đổi về None trong code
 IDENTIFY_SCHEMA = {
     "type": "object",
     "properties": {
-        "is_financial_statement": {"type": "boolean"},
+        "document_kind": {"type": "string", "enum": ["financial_statement", "explanation_letter", "other"]},
         "company_name": _NULLABLE_STRING,
         "ticker": _NULLABLE_STRING,
         "fiscal_year": {"type": ["integer", "null"]},
-        "period": {"type": ["string", "null"], "enum": ["Q1", "Q2", "Q3", "Q4", "H1", "9M", "FY", None]},
-        "scope": {"type": ["string", "null"], "enum": ["consolidated", "separate", None]},
+        "period": {"type": "string", "enum": ["Q1", "Q2", "Q3", "Q4", "H1", "9M", "FY", "unknown"]},
+        "scope": {"type": "string", "enum": ["consolidated", "separate", "unknown"]},
     },
-    "required": ["is_financial_statement", "company_name", "ticker", "fiscal_year", "period", "scope"],
+    "required": ["document_kind", "company_name", "ticker", "fiscal_year", "period", "scope"],
     "additionalProperties": False,
 }
 
 IDENTIFY_PROMPT = """Ảnh sau là các trang đầu của một file người dùng tải lên. Cho biết, chép đúng như in trên trang:
-- is_financial_statement: đây có phải báo cáo tài chính của một doanh nghiệp Việt Nam không;
+- document_kind: financial_statement nếu là báo cáo tài chính của một doanh nghiệp Việt Nam; explanation_letter nếu là
+  công văn giải trình biến động kết quả kinh doanh / lợi nhuận gửi UBCKNN, Sở GDCK; other nếu là loại khác;
 - company_name: tên doanh nghiệp lập báo cáo; ticker: mã chứng khoán nếu có in;
-- fiscal_year, period: kỳ báo cáo (Q1..Q4 cho quý, H1 cho 6 tháng/bán niên, 9M cho 9 tháng, FY cho cả năm);
-- scope: consolidated nếu là báo cáo hợp nhất, separate nếu là báo cáo riêng.
-Không thấy thông tin nào thì trả null cho trường đó."""
+- fiscal_year, period: kỳ báo cáo hoặc kỳ được giải trình (Q1..Q4 cho quý, H1 cho 6 tháng/bán niên, 9M cho 9 tháng, FY
+  cho cả năm; unknown nếu không thấy);
+- scope: consolidated nếu là báo cáo hợp nhất, separate nếu là báo cáo riêng, unknown nếu không rõ.
+Không thấy tên hay mã thì trả null cho trường đó."""
 
 
 REREAD_SCHEMA = {

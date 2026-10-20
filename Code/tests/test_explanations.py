@@ -81,3 +81,11 @@ def test_amount_change_across_zero_uses_signed_difference():
     r = {"text": "Lãi thuần từ mua bán chứng khoán đầu tư giảm", "about": "company", "line_item": "invest_sec",
          "direction": "down", "number_kind": "change", "pct": None, "amount": "467.394", "amount_unit": "triệu đồng"}
     assert check_reason(r, facts, "quarter").verdict == "khớp"
+
+
+def test_company_own_grouping_is_not_checkable():
+    # STB quý 1/2026: "chi từ các hoạt động còn lại" = dự phòng + chi phí hoạt động + thuế, BCTC không có dòng này
+    facts = FakeFacts(**{"provision.q_cur": 2023_9 * B // 10, "provision.q_prev_year": 195_3 * B // 10})
+    r = {"text": "Chi từ các hoạt động còn lại tăng 1.054 tỷ đồng", "about": "company", "line_item": "provision",
+         "direction": "up", "number_kind": "change", "pct": None, "amount": "1.054 tỷ đồng", "amount_unit": "tỷ đồng"}
+    assert check_reason(r, facts, "quarter").verdict == "không kiểm được"

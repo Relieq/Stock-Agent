@@ -341,6 +341,10 @@ def check_reason(r: dict, facts, period_kind: str) -> Check:
     if r.get("about") == "segment":
         return Check(text, "không kiểm được", r.get("pct") or r.get("amount") or "",
                      note="số của một mảng, chuỗi hay công ty con: BCTC không tách")
+    if "hoat dong con lai" in _folded(text) and item != "non_interest_income":
+        # STB: "chi từ các hoạt động còn lại" = dự phòng + chi phí hoạt động + thuế gộp lại, BCTC không có dòng này
+        return Check(text, "không kiểm được", r.get("pct") or r.get("amount") or "",
+                     note="nhóm khoản mục do công ty tự gộp, BCTC không có dòng tương ứng")
     if r.get("number_kind") == "other":
         return Check(text, "không kiểm được", r.get("pct") or r.get("amount") or "",
                      note="con số không phải mức thay đổi so với cùng kỳ (kế hoạch, sản lượng, dư nợ...)")

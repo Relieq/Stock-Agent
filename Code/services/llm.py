@@ -155,6 +155,7 @@ OUTPUT_LIMITS = (
     ("reextract_", 16_000),       # chép lại một trang
     ("page_classification", 6_000),
     ("identify_upload", 3_000),
+    ("explanation_read", 12_000),  # đọc công văn giải trình (services/analyst/explanations.py)
     ("verify_cells", 6_000), ("reread_cells", 6_000), ("repair_", 6_000),
 )
 

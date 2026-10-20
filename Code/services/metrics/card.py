@@ -29,6 +29,9 @@ KEY_METRICS = {
     "TCTD": [("nii", "Thu nhập lãi thuần"), ("toi", "Tổng thu nhập hoạt động"),
              ("provision", "Chi phí dự phòng rủi ro tín dụng"), ("pbt", "Lợi nhuận trước thuế"),
              ("npat_parent", "LNST của cổ đông ngân hàng mẹ")],
+    # Công ty chứng khoán (mẫu B02-CTCK): doanh thu hoạt động gồm lãi từ tài sản tài chính, môi giới, cho vay ký quỹ...
+    "CTCK": [("revenue", "Cộng doanh thu hoạt động"), ("opex", "Cộng chi phí hoạt động"),
+             ("pbt", "Lợi nhuận kế toán trước thuế"), ("npat_parent", "LNST phân bổ cho chủ sở hữu")],
 }
 EXPENSE_METRICS = {"provision", "cogs", "selling_expense", "admin_expense", "opex"}
 
@@ -410,10 +413,10 @@ def build_card(document_id: int, ticker: str, year: int, period: str, record: di
                history: dict[tuple[int, str], Decimal] | None = None, evidence=None,
                plans: dict[str, tuple[Decimal, str]] | None = None) -> Card:
     f = Facts(document_id, record, {(m.statement, m.key) for m in evidence.missing} if evidence is not None else None)
-    kind = "TCTD" if f.template == "TCTD" else ("corporate" if f.template in ("TT200", "TT99") else None)
+    kind = {"TCTD": "TCTD", "CTCK": "CTCK", "TT200": "corporate", "TT99": "corporate"}.get(f.template)
     if kind is None:
         return Card(document_id, ticker, year, period, f.template, [], [],
-                    ["Thẻ chưa hỗ trợ mẫu BCTC này (công ty chứng khoán, bảo hiểm)"], supported=False)
+                    ["Thẻ chưa hỗ trợ mẫu BCTC này (bảo hiểm)"], supported=False)
     metrics = []
     for key, name in KEY_METRICS[kind]:
         vals = {col: f.metric("IS", key, col) for col in ("q_cur", "q_prev_year", "ytd_cur", "ytd_prev_year")}
@@ -425,7 +428,14 @@ def build_card(document_id: int, ticker: str, year: int, period: str, record: di
 
     flags: list[Flag] = []
     not_evaluated: list[str] = []
-    for fn in (flag_sign_change, flag_non_core, flag_other_income, flag_provision, flag_consolidation, flag_cash):
+    checks = (flag_sign_change, flag_non_core, flag_other_income, flag_provision, flag_consolidation, flag_cash)
+    if kind == "CTCK":
+        # Mẫu CTCK không có lợi nhuận gộp; dòng tiền kinh doanh của công ty chứng khoán đi theo dư nợ cho vay ký quỹ và
+        # danh mục tự doanh nên âm thường xuyên, cờ dòng tiền sẽ báo nhầm
+        checks = (flag_sign_change, flag_other_income, flag_consolidation)
+        not_evaluated += ["Lợi nhuận ngoài hoạt động chính: mẫu BCTC công ty chứng khoán không có lợi nhuận gộp",
+                          "Dòng tiền kinh doanh: với công ty chứng khoán đi theo dư nợ cho vay ký quỹ, chưa có quy tắc riêng"]
+    for fn in checks:
         if (x := fn(f)) is not None:
             flags.append(x)
     low = flag_low_base(f, history or {}, year, period)

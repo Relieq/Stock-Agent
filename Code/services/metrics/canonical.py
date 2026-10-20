@@ -55,7 +55,28 @@ BANK: dict[tuple[str, str], str] = {
 }
 
 
+# Công ty chứng khoán: mẫu B02/B01/B03-CTCK (TT334), mã in trên BCTC
+CTCK: dict[tuple[str, str], str] = {
+    ("IS", "revenue"): "20",           # cộng doanh thu hoạt động
+    ("IS", "opex"): "40",              # cộng chi phí hoạt động
+    ("IS", "fin_income"): "50",
+    ("IS", "fin_expense"): "60",
+    ("IS", "admin_expense"): "62",     # chi phí quản lý công ty chứng khoán
+    ("IS", "operating_profit"): "70",  # kết quả hoạt động
+    ("IS", "other_profit"): "80",      # cộng kết quả hoạt động khác
+    ("IS", "pbt"): "90",
+    ("IS", "npat"): "200",
+    ("IS", "npat_parent"): "201",      # LNST phân bổ cho chủ sở hữu
+    ("IS", "minority"): "203",         # phân bổ cho cổ đông không kiểm soát (SSI)
+    ("BS", "total_assets"): "270",
+    ("BS", "equity"): "400",
+    ("CF", "cfo"): "60",
+}
+
+
 def code_for(template: str, statement: str, metric: str) -> str | None:
     if template == "TCTD":
         return BANK.get((statement, metric))
+    if template == "CTCK":
+        return CTCK.get((statement, metric))
     return CORPORATE.get((statement, metric), {}).get(template)

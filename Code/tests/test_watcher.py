@@ -36,3 +36,13 @@ def test_downtime_notice_only_after_more_than_two_passes():
     assert watcher.downtime_notice(now - timedelta(minutes=20), now, 15) is None   # khởi động lại sau khi sửa code
     text = watcher.downtime_notice(now - timedelta(hours=17, minutes=17), now, 15)
     assert "17 giờ 17 phút" in text and "23:00 19/10" in text
+
+
+def test_stuck_download_is_reported_once():
+    from datetime import datetime, timedelta, timezone
+    from services.watcher.__main__ import stuck_notice
+    now = datetime(2026, 10, 20, 9, 0, tzinfo=timezone.utc)
+    rows = [(22191, "TCX", "BCTC quý 3 năm 2026", now - timedelta(hours=7), "https://static2.vietstock.vn/x.zip")]
+    body, ids = stuck_notice(rows, set(), now)
+    assert ids == [22191] and "TCX" in body and "7 giờ" in body
+    assert stuck_notice(rows, {22191}, now) == (None, [])

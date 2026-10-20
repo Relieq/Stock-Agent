@@ -660,7 +660,7 @@ F10 & Agent báo cáo so sánh theo câu hỏi của người dùng & Dự kiế
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[font=\small\sffamily]
-  \node[box=26mm] (src) at (0,0) {Nguồn công bố\\Vietstock (sau:\\HOSE, HNX)};
+  \node[box=26mm] (src) at (0,0) {Nguồn công bố\\Vietstock, HOSE\\(sau: HNX)};
   \node[box=26mm] (w) at (3.8,0) {Watcher\\quét định kỳ};
   \node[db] (reg) at (7.6,0) {Kho tài liệu\\(SHA-256)};
   \node[rbox=26mm] (hr) at (3.8,-2.4) {Duyệt tay\\(admin)};
@@ -765,7 +765,7 @@ máy chủ ảo (VPS) (Hình~\ref{fig:trienkhai}).
           label={[font=\footnotesize\sffamily,anchor=north]north:«device» \textbf{Máy chủ} (Docker Compose)}] (srv) {};
   \end{scope}
   \node[udnode,text width=24mm] (browser) at (-5.4,-1.3) {«device»\\\textbf{Trình duyệt}\\của người dùng};
-  \node[udnode,text width=26mm] (vs) at (9.8,1.2) {«external»\\\textbf{Vietstock}};
+  \node[udnode,text width=26mm] (vs) at (9.8,1.2) {«external»\\\textbf{Vietstock, HOSE}};
   \node[udnode,text width=26mm] (llm) at (9.8,-1.3) {«external»\\\textbf{Nhà cung cấp mô hình}\\(API kiểu OpenAI)};
   \node[udnode,text width=26mm] (smtp) at (9.8,-3.8) {«external»\\\textbf{Máy chủ email}\\(SMTP)};
   \draw[thick] (browser) -- node[above,guard]{HTTPS} (web);
@@ -791,9 +791,10 @@ thức.}\label{fig:trienkhai}
   \node[state] (nr) at (11.0,0) {needs\_review\\(cần duyệt)};
   \node[state] (f) at (11.0,-2.2) {failed\\(lỗi)};
   \node[state] (ap) at (14.8,0) {approved\\(đã duyệt tay)};
-  \node[state] (dup) at (3.5,-2.2) {duplicate\\(trùng file)};
+  \node[state] (dup) at (3.5,-2.2) {duplicate\\(trùng)};
   \draw[flow] (s0) -- (d);
   \draw[flow] (d) -- node[above,guard]{tải file} (dl);
+  \draw[flow] (d.south) |- node[below,guard,pos=0.75,align=center]{[BCTC đã có\\từ nguồn khác]} (dup.west);
   \draw[flow] (dl) -- node[right,guard,align=left]{[file đã có ở\\công bố khác]} (dup);
   \draw[flow] (dl) -- node[above,guard,align=center]{bắt đầu\\đọc} (ex);
   \draw[flow] (ex.north) |- node[above,guard,pos=0.75]{[ràng buộc đạt]} (v.west);
@@ -813,7 +814,7 @@ vuông là điều kiện. Chỉ \code{verified} và \code{approved} được hi
 \begin{sequencediagram}
   \renewcommand{\unitfactor}{0.7}
   \newthread{w}{:Bộ canh}
-  \newinst[1.6]{v}{:Vietstock}
+  \newinst[1.6]{v}{:Vietstock/HOSE}
   \newinst[1.6]{p}{:Pipeline}
   \newinst[1.6]{m}{:Mô hình thị giác}
   \newinst[1.6]{d}{:CSDL}
@@ -885,8 +886,30 @@ Bộ luật được kiểm thử trên toàn bộ tiêu đề thật của VN30
 Cùng lượt quét, watcher lấy cả mục \enquote{Giải trình KQKD} của Vietstock: công văn công ty phải gửi khi lợi nhuận
 biến động từ 10\% so với cùng kỳ hoặc khi số sau soát xét, kiểm toán khác số tự lập. Công văn được lưu như một loại tài
 liệu riêng, gắn với kỳ BCTC mà nó giải trình, không đi vào bước đọc số; thẻ KQKD của kỳ đó dẫn tới công văn. Năm
-2025--2026 có 91 công văn của 20/30 mã VN30, phần lớn là bản scan dài hai trang. Đây là nguồn dữ liệu cho phần tìm nguyên
+2025--2026 có 92 công văn của 21/30 mã VN30, phần lớn là bản scan dài hai trang. Đây là nguồn dữ liệu cho phần tìm nguyên
 nhân biến động ở giai đoạn sau.
+
+\subsection{Nguồn thứ hai: trang công bố thông tin của HOSE}
+Chỉ dựa vào Vietstock thì hệ thống phụ thuộc vào một trang đăng lại: Vietstock có lúc đăng tiêu đề BCTC mà link file
+chưa dùng được, có lượt phản hồi chậm đến mức bỏ qua nhiều mã, và giờ Vietstock đăng không phải giờ công bố chính thức.
+Vì vậy watcher lấy thêm danh sách tệp mà mỗi công ty đăng trên trang của Sở Giao dịch Chứng khoán TP.HCM (HOSE), nơi
+niêm yết toàn bộ VN30. Mỗi tệp BCTC trên HOSE ghi rõ kỳ (quý, bán niên, năm) và thời điểm HOSE đăng; hợp nhất hay riêng
+được nhận theo tên tệp (các cách viết đã gặp như \enquote{hợp nhất}, \enquote{HN}, \enquote{riêng lẻ}, \enquote{RL},
+\enquote{công ty mẹ}).
+
+So trên 233 BCTC VN30 có ở cả hai nguồn (quý 4/2025 đến quý 3/2026), HOSE đăng trước Vietstock ở 161 BCTC, Vietstock
+đăng trước ở 62 và cách nhau dưới 15 phút ở 10. Chênh lệch trung vị nhỏ (HOSE sớm hơn 0,6 giờ), nhưng 10\% số BCTC có
+trên HOSE sớm hơn từ 15,5 giờ trở lên, và 10\% khác lại có trên Vietstock sớm hơn từ 7,1 giờ trở lên. Vì vậy hệ thống
+dùng cả hai nguồn và đọc BCTC từ nguồn nào có trước:
+\begin{itemize}
+  \item BCTC đã có từ Vietstock: giờ HOSE đăng được ghi làm giờ công bố chính thức; nếu Vietstock chưa tải được file thì
+        lấy file từ HOSE.
+  \item BCTC chưa có: thêm BCTC từ HOSE để đọc ngay. Khi Vietstock đăng cùng BCTC đó (cùng mã, kỳ, loại, phạm vi), bản
+        của Vietstock được đánh dấu trùng, không đọc lại. Bản riêng, bản điều chỉnh, và tệp không ghi hợp nhất hay riêng
+        của công ty có cả hai loại thì vẫn chờ Vietstock.
+  \item BCTC đã đăng tiêu đề quá 6 giờ mà cả hai nguồn đều chưa có file dùng được thì gửi email cho quản trị.
+  \item Vietstock lỗi ba mã liền nhau (quá tải) thì lượt quét bỏ các mã còn lại để chuyển ngay sang HOSE, lượt sau thử lại.
+\end{itemize}
 
 \subsection{Lưu trữ và phiên bản}
 \begin{itemize}
@@ -895,10 +918,9 @@ nhân biến động ở giai đoạn sau.
         với cùng một file). Công bố sau được đánh dấu trùng và trỏ về công bố trước, không đọc lại, không tính hai lần vào thẻ hay
         phép đối chiếu giữa các kỳ.
   \item File nén (\code{.zip}, \code{.rar}) được giải nén và tách thành từng báo cáo.
-  \item Lưu thời điểm Vietstock đăng (\code{source\_listed\_at}) và thời điểm hệ thống thấy (\code{discovered\_at}). Giờ
-        công bố chính thức (\code{published\_at}) sẽ lấy từ HOSE, HNX ở giai đoạn sau.
+  \item Lưu thời điểm nguồn đăng, thời điểm hệ thống thấy, và giờ công bố chính thức lấy từ HOSE.
 \end{itemize}
-Kho hiện có 635 tài liệu của 31 mã (VN30 và một mã người dùng yêu cầu thêm), trong đó 120 BCTC đã được đọc và 91 công
+Kho hiện có 639 tài liệu của 31 mã (VN30 và một mã người dùng yêu cầu thêm), trong đó 121 BCTC đã được đọc và 92 công
 văn giải trình. Người dùng
 được mời cũng có thể tải lên BCTC riêng; tài liệu tải lên chỉ người đó thấy, không xuất hiện trong dữ liệu công khai.
 

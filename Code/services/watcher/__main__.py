@@ -1,4 +1,5 @@
-"""Bộ canh BCTC: định kỳ lấy danh sách từ Vietstock, tải file mới, đọc và kiểm chứng BCTC mới, báo cho người vận hành.
+"""Bộ canh BCTC: định kỳ lấy danh sách từ Vietstock và HOSE (services/ingestion/hose.py), tải file mới, đọc và kiểm
+chứng BCTC mới, báo cho người vận hành.
 
     python -m services.watcher                      # chạy mãi, mỗi 15 phút một lượt
     python -m services.watcher --once               # chạy một lượt rồi dừng
@@ -27,7 +28,8 @@ from datetime import date, datetime, timedelta, timezone
 from services.db import connect
 from services.extraction.pipeline import extract_document
 from services.extraction.second_read import after_extraction
-from services.ingestion.registry import discover, download_pending, raw_data_dir
+from services.ingestion.hose import HoseClient
+from services.ingestion.registry import discover, discover_hose, download_pending, raw_data_dir
 from services.ingestion.vietstock import VietstockClient
 from services.llm import VisionClient
 from services.alerts import notify_watchers
@@ -67,6 +69,56 @@ def _beat() -> None:
         pass
 
 
+STUCK_HOURS = 6
+
+
+def _stuck_path():
+    return raw_data_dir() / "stuck_downloads_alerted.txt"
+
+
+def stuck_downloads(conn, now: datetime, hours: int = STUCK_HOURS) -> list[tuple]:
+    """BCTC đầy đủ (hợp nhất hoặc báo cáo duy nhất) của mã đang theo dõi mà nguồn đã đăng quá `hours` giờ vẫn chưa tải
+    được file (TCX quý 3/2026: Vietstock đăng tiêu đề nhưng link file trả 404)."""
+    return conn.execute(
+        """SELECT d.id, d.ticker, d.title_raw, d.source_listed_at, d.source_url FROM documents d
+           WHERE d.content_kind = 'full' AND d.doc_type LIKE 'fs_%%' AND d.scope IN ('consolidated', 'standalone')
+             AND d.owner_user_id IS NULL AND d.source_listed_at < %s
+             AND d.source_listed_at > %s - interval '30 days'
+             AND NOT EXISTS (SELECT 1 FROM document_files f WHERE f.document_id = d.id)
+             AND EXISTS (SELECT 1 FROM companies c WHERE c.ticker = d.ticker AND c.tracked)
+           ORDER BY d.source_listed_at""", (now - timedelta(hours=hours), now)).fetchall()
+
+
+def stuck_notice(rows: list[tuple], already: set[int], now: datetime) -> tuple[str | None, list[int]]:
+    """Thư báo quản trị cho các BCTC chưa tải được file mà chưa từng báo; mỗi BCTC chỉ báo một lần."""
+    new = [r for r in rows if r[0] not in already]
+    if not new:
+        return None, []
+    lines = [f"{t}: {title} - nguồn đăng lúc {listed.astimezone(VN_TZ):%H:%M %d/%m}, đã "
+             f"{int((now - listed).total_seconds() // 3600)} giờ mà chưa tải được file ({url})"
+             for _, t, title, listed, url in new]
+    body = ("Các BCTC sau đã được đăng tiêu đề nhưng bộ canh vẫn chưa tải được file (link lỗi hoặc nguồn chưa đưa file "
+            "lên). Bộ canh vẫn tự thử lại mỗi lượt; nếu kéo dài, có thể tải file từ trang công ty rồi đưa vào bằng trang "
+            "Yêu cầu.\n\n" + "\n".join(lines))
+    return body, [r[0] for r in new]
+
+
+def _check_stuck(conn) -> None:
+    now = datetime.now(timezone.utc)
+    try:
+        already = {int(x) for x in _stuck_path().read_text(encoding="utf-8").split()}
+    except (OSError, ValueError):
+        already = set()
+    body, ids = stuck_notice(stuck_downloads(conn, now), already, now)
+    if body:
+        print(body)
+        notify_admin(f"[Soi] {len(ids)} BCTC đã đăng quá {STUCK_HOURS} giờ mà chưa tải được file", body)
+        try:
+            _stuck_path().write_text(" ".join(str(i) for i in sorted(already | set(ids))), encoding="utf-8")
+        except OSError:
+            pass
+
+
 def downtime_notice(last: datetime | None, now: datetime, interval_min: int) -> str | None:
     """Nội dung thư báo bộ canh vừa chạy lại sau một thời gian dừng; None nếu không cần báo. Khoảng lặng chỉ hơn một
     lượt (khởi động lại sau khi sửa code) thì không báo."""
@@ -103,6 +155,11 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
         tickers = [r[0] for r in conn.execute("SELECT ticker FROM companies WHERE tracked ORDER BY ticker")]
         stats = discover(conn, vs, tickers, year)
         conn.commit()
+        # Nguồn thứ hai: HOSE (giờ công bố chính thức; BCTC HOSE đăng trước Vietstock thì đọc ngay)
+        hose_tickers = [r[0] for r in conn.execute(
+            "SELECT ticker FROM companies WHERE tracked AND exchange = 'HOSE' ORDER BY ticker")]
+        hstats = discover_hose(conn, HoseClient(ids_path=raw_data_dir() / "hose_ids.json"), hose_tickers, year)
+        conn.commit()
         # Công văn giải trình kết quả kinh doanh: chỉ tải về (cùng lượt tải bên dưới) và báo, chưa đọc nội dung
         new_explanations = [f"{t}: {title.strip()} (công văn giải trình, đã lưu)" for t, title in conn.execute(
             "SELECT ticker, title_raw FROM documents WHERE doc_type = 'explanation' AND discovered_at >= %s"
@@ -111,6 +168,7 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
         for period in ("Q1", "Q2", "Q3", "Q4", "H1", "9M", "FY"):
             download_pending(conn, vs, year=year, period=period, doc_type=None, tickers=None)
         conn.commit()
+        _check_stuck(conn)
         # Chỉ tự đọc BCTC của năm đang canh; dữ liệu năm trước chạy bù bằng services.extraction run
         pending = _pending_extraction(conn, since, year)
         lines = []
@@ -148,7 +206,8 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
         lines += process_queue(conn, vision)
         lines += new_explanations
     stamp = datetime.now(VN_TZ).strftime("%d/%m %H:%M")
-    print(f"[{stamp}] {stats['seen']} tài liệu trong danh sách, {stats['new']} mới, {len(pending)} BCTC mới đã xử lý")
+    print(f"[{stamp}] {stats['seen']} tài liệu trong danh sách, {stats['new']} mới (HOSE: {hstats['seen']} BCTC, "
+          f"{hstats['new']} mới, {hstats['attached']} lấy file thay Vietstock), {len(pending)} BCTC mới đã xử lý")
     if lines:
         body = "\n".join(lines)
         print(body)

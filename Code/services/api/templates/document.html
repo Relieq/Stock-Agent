@@ -10,6 +10,7 @@
     Mô hình: {{ record.model }}{% if record.usage %} · {{ "{:,}".format(record.usage.input_tokens) }} token vào,
     {{ "{:,}".format(record.usage.output_tokens) }} token ra{% endif %} ·
     <a href="/tai-lieu/{{ doc.id }}/file" target="_blank">File gốc</a> ·
+    {% if doc.status in ("verified", "approved") %}<a href="/tai-lieu/{{ doc.id }}/excel">Tải Excel</a> ·{% endif %}
     <a href="{{ doc.source_url }}" target="_blank" rel="noopener">Nguồn {{ {"hose": "HOSE", "vietstock": "Vietstock"}.get(doc.source, doc.source) }}</a>
   </div>
   {% set gated = d.checks | selectattr('gate') | list %}
@@ -51,7 +52,7 @@
   {% if admin %}
   <div class="reviewbox">
     {% if doc.status == "needs_review" %}<b>Duyệt tay</b> <span class="small muted">Đối chiếu các dòng tô đỏ với ảnh bên phải.{% else %}<b>Sửa tay</b> <span class="small muted">BCTC đã xuất bản: chỉ sửa sau khi đối chiếu ảnh gốc; mọi lần sửa được ghi lại và hệ thống kiểm lại ràng buộc (còn lệch thì BCTC về hàng duyệt).{% endif %}
-      Ô đọc sai: nhập vị trí dòng (cột #), cột và số nguyên văn như in; mã số đọc sai: chọn cột "Mã số".</span>
+      Bấm đúp vào ô số (hoặc ô mã số) trong bảng để điền sẵn, rồi sửa thành số nguyên văn như in.</span>
     <form method="post" action="/duyet/{{ doc.id }}/sua" class="row">
       <select name="statement">{% for t in d.tables %}<option value="{{ t.statement }}">{{ t.name }}</option>{% endfor %}</select>
       <input name="row" type="number" min="0" placeholder="dòng #" required style="width:80px">
@@ -94,9 +95,9 @@
       <thead><tr>{% if admin %}<th title="Vị trí dòng, dùng khi sửa tay">#</th>{% endif %}<th>STT</th><th>Mã</th><th>Chỉ tiêu</th><th>TM</th>{% for k, name in t.columns %}<th class="num">{{ name }}</th>{% endfor %}<th>Tr.</th></tr></thead>
       <tbody>
       {% for r in t.rows %}
-      <tr data-page="{{ r.page or (t.pages[0] if t.pages else 1) }}" {% if r.flagged %}class="flag"{% endif %}>
+      <tr data-page="{{ r.page or (t.pages[0] if t.pages else 1) }}" data-st="{{ t.statement }}" data-row="{{ r.index }}" data-code="{{ r.code or '' }}" {% if r.flagged %}class="flag"{% endif %}>
         {% if admin %}<td class="muted small">{{ r.index }}</td>{% endif %}<td>{{ r.stt or "" }}</td>{% if r.code and "." in r.code and r.code.split(".")[-1].isdigit() %}<td class="code muted" title="BCTC không in mã dòng này: mã đặt theo vị trí dưới dòng tổng để kiểm phép cộng">{{ r.code }}</td>{% elif r.code and r.code.startswith("b.") %}<td class="code muted" title="BCTC ngân hàng không in mã số: mã chuẩn do hệ thống gán theo tên dòng">{{ r.code }}</td>{% else %}<td class="code">{{ r.code or "" }}</td>{% endif %}<td class="lbl">{{ r.label }}</td><td>{{ r.note or "" }}</td>
-        {% for k, name in t.columns %}{% set ev = r.evidence.get(k) %}<td class="num{% if ev %} ev-{{ ev.status }}{% endif %}"
+        {% for k, name in t.columns %}{% set ev = r.evidence.get(k) %}<td data-col="{{ k }}" data-raw="{{ r.values.get(k) or '' }}" class="num{% if ev %} ev-{{ ev.status }}{% endif %}"
           {% if ev %}title="{{ EVIDENCE[ev.status] }}{% if ev.sum %}&#10;Cộng tổng: {{ ev.sum | join(', ') }}{% endif %}{% if ev.period %}&#10;Giữa các kỳ: {{ ev.period | join(', ') }}{% endif %}{% if ev.differs %}&#10;Khác: {{ ev.differs | join(', ') }}{% endif %}{% if ev.conflict %}&#10;Cần xem lại: {{ ev.conflict | join(', ') }}{% endif %}{% if ev.second_printed %}&#10;Lần đọc thứ hai: {{ ev.second_printed }}{% endif %}"{% endif %}>{{ r.values.get(k) or "" }}</td>{% endfor %}
         <td class="muted">{{ r.page or "" }}</td>
       </tr>
@@ -161,6 +162,17 @@
 </div>
 
 <script>
+{# Quản trị: bấm đúp một ô của bảng số để điền sẵn khung sửa tay (báo cáo, dòng, cột, số đang lưu) #}
+const fixForm = document.querySelector('form[action$="/sua"]');
+if (fixForm) document.querySelectorAll('table.fs tr[data-row] td').forEach(td => td.ondblclick = () => {
+  const tr = td.parentElement, col = td.dataset.col || (td.classList.contains('code') ? 'code' : null);
+  if (!col) return;
+  const f = fixForm.elements;
+  f['statement'].value = tr.dataset.st; f['row'].value = tr.dataset.row; f['column'].value = col;
+  f['value'].value = col === 'code' ? tr.dataset.code : (td.dataset.raw || '');
+  fixForm.scrollIntoView({behavior: 'smooth', block: 'center'});
+  f['value'].focus(); f['value'].select();
+});
 const docId = {{ doc.id }}, maxPage = {{ d.page_count }};
 const img = document.getElementById('pageimg'), no = document.getElementById('pageno'), openLink = document.getElementById('openimg');
 function show(p) {

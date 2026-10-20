@@ -313,6 +313,39 @@ def document(request: Request, doc_id: int):
         "EVIDENCE": STATUS_LABELS, "admin": request.state.user is not None and request.state.user.is_admin})
 
 
+PERIOD_TEXT = {"Q1": "quý 1", "Q2": "quý 2", "Q3": "quý 3", "Q4": "quý 4", "H1": "bán niên", "9M": "9 tháng", "FY": "năm"}
+SCOPE_TEXT = {"consolidated": "hợp nhất", "separate": "riêng", "standalone": "BCTC duy nhất (không có công ty con)"}
+
+
+@app.get("/tai-lieu/{doc_id}/excel")
+def excel_export(request: Request, doc_id: int):
+    """BCTC đã kiểm chứng hoặc đã duyệt ra file Excel (services/api/export.py)."""
+    from services.api.export import workbook
+    doc = _document(doc_id, request)
+    if doc["status"] not in ("verified", "approved"):
+        raise HTTPException(404, "Chỉ xuất được BCTC đã kiểm chứng hoặc đã duyệt")
+    record = data.load_record(doc_id)
+    if record is None:
+        raise HTTPException(404, "Tài liệu này chưa được đọc")
+    with connect() as conn:
+        evidence = data.evidence(conn, doc_id)
+        listed, published = conn.execute("SELECT source_listed_at, published_at FROM documents WHERE id = %s",
+                                         (doc_id,)).fetchone()
+    first_at, first_source = cards.first_seen(listed, doc["source"], published)
+    s = record.get("summary", {})
+    info = {"ticker": doc["ticker"], "name": doc["name"], "title": doc["title"],
+            "period_text": f"{PERIOD_TEXT.get(doc['period'], doc['period'])}/{doc['year']}",
+            "scope_text": SCOPE_TEXT.get(doc["scope"], doc["scope"] or ""),
+            "source": cards.SOURCE_NAMES.get(doc["source"], doc["source"]), "source_url": doc["source_url"],
+            "first_at": first_at, "first_source": first_source, "processed_at": doc["processed_at"],
+            "status_text": "đã duyệt tay" if doc["status"] == "approved" else "đã kiểm chứng tự động",
+            "gate": (s.get("gate_checks", 0) - s.get("gate_failed", 0), s.get("gate_checks", 0))}
+    name = f"Soi_{doc['ticker']}_{doc['period']}_{doc['year']}_{doc['scope'] or ''}.xlsx"
+    return Response(workbook(record, evidence, info),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 @app.get("/tai-lieu/{doc_id}/trang/{page}.png")
 def page_image(request: Request, doc_id: int, page: int):
     doc = _document(doc_id, request)

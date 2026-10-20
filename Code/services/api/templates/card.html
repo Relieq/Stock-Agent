@@ -74,7 +74,8 @@
   {% if card.not_evaluated %}<p class="small muted">Chưa xét được: {{ card.not_evaluated | join('; ') }}</p>{% endif %}
   {% if info.explanation %}<p class="small">Công ty có công văn giải trình kết quả kinh doanh kỳ này:
     <a href="{{ info.explanation.url }}" target="_blank" rel="noopener">{{ info.explanation.title }}</a> (văn bản của công ty, hệ thống chưa đọc).</p>{% endif %}
-  <p class="small"><a href="/tai-lieu/{{ doc_id }}">Xem toàn bộ số đã đọc và các phép kiểm tra</a> · <a href="{{ info.source_url }}" target="_blank" rel="noopener">Nguồn Vietstock</a></p>
+  <p class="small"><a href="/tai-lieu/{{ doc_id }}">Xem toàn bộ số đã đọc và các phép kiểm tra</a> ·
+    {% if info.published %}<a href="/tai-lieu/{{ doc_id }}/excel">Tải Excel (cả ba báo cáo)</a> · {% endif %}<a href="{{ info.source_url }}" target="_blank" rel="noopener">Nguồn Vietstock</a></p>
 {% endif %}
 
 <dialog id="viewer"><form method="dialog"><button class="close">Đóng</button></form>

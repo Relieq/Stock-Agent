@@ -1068,7 +1068,8 @@ viên và hệ thống.
 
 Người duyệt có thể sửa một ô số, hoặc sửa mã số của một dòng khi mô hình đọc nhầm mã (BCTC bán niên 2026 của GVR: mã
 420a/420b bị đọc thành 421/421a). Quản trị cũng sửa được ô của BCTC đã xuất bản khi phát hiện sai sau này; hệ thống kiểm
-lại ràng buộc, còn lệch thì BCTC trở về hàng duyệt. Với ô chưa có phép kiểm mà hai lần đọc khác nhau, người duyệt xem ảnh
+lại ràng buộc, còn lệch thì BCTC trở về hàng duyệt. Bấm đúp vào một ô trong bảng số thì khung sửa được điền sẵn báo
+cáo, dòng, cột và số đang lưu, người duyệt chỉ cần gõ lại số như in. Với ô chưa có phép kiểm mà hai lần đọc khác nhau, người duyệt xem ảnh
 rồi bấm \enquote{đúng như ảnh} nếu lần đọc đầu đúng: ô thôi ở trạng thái cần xem lại, không tính là ô sửa tay, và xác
 nhận hết hiệu lực nếu số trong ô đổi sau đó. Hai loại sửa được ghi riêng: chỉ các ô số sửa tay mới được dùng làm dữ liệu vàng để
 đánh giá bước định vị ô sai (mục~\ref{sec:evalrepair}). Ví dụ BCTC bán niên của GVR chỉ có bản 72 dpi; sau khi đối
@@ -1327,6 +1328,14 @@ Facebook, Zalo; chỉ thẻ đã kiểm chứng mới có trang chia sẻ công 
 \begin{subfigure}{\linewidth}\centering\fbox{\includegraphics[width=0.62\linewidth]{anh-chia-se-vcb.png}}\caption{Ảnh thẻ để chia sẻ}\end{subfigure}
 \caption{Lịch công bố và ảnh thẻ chia sẻ.}\label{fig:lich}
 \end{figure}
+
+\subsection{Xuất file Excel}
+Từ thẻ KQKD hoặc trang tài liệu, người dùng tải được BCTC đã kiểm chứng hoặc đã duyệt dưới dạng file Excel. Mỗi báo
+cáo (BCĐKT, KQKD, LCTT) là một trang tính; số để dạng số theo đơn vị hệ thống đã dùng khi đọc BCTC (ghi ở dòng đầu trang
+tính), số trong ngoặc thành số âm. Cạnh mỗi cột số là cột bằng chứng của từng ô (khớp cộng tổng, khớp giữa các kỳ, hai
+lần đọc trùng, chưa kiểm được\ldots), tô cùng màu như trên web, kèm số trang trong file gốc. Trang \enquote{Nguồn} ghi
+BCTC gốc và link, giờ công bố sớm nhất, trạng thái kiểm chứng, các ô người duyệt đã sửa tay, và lưu ý đây là thông tin
+chứ không phải khuyến nghị đầu tư. Như vậy số đem ra khỏi hệ thống vẫn mang theo nguồn và mức độ đã được kiểm.
 
 \subsection{Người dùng và quyền riêng tư}
 Giai đoạn thử nghiệm chỉ dành cho người được mời, đăng nhập bằng link gửi qua email. Người dùng theo dõi mã để nhận

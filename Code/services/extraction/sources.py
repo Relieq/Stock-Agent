@@ -83,6 +83,28 @@ def open_pdf(candidate: PdfCandidate) -> pymupdf.Document:
     return pymupdf.open(stream=io.BytesIO(candidate.data), filetype="pdf")
 
 
+def text_orientation(doc: pymupdf.Document, page: int, min_chars: int = 200) -> int | None:
+    """Hướng của trang theo lớp chữ trong file: 0 nếu phần lớn dòng chữ chạy trái sang phải, 180 nếu chạy ngược,
+    None nếu không đủ chữ để kết luận (bản scan không có lớp chữ) hoặc chữ chạy dọc."""
+    p = doc[page - 1]
+    if p.rotation:
+        return None
+    votes = {0: 0, 180: 0}
+    for block in p.get_text("dict").get("blocks", []):
+        for line in block.get("lines", []):
+            n = sum(len(span.get("text", "").strip()) for span in line.get("spans", []))
+            dx = line.get("dir", (1, 0))[0]
+            if dx > 0.9:
+                votes[0] += n
+            elif dx < -0.9:
+                votes[180] += n
+    total = votes[0] + votes[180]
+    if total < min_chars:
+        return None
+    best = max(votes, key=votes.get)
+    return best if votes[best] >= 0.8 * total else None
+
+
 def render_page(doc: pymupdf.Document, page: int, long_side: int, rotate: int = 0) -> bytes:
     """Ảnh PNG của trang (đánh số từ 1), cạnh dài khoảng `long_side` pixel, xoay `rotate` độ theo chiều kim đồng hồ."""
     p = doc[page - 1]

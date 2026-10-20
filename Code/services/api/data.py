@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -151,6 +152,11 @@ def page_png(storage_key: str, member: str, page: int, rotate: int, long_side: i
 
 def page_image(record: dict, storage_key: str, page: int) -> bytes:
     return page_png(storage_key, record["chosen"], page, _rotation(record, page))
+
+
+def page_etag(record: dict, storage_key: str, page: int) -> str:
+    key = f"{storage_key}|{record['chosen']}|{page}|{_rotation(record, page)}"
+    return '"' + hashlib.sha1(key.encode()).hexdigest()[:16] + '"'
 
 
 def evidence(conn, document_id: int):

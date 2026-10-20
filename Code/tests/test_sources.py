@@ -47,3 +47,31 @@ def test_strips_are_larger_than_whole_page_and_rotation_is_applied():
     assert len(strips) == 3 and all(_size(s)[0] > full_w for s in strips)
     w, h = _size(render_sharp(doc, 1, rotate=90))
     assert w > h                                # trang dọc xoay 90 độ thành ảnh ngang
+
+
+def test_text_layer_tells_whether_a_page_is_upside_down():
+    import pymupdf
+    from services.extraction.sources import text_orientation
+    doc = pymupdf.open()
+    for rotate in (0, 180):
+        page = doc.new_page()
+        for i in range(12):
+            page.insert_text((300, 100 + 40 * i) if rotate else (60, 100 + 40 * i),
+                             "Tổng lợi nhuận kế toán trước thuế 11.030.887", rotate=rotate)
+    doc.new_page()                                        # trang trắng (bản scan không có lớp chữ)
+    assert [text_orientation(doc, p) for p in (1, 2, 3)] == [0, 180, None]
+
+
+def test_flip_is_saved_only_when_confirmed(monkeypatch):
+    # VPB quý 3/2026: trang 8 đứng thẳng theo lớp chữ, nên không được lưu hướng xoay 180 dù bản chép ngược ít lệch hơn
+    from services.extraction import pipeline
+    monkeypatch.setattr(pipeline, "text_orientation", lambda doc, page: 0)
+    assert not pipeline._confirm_upside_down(None, None, 8, 0)
+    assert pipeline._confirm_upside_down(None, None, 8, 180)
+    monkeypatch.setattr(pipeline, "text_orientation", lambda doc, page: None)
+    monkeypatch.setattr(pipeline, "render_page", lambda *a, **k: b"")
+
+    class Client:
+        def json_from_images(self, prompt, images, schema, name, **k):
+            return {"upright": "B"}
+    assert pipeline._confirm_upside_down(Client(), None, 86, 90)

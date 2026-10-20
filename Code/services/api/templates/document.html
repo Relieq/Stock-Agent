@@ -156,7 +156,7 @@ const img = document.getElementById('pageimg'), no = document.getElementById('pa
 function show(p) {
   p = Math.max(1, Math.min(maxPage, +p || 1));
   no.value = p;
-  const url = '/tai-lieu/' + docId + '/trang/' + p + '.png';
+  const url = '/tai-lieu/' + docId + '/trang/' + p + '.png?v=2';
   img.src = url; openLink.href = url;
 }
 document.getElementById('prev').onclick = () => show(+no.value - 1);

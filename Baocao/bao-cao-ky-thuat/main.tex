@@ -992,7 +992,10 @@ phương án làm số ràng buộc đạt nhiều nhất mà không làm mất 
                 các dòng theo thứ tự trang. Mỗi lượt trả lời ngắn hơn nên mô hình ít bỏ sót dòng ở chỗ chuyển trang.
           \item Luôn dùng ảnh nét ở mức \code{original} (mục~\ref{sec:anhnet}).
           \item Nếu chép lại vẫn lệch, lần lượt xoay \textbf{từng trang một} thêm 180 độ rồi chép lại, vì một số file scan
-                có trang lộn ngược (VHM quý 1/2026).
+                có trang lộn ngược (VHM quý 1/2026). Bản chép ở hướng xoay ít lệch hơn chưa chắc vì trang lộn ngược
+                (mô hình đôi khi tình cờ đọc tốt hơn ở hướng sai), nên hướng xoay chỉ được lưu lại khi xác nhận được:
+                theo chiều các dòng chữ nếu file có lớp chữ, hoặc hỏi mô hình ảnh nào trong hai hướng có chữ đứng thẳng.
+                Hướng này dùng để hiện ảnh trang trên web và để đọc lại ô.
         \end{itemize}
         Bản mới chỉ được giữ khi hiệu số \enquote{ràng buộc đạt trừ ràng buộc lệch} tốt hơn bản cũ (hoặc bằng nhưng có
         nhiều ràng buộc đạt hơn) và số ràng buộc đạt không giảm. Chỉ so số ràng buộc lệch là chưa đủ: bản chép lại làm

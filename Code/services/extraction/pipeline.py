@@ -27,7 +27,9 @@ import psycopg
 from services.extraction import prompts
 from services.extraction.bank import canonicalize
 from services.extraction.numbers import normalize_code, parse_amount
-from services.extraction.sources import candidates, is_low_dpi, open_pdf, render_page, render_sharp, render_strips
+from services.extraction.sources import (
+    candidates, is_low_dpi, open_pdf, render_page, render_sharp, render_strips, text_orientation,
+)
 from services.extraction.repair import agrees, cross_proposals, localize, proposal_dict
 from services.extraction.rules import RULESETS
 from services.extraction.validate import (
@@ -215,8 +217,8 @@ def _escalate(record: dict, client: VisionClient, doc, conn: psycopg.Connection 
             break
     if _reextract_failed_statements(record, client, doc):
         # Chép lại xong thì định vị ô sai lại từ đầu: lỗi cũ có thể che lỗi đọc thật, và _reread_failed chỉ tìm dòng theo
-        # mã in trên BCTC nên bỏ qua ngân hàng (VPB quý 3/2026: trang KQKD lộn ngược, chép lại đúng chiều còn đúng một ô
-        # đọc sai mà không bước nào đọc lại)
+        # mã in trên BCTC nên bỏ qua ngân hàng (VPB quý 3/2026: chép lại trang KQKD xong còn đúng một ô đọc sai mà không
+        # bước nào đọc lại)
         _repair_by_constraints(record, client, doc, conn)
         _reread_failed(record, client, doc)
 
@@ -618,11 +620,17 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
                 record["raw"][st] = before
             else:
                 improved = True
-                if extra_rotation:
+                flipped = [p for p in pages if rotations[p] != base[p]]
+                # Bản đọc ở hướng xoay thêm 180 độ ít lệch hơn chưa chắc vì trang lộn ngược: VPB quý 3/2026 trang 8 đứng
+                # thẳng, chép ở hướng đúng còn lệch 4 phép kiểm, chép ngược tình cờ chỉ lệch 1. Giữ các dòng đọc được,
+                # nhưng chỉ lưu hướng xoay (dùng để vẽ ảnh trên web và đọc lại ô) khi xác nhận được trang lộn ngược.
+                if extra_rotation and all(_confirm_upside_down(client, doc, p, base[p]) for p in flipped):
                     saved = chosen.setdefault("rotations", {})
                     for p, r in rotations.items():   # khóa số (vừa định vị) hoặc chuỗi (đọc lại từ JSON)
                         saved.pop(p, None)
                         saved[str(p)] = r
+                elif extra_rotation:
+                    record.setdefault("rotation_rejected", []).append({"statement": st, "pages": flipped})
             log.append({"statement": st, "pages": pages, "rotation_added": extra_rotation,
                         "rotations": {str(p): r for p, r in rotations.items()},
                         "failed_before": n_failed, "failed_after": after_failed,
@@ -630,6 +638,18 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
                         "rows_before": len(before.get("rows", [])), "rows_after": len(merged["rows"]),
                         "kept": kept, "model": client.cfg.model})
     return improved
+
+
+def _confirm_upside_down(client: VisionClient, doc, page: int, rotation: int) -> bool:
+    """Trang `page` (đang vẽ với hướng `rotation`) có thật sự cần xoay thêm 180 độ không. File có lớp chữ thì xét chiều
+    các dòng chữ; không thì hỏi mô hình ảnh nào trong hai ảnh (hướng hiện tại và xoay thêm 180 độ) có chữ đứng thẳng."""
+    native = text_orientation(doc, page)
+    if native is not None:
+        return (rotation + 180) % 360 == native
+    images = [("Ảnh A", render_page(doc, page, LOCATE_LONG_SIDE, rotation)),
+              ("Ảnh B", render_page(doc, page, LOCATE_LONG_SIDE, (rotation + 180) % 360))]
+    answer = client.json_from_images(prompts.ORIENT_PROMPT, images, prompts.ORIENT_SCHEMA, "orientation_check")
+    return answer.get("upright") == "B"
 
 
 def _rotation(record: dict, page: int) -> int:

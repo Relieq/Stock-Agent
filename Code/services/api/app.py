@@ -319,11 +319,15 @@ def page_image(request: Request, doc_id: int, page: int):
     record = data.load_record(doc_id)
     if record is None or not doc["storage_key"]:
         raise HTTPException(404)
+    # Ảnh đổi khi hướng xoay của trang đổi (ví dụ sửa hướng sai): trình duyệt hỏi lại mỗi lần, cùng ETag thì dùng ảnh cũ
+    etag = data.page_etag(record, doc["storage_key"], page)
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
     try:
         png = data.page_image(record, doc["storage_key"], page)
     except (IndexError, FileNotFoundError):
         raise HTTPException(404, "Không có trang này")
-    return Response(png, media_type="image/png", headers={"Cache-Control": "max-age=86400"})
+    return Response(png, media_type="image/png", headers={"Cache-Control": "no-cache", "ETag": etag})
 
 
 @app.get("/tai-lieu/{doc_id}/file")

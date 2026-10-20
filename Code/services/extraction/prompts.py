@@ -57,6 +57,18 @@ Mỗi ảnh có nhãn "Trang N" ngay trước nó. Với MỖI trang, cho biết
 Trang bảng biểu kéo dài sang trang sau thì trang sau cũng mang cùng loại. Trả về đúng một phần tử cho mỗi trang."""
 
 
+ORIENT_SCHEMA = {
+    "type": "object",
+    "properties": {"upright": {"type": "string", "enum": ["A", "B", "unclear"]}},
+    "required": ["upright"],
+    "additionalProperties": False,
+}
+
+ORIENT_PROMPT = """Hai ảnh A và B là cùng một trang báo cáo tài chính, ảnh B là ảnh A xoay 180 độ.
+Ảnh nào có chữ đứng thẳng (đọc được từ trái sang phải, từ trên xuống dưới)? Trả lời A, B, hoặc unclear nếu không nhìn
+rõ."""
+
+
 IDENTIFY_SCHEMA = {
     "type": "object",
     "properties": {

@@ -82,7 +82,7 @@
 <script>
 const dlg = document.getElementById('viewer'), img = document.getElementById('viewerimg'), cap = document.getElementById('viewercap');
 document.querySelectorAll('button.src').forEach(b => b.onclick = () => {
-  img.src = '/tai-lieu/' + b.dataset.doc + '/trang/' + b.dataset.page + '.png';
+  img.src = '/tai-lieu/' + b.dataset.doc + '/trang/' + b.dataset.page + '.png?v=2';
   cap.textContent = b.title || b.textContent;
   dlg.showModal();
 });

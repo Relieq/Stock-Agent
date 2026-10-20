@@ -88,7 +88,7 @@ def explanation(conn: psycopg.Connection, ticker: str, year: int, period: str, s
     row = conn.execute(
         """SELECT title_raw, source_url FROM documents
            WHERE ticker = %s AND fiscal_year = %s AND fiscal_period = %s AND doc_type = 'explanation'
-             AND owner_user_id IS NULL
+             AND owner_user_id IS NULL AND duplicate_of IS NULL
            ORDER BY (scope = %s) DESC, source_listed_at DESC NULLS LAST LIMIT 1""",
         (ticker, year, period, scope)).fetchone()
     return {"title": row[0].strip(), "url": row[1]} if row else None

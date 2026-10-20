@@ -481,3 +481,30 @@ def test_row_pages_written_as_printed_page_numbers_are_mapped_back():
     assert [r["page"] for r in fix_row_pages(raw, [9])["rows"]] == [9, 9]
     raw = {"rows": [{"page": 5}, {"page": 6}]}
     assert [r["page"] for r in fix_row_pages(raw, [5, 6, 7])["rows"]] == [5, 6]      # đúng sẵn thì giữ nguyên
+
+
+def test_assigned_page_without_rows_is_read_again(monkeypatch):
+    # SSI quý 2/2026: BCĐKT được giao trang 4-6 nhưng lần chép đầu dừng ở trang 4; trang 5 được chép lại riêng và ghép
+    # đúng chỗ. Trang không có dòng nào khi đọc lại (trang chữ ký) không làm đổi gì.
+    from types import SimpleNamespace
+    from services.extraction import pipeline
+    monkeypatch.setattr(pipeline, "render_sharp", lambda *a, **k: b"")
+    bs = [_row(None, "100", "TÀI SẢN NGẮN HẠN", "60", page=4), _row(None, "200", "TÀI SẢN DÀI HẠN", "40", page=4),
+          _row(None, "280", "TỔNG CỘNG TÀI SẢN", "100", page=4)]
+    rec = _record({"BS": bs})
+    rec |= {"chosen": "a", "candidates": [{"name": "a", "statement_pages": {"BS": [4, 5, 6]}}]}
+    assert pipeline.empty_pages(rec) == {"BS": [5, 6]}
+    answers = {5: [_row(None, "300", "NỢ PHẢI TRẢ", "70", page=5), _row(None, "400", "VỐN CHỦ SỞ HỮU", "30", page=5),
+                   _row(None, "440", "TỔNG CỘNG NGUỒN VỐN", "100", page=5)], 6: []}
+
+    class Client:
+        cfg = SimpleNamespace(model="m")
+
+        def json_from_images(self, prompt, images, *a, **k):
+            return {"rows": answers[int(images[0][0].split()[-1])]}
+
+    assert pipeline._read_empty_pages(rec, Client(), None)
+    assert [r["code"] for r in rec["raw"]["BS"]["rows"]] == ["100", "200", "280", "300", "400", "440"]
+    assert [(e["page"], e["kept"]) for e in rec["extensions"]] == [(5, True), (6, False)]
+    assert pipeline.empty_pages(rec) == {"BS": [6]}
+    assert not pipeline._read_empty_pages(rec, Client(), None) and len(rec["extensions"]) == 2   # không thử lại

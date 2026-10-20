@@ -979,7 +979,8 @@ phương án làm số ràng buộc đạt nhiều nhất mà không làm mất 
 \subsection{Thang leo thang khi còn lệch}\label{sec:leothang}
 \begin{enumerate}
   \item BCĐKT chưa có đủ tổng tài sản và tổng nguồn vốn, hoặc KQKD không có dòng LNST, thì chép thêm trang kế tiếp, vì
-        có thể bước định vị bỏ sót trang (trang nguồn vốn, trang cuối KQKD).
+        có thể bước định vị bỏ sót trang (trang nguồn vốn, trang cuối KQKD). Trang đã được giao cho một báo cáo mà lần
+        chép đầu không ra dòng nào thì được chép lại riêng, mỗi trang một lần gọi.
   \item \textbf{Tự định vị ô sai bằng ràng buộc, rồi đọc lại riêng các ô đó} (mục~\ref{sec:loi}).
   \item Đọc lại các ô thuộc ràng buộc còn lệch ở độ phân giải cao hơn. Chỉ giữ lần đọc lại nếu số ràng buộc lệch giảm và
         số ràng buộc đạt không giảm.
@@ -1455,8 +1456,8 @@ Lần đọc thứ hai không chạy trong phép đo này; trong quy trình th�
 phép cộng nào.
 
 Phép đo còn phát hiện một lỗi của quy trình: đôi khi mô hình ghi số trang in ở chân trang BCTC thay vì số trang của ảnh
-được gửi, làm bước đọc lại ô mở nhầm trang. Lỗi này đã xảy ra ở 2 BCTC thật (MSN và STB quý 2/2026); hệ thống nay tự đổi
-lại số trang theo thứ tự các trang đã gửi.
+được gửi, làm bước đọc lại ô mở nhầm trang. Lỗi này đã xảy ra ở 4 BCTC thật (MSN quý 2/2026, STB quý 1 và quý 2/2026, TCB quý
+1/2026); hệ thống nay tự đổi lại số trang theo thứ tự các trang đã gửi.
 
 \subsection{Giới hạn}
 \begin{itemize}
@@ -1560,7 +1561,9 @@ Lần đầu chạy phép kiểm đủ dòng (mục~\ref{sec:duydong}) trên 119
         khoán, toàn bộ phép kiểm KQKD của hai BCTC này (48 và 24 phép) đều khớp.
   \item \textbf{BCĐKT quý 2/2026 của SSI} không có phần ngoài bảng, trong khi bản quý 1 có 33 dòng ngoài bảng: lần chép
         đầu dừng ở trang 6, bỏ qua ba trang cuối. Chép thêm ba trang này lấy được 39 dòng với chi phí 0,0053 USD; số phép
-        kiểm BCĐKT đạt tăng từ 26 lên 30, không phép nào lệch.
+        kiểm BCĐKT đạt tăng từ 26 lên 30, không phép nào lệch. Từ ca này, quy trình tự chép lại riêng mọi trang được
+        giao cho một báo cáo mà lần chép đầu không ra dòng nào. Trên 119 BCTC còn 12 trang như vậy (HDB, MCH); chép lại
+        đều không ra dòng nào vì đó là trang chữ ký, chi phí cả 12 trang là 0,0082 USD.
 \end{itemize}
 
 Sau khi sửa, phép kiểm còn báo 5/119 BCTC, đều là công ty tự đổi cách trình bày: MWG quý 1 và VIC quý 2/2026 có số đầu năm khác quý liền kề (trình bày lại), còn VHM, VJC và VNM quý 2/2026 đổi tên hoặc gộp một

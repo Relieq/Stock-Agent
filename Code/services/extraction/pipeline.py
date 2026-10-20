@@ -204,9 +204,11 @@ def _escalate(record: dict, client: VisionClient, doc, conn: psycopg.Connection 
     2. vẫn lệch thì chép lại cả báo cáo đó, mỗi trang một lần gọi (sửa lỗi bỏ sót dòng), giữ bản ít lệch hơn,
        rồi đọc lại ô thêm một lần.
     Trước đó: BCĐKT chưa kiểm được tổng tài sản = tổng nguồn vốn, hay KQKD không có dòng LNST, thì chép thêm trang kế
-    tiếp (bước định vị trang có thể bỏ sót trang nguồn vốn hay trang cuối KQKD). Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
+    tiếp (bước định vị trang có thể bỏ sót trang nguồn vốn hay trang cuối KQKD); trang được giao mà lần chép đầu không ra
+    dòng nào thì chép lại riêng trang đó. Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
     _extend_balance_sheet(record, client, doc)
     _extend_income_statement(record, client, doc)
+    _read_empty_pages(record, client, doc)
     _repair_by_constraints(record, client, doc, conn)
     for _ in range(REREAD_ROUNDS):
         if not _reread_failed(record, client, doc):
@@ -490,6 +492,50 @@ def _extend_income_statement(record: dict, client: VisionClient, doc) -> bool:
         return not need & still and _gate_tally(record).get("IS", (0, 0))[0] <= failed_before
 
     return _extend_statement(record, client, doc, "IS", done)
+
+
+def empty_pages(record: dict) -> dict[str, list[int]]:
+    """Trang được giao cho một báo cáo mà lần chép không ra dòng nào: {báo cáo: [trang]}. Chỉ xét báo cáo đã có dòng ở
+    ít nhất một trang được giao (nếu không thì là số trang ghi sai, không phải trang bị bỏ sót)."""
+    chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
+    out = {}
+    for st, pages in chosen["statement_pages"].items():
+        got = {int(r["page"]) for r in record["raw"].get(st, {}).get("rows", []) if str(r.get("page") or "").isdigit()}
+        pages = [int(p) for p in pages]
+        if got & set(pages) and (empty := [p for p in pages if p not in got]):
+            out[st] = empty
+    return out
+
+
+def _read_empty_pages(record: dict, client: VisionClient, doc) -> bool:
+    """Chép lại riêng từng trang được giao cho báo cáo mà lần chép đầu không ra dòng nào.
+
+    Ví dụ SSI quý 2/2026: BCĐKT được giao trang 4-9 nhưng lần chép đầu dừng ở trang 6, mất cả phần ngoài bảng ở trang
+    7-9; mọi phép cộng vẫn đúng nên chỉ phát hiện được khi so với BCTC quý 1. Trang trống thật (trang chữ ký) chỉ tốn một
+    lần gọi và không đổi gì. Giữ dòng mới khi báo cáo không thêm ràng buộc lệch và không mất ràng buộc đạt.
+    """
+    changed = False
+    tried = {(e["statement"], e["page"]) for e in record.get("extensions", []) if e.get("reason") == "empty_page"}
+    for st, pages in empty_pages(record).items():
+        for page in (p for p in pages if (st, p) not in tried):
+            part = fix_row_pages(client.json_from_images(
+                prompts.extract_prompt(st), [(f"Trang {page}", render_sharp(doc, page, _rotation(record, page)))],
+                prompts.extract_schema(st), f"statement_{st}", step=f"empty_page_{st}", detail=ORIGINAL), [page])
+            extra = part.get("rows", [])
+            before = record["raw"][st]
+            failed, passed = _gate_tally(record).get(st, (0, 0))
+            rows = before.get("rows", [])
+            at = max((i + 1 for i, r in enumerate(rows) if str(r.get("page") or "").isdigit() and int(r["page"]) < page),
+                     default=0)
+            record["raw"][st] = before | {"rows": rows[:at] + extra + rows[at:]}
+            failed_after, passed_after = _gate_tally(record).get(st, (0, 0))
+            kept = bool(extra) and failed_after <= failed and passed_after >= passed
+            if not kept:
+                record["raw"][st] = before
+            changed |= kept
+            record.setdefault("extensions", []).append({"statement": st, "page": page, "rows": len(extra), "kept": kept,
+                                                        "reason": "empty_page", "model": client.cfg.model})
+    return changed
 
 
 def _gate_failures(record: dict) -> dict[str, int]:

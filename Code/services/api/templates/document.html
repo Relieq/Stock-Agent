@@ -35,7 +35,7 @@
     {% for c in record.codes_inferred or [] %}<li>Dòng "{{ c.label }}" bị chép thiếu mã số: gán mã {{ c.code }} vì số của dòng khớp đúng phần còn thiếu của ràng buộc {{ c.rule }} ở mọi cột.</li>{% endfor %}
     {% if record.cf_positional %}<li>LCTT có {{ record.cf_positional | length }} dòng không in mã số: đặt mã theo vị trí (mờ) dưới dòng tổng gần nhất để kiểm "dòng tổng = tổng các dòng thành phần".</li>{% endif %}
     {% if record.labels_repaired %}<li>Tên chỉ tiêu dài xuống nhiều dòng làm tên bị lệch sang dòng dưới: đã gán lại tên theo đúng hàng số.</li>{% endif %}
-    {% for e in record.extensions or [] %}{% if e.kept %}<li>Bước định vị trang bỏ sót trang {{ e.page }} của {{ e.statement }}: đã chép thêm.</li>{% endif %}{% endfor %}
+    {% for e in record.extensions or [] %}{% if e.kept %}<li>{% if e.reason == "empty_page" %}Lần chép đầu bỏ sót trang {{ e.page }} của {{ e.statement }}: đã chép lại riêng trang này ({{ e.rows }} dòng).{% else %}Bước định vị trang bỏ sót trang {{ e.page }} của {{ e.statement }}: đã chép thêm.{% endif %}</li>{% endif %}{% endfor %}
     {% if d.rereads %}<li>Đọc lại {{ d.rereads | length }} ô ở độ phân giải cao hơn (xem tab Kiểm tra).</li>{% endif %}
     </ul>
   </div>

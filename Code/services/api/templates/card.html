@@ -19,7 +19,7 @@
       <button>{{ "Đang theo dõi ✓" if watching else "Theo dõi, nhận email" }}</button></form>{% endif %}
   </div>
   {% if private %}<p class="warnbox small">BCTC từ file bạn tải lên, chưa đối chiếu được với bản chính thức trên Vietstock; chỉ bạn xem được.</p>{% endif %}
-  {% if info %}<div class="small muted">Vietstock đăng: {{ info.listed_at | gio }} · Hệ thống xử lý xong: {{ info.processed_at | gio }}</div>{% endif %}
+  {% if info %}<div class="small muted">Công bố sớm nhất: {{ info.first_at | gio }} ({{ info.first_source }}) · Hệ thống xử lý xong: {{ info.processed_at | gio }}</div>{% endif %}
 </section>
 
 {% if not card %}

@@ -1,7 +1,7 @@
 """Lịch công bố BCTC quý của các mã đang theo dõi: đã công bố chưa, hạn chót, ngày dự kiến theo thói quen các quý trước.
 
 Hạn theo quy định công bố thông tin (vision-and-roadmap.md mục 3.2): BCTC quý trong 20 ngày sau khi hết quý, công ty mẹ
-lập BCTC hợp nhất được 30 ngày. Ngày "công bố" ở đây là lúc Vietstock đăng (documents.source_listed_at), thường trễ hơn
+lập BCTC hợp nhất được 30 ngày. Ngày "công bố" ở đây là lúc BCTC xuất hiện sớm nhất trên Vietstock hoặc HOSE, thường trễ hơn
 giờ công bố chính thức vài giờ; giờ chính thức (published_at) chưa thu thập.
 """
 
@@ -35,7 +35,7 @@ class Entry:
     consolidated: bool
     quarter_end: date
     deadline: date
-    published: datetime | None          # lúc Vietstock đăng BCTC quý đầu tiên của kỳ
+    published: datetime | None          # lúc BCTC quý đầu tiên của kỳ xuất hiện (Vietstock hoặc HOSE)
     typical_days: int | None            # số ngày sau khi hết quý mà mã này thường công bố (trung vị các quý trước)
     history: int                        # số quý trước dùng để tính
 
@@ -55,9 +55,10 @@ class Entry:
 
 
 def _listed(conn: psycopg.Connection) -> dict[tuple[str, int, str], datetime]:
-    """(mã, năm, kỳ) -> lúc Vietstock đăng BCTC quý sớm nhất của kỳ đó (mọi phạm vi, bỏ bản tải lên riêng)."""
+    """(mã, năm, kỳ) -> lúc BCTC quý đầu tiên của kỳ đó xuất hiện công khai, ở nguồn nào sớm hơn (giờ Vietstock hay
+    HOSE đăng; mọi phạm vi, bỏ bản tải lên riêng)."""
     rows = conn.execute(
-        """SELECT ticker, fiscal_year, fiscal_period, min(source_listed_at) FROM documents
+        """SELECT ticker, fiscal_year, fiscal_period, min(LEAST(source_listed_at, published_at)) FROM documents
            WHERE doc_type = 'fs_quarter' AND owner_user_id IS NULL AND source_listed_at IS NOT NULL
              AND fiscal_period IN ('Q1', 'Q2', 'Q3', 'Q4')
            GROUP BY 1, 2, 3""").fetchall()

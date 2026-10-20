@@ -283,7 +283,7 @@ def _document(doc_id: int, request: Request | None = None):
         row = conn.execute(
             """
             SELECT d.id, d.ticker, c.name, d.title_raw, d.source_url, d.status, d.scope, d.fiscal_year,
-                   d.fiscal_period, f.storage_key, d.source_listed_at, d.processed_at, d.owner_user_id
+                   d.fiscal_period, f.storage_key, d.source_listed_at, d.processed_at, d.owner_user_id, d.source
             FROM documents d JOIN companies c ON c.ticker = d.ticker
             LEFT JOIN LATERAL (SELECT storage_key FROM document_files WHERE document_id = d.id
                                ORDER BY downloaded_at DESC LIMIT 1) f ON true
@@ -292,7 +292,7 @@ def _document(doc_id: int, request: Request | None = None):
     if row is None:
         raise HTTPException(404, "Không có tài liệu này")
     keys = ("id", "ticker", "name", "title", "source_url", "status", "scope", "year", "period", "storage_key",
-            "listed_at", "processed_at", "owner")
+            "listed_at", "processed_at", "owner", "source")
     doc = dict(zip(keys, row))
     user = getattr(request.state, "user", None) if request else None
     if doc["owner"] is not None and (user is None or (user.id != doc["owner"] and not user.is_admin)):

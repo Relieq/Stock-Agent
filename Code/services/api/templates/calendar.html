@@ -10,7 +10,7 @@
   <a class="small" href="/mua-bctc/{{ period|lower }}-{{ year }}">Bảng mùa BCTC</a>
 </div>
 <p class="muted small">Quý kết thúc {{ quarter_end.strftime('%d/%m/%Y') }}. Hạn công bố BCTC quý: 20 ngày; công ty mẹ lập BCTC hợp nhất: 30 ngày.
-  "Thường công bố" là trung vị số ngày sau khi hết quý ở các quý trước. Ngày công bố tính theo lúc Vietstock đăng. Hạn 20 hay 30 ngày suy từ việc mã có BCTC hợp nhất trong kho hay không, nên là ước tính.
+  "Thường công bố" là trung vị số ngày sau khi hết quý ở các quý trước. Ngày công bố tính theo lúc BCTC xuất hiện sớm nhất trên Vietstock hoặc HOSE. Hạn 20 hay 30 ngày suy từ việc mã có BCTC hợp nhất trong kho hay không, nên là ước tính.
   Đã công bố {{ groups.published | length + groups.late | length }}/{{ total }} mã.</p>
 
 <div class="cal">

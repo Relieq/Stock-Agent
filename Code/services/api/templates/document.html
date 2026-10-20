@@ -10,7 +10,7 @@
     Mô hình: {{ record.model }}{% if record.usage %} · {{ "{:,}".format(record.usage.input_tokens) }} token vào,
     {{ "{:,}".format(record.usage.output_tokens) }} token ra{% endif %} ·
     <a href="/tai-lieu/{{ doc.id }}/file" target="_blank">File gốc</a> ·
-    <a href="{{ doc.source_url }}" target="_blank" rel="noopener">Nguồn Vietstock</a>
+    <a href="{{ doc.source_url }}" target="_blank" rel="noopener">Nguồn {{ {"hose": "HOSE", "vietstock": "Vietstock"}.get(doc.source, doc.source) }}</a>
   </div>
   {% set gated = d.checks | selectattr('gate') | list %}
   {% set failed = gated | rejectattr('passed') | list %}

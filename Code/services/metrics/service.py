@@ -44,16 +44,28 @@ def npat_history(conn: psycopg.Connection, ticker: str, scope: str) -> dict[tupl
     return prev | own
 
 
+SOURCE_NAMES = {"vietstock": "Vietstock", "hose": "HOSE", "upload": "tệp tải lên"}
+
+
+def first_seen(listed, source: str, published) -> tuple:
+    """Lúc BCTC xuất hiện công khai sớm nhất và nơi xuất hiện: giờ nguồn của tài liệu đăng hoặc giờ HOSE đăng (giờ
+    công bố chính thức), lấy cái sớm hơn."""
+    if published is not None and (listed is None or published < listed):
+        return published, "HOSE"
+    return listed, SOURCE_NAMES.get(source, source)
+
+
 def card_for(conn: psycopg.Connection, document_id: int) -> tuple[Card, dict] | None:
     """(thẻ, thông tin tài liệu) hoặc None nếu chưa có kết quả đọc."""
     row = conn.execute(
         """SELECT d.ticker, c.name, d.fiscal_year, d.fiscal_period, d.scope, d.doc_type, d.status, d.audit_status,
-                  d.source_listed_at, d.processed_at, d.source_url, d.title_raw
+                  d.source_listed_at, d.processed_at, d.source_url, d.title_raw, d.published_at, d.source
            FROM documents d JOIN companies c ON c.ticker = d.ticker WHERE d.id = %s""", (document_id,)).fetchone()
     rec = _record(conn, document_id)
     if row is None or rec is None:
         return None
-    ticker, name, year, period, scope, doc_type, status, audit, listed, processed, url, title = row
+    ticker, name, year, period, scope, doc_type, status, audit, listed, processed, url, title, published, source = row
+    first_at, first_source = first_seen(listed, source, published)
     ev = document_evidence(conn, document_id)
     plans = {m: (v, url) for m, v, url in conn.execute(
         "SELECT metric, value, source_url FROM agm_plans WHERE ticker = %s AND fiscal_year = %s", (ticker, year))}
@@ -64,6 +76,7 @@ def card_for(conn: psycopg.Connection, document_id: int) -> tuple[Card, dict] | 
             "status": status, "published": status in PUBLISHABLE,
             "reviewed": {"fs_semiannual": "Đã soát xét", "fs_annual": "Đã kiểm toán"}.get(doc_type, "Chưa soát xét"),
             "listed_at": listed, "processed_at": processed, "source_url": url, "title": title,
+            "source": SOURCE_NAMES.get(source, source), "first_at": first_at, "first_source": first_source,
             "gate": (s.get("gate_checks", 0) - s.get("gate_failed", 0), s.get("gate_checks", 0)),
             "manual_fixes": len(rec.get("manual_fixes", [])),
             "explanation": explanation(conn, ticker, year, period, scope)}

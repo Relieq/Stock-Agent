@@ -134,7 +134,7 @@ def downtime_notice(last: datetime | None, now: datetime, interval_min: int) -> 
 def _pending_extraction(conn, since: date, year: int) -> list[tuple]:
     rows = conn.execute(
         """
-        SELECT d.id, d.ticker, d.title_raw, d.source_listed_at, d.discovered_at, d.status
+        SELECT d.id, d.ticker, d.title_raw, LEAST(d.source_listed_at, d.published_at), d.discovered_at, d.status
         FROM documents d
         WHERE d.status IN ('downloaded', 'failed') AND d.content_kind = 'full' AND d.scope IN ('consolidated', 'standalone')
           AND d.discovered_at >= %s AND d.fiscal_year >= %s AND d.owner_user_id IS NULL
@@ -197,7 +197,7 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             second = after_extraction(conn, doc_id, vision)
             lines.append(
                 f"{ticker}: {title} -> {rec['status']} ({s['gate_checks'] - s['gate_failed']}/{s['gate_checks']} ràng buộc"
-                f" bắt buộc đạt); Vietstock đăng {listed_at.astimezone(VN_TZ):%d/%m %H:%M}"
+                f" bắt buộc đạt); công bố {listed_at.astimezone(VN_TZ):%d/%m %H:%M} (Vietstock hoặc HOSE, nguồn sớm hơn)"
                 + (f", xử lý xong sau {lag.total_seconds() / 60:.0f} phút" if lag else "")
                 + (f"; gửi {sent} email cho người theo dõi" if sent else "")
                 + (f"; {second}" if second else "")

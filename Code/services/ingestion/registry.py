@@ -139,16 +139,18 @@ def discover_hose(conn: psycopg.Connection, client: HoseClient, tickers: list[st
             letter = st.doc_type == "explanation"
             if st.scope is None and has_both and not letter:
                 continue
-            conn.execute(
+            inserted = conn.execute(
                 """INSERT INTO documents (ticker, source, source_doc_id, source_url, title_raw, file_ext, content_kind,
                                           doc_type, fiscal_year, fiscal_period, scope, is_amended, source_listed_at,
                                           published_at)
                    VALUES (%s, 'hose', %s, %s, %s, %s, %s, %s, %s, %s, %s, false, %s, %s)
-                   ON CONFLICT (source, source_doc_id) DO NOTHING""",
+                   ON CONFLICT (source, source_doc_id) DO NOTHING RETURNING id""",
                 (ticker, st.source_doc_id, st.url, st.title, st.file_ext, "explanation" if letter else "full",
                  st.doc_type, st.fiscal_year, st.fiscal_period,
-                 st.scope or ("consolidated" if has_both else "standalone"), st.posted_at, st.posted_at))
+                 st.scope or ("consolidated" if has_both else "standalone"), st.posted_at, st.posted_at)).fetchone()
             conn.commit()
+            if inserted is None:
+                continue        # đã thêm ở lượt trước rồi bị đánh dấu trùng (file giống hệt công bố khác): không đếm lại
             stats["letters_new" if letter else "new"] += 1
             print(f"  HOSE {ticker}: {st.title}: mới, HOSE đăng trước Vietstock")
     return stats

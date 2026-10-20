@@ -886,7 +886,7 @@ Bộ luật được kiểm thử trên toàn bộ tiêu đề thật của VN30
 Cùng lượt quét, watcher lấy cả mục \enquote{Giải trình KQKD} của Vietstock: công văn công ty phải gửi khi lợi nhuận
 biến động từ 10\% so với cùng kỳ hoặc khi số sau soát xét, kiểm toán khác số tự lập. Công văn được lưu như một loại tài
 liệu riêng, gắn với kỳ BCTC mà nó giải trình, không đi vào bước đọc số; thẻ KQKD của kỳ đó dẫn tới công văn. Năm
-2025--2026 có 92 công văn của 21/30 mã VN30, phần lớn là bản scan dài hai trang. Đây là nguồn dữ liệu cho phần tìm nguyên
+2025--2026 có 93 công văn (không tính bản trùng) của 21/30 mã VN30, phần lớn là bản scan dài hai trang. Đây là nguồn dữ liệu cho phần tìm nguyên
 nhân biến động ở giai đoạn sau.
 
 \subsection{Nguồn thứ hai: trang công bố thông tin của HOSE}
@@ -909,6 +909,10 @@ dùng cả hai nguồn và đọc BCTC từ nguồn nào có trước:
         của công ty có cả hai loại thì vẫn chờ Vietstock.
   \item BCTC đã đăng tiêu đề quá 6 giờ mà cả hai nguồn đều chưa có file dùng được thì gửi email cho quản trị.
   \item Vietstock lỗi ba mã liền nhau (quá tải) thì lượt quét bỏ các mã còn lại để chuyển ngay sang HOSE, lượt sau thử lại.
+  \item Công văn giải trình kết quả kinh doanh cũng được lấy từ HOSE. Trên HOSE công văn là tin thường của công ty, nên
+        nhận theo tên tệp có chữ \enquote{giải trình} và đọc kỳ được giải trình từ tên tệp (thiếu năm thì suy từ ngày
+        đăng); tệp đính chính BCTC kèm giải trình không tính là công văn. Lần chạy đầu bổ sung 3 công văn mà Vietstock
+        không có (ACB quý 2, MCH quý 2 và bán niên 2026).
 \end{itemize}
 
 \subsection{Lưu trữ và phiên bản}
@@ -920,7 +924,7 @@ dùng cả hai nguồn và đọc BCTC từ nguồn nào có trước:
   \item File nén (\code{.zip}, \code{.rar}) được giải nén và tách thành từng báo cáo.
   \item Lưu thời điểm nguồn đăng, thời điểm hệ thống thấy, và giờ công bố chính thức lấy từ HOSE.
 \end{itemize}
-Kho hiện có 639 tài liệu của 31 mã (VN30 và một mã người dùng yêu cầu thêm), trong đó 121 BCTC đã được đọc và 92 công
+Kho hiện có 643 tài liệu của 31 mã (VN30 và một mã người dùng yêu cầu thêm), trong đó 121 BCTC đã được đọc và 93 công
 văn giải trình. Người dùng
 được mời cũng có thể tải lên BCTC riêng; tài liệu tải lên chỉ người đó thấy, không xuất hiện trong dữ liệu công khai.
 
@@ -1063,7 +1067,10 @@ viên và hệ thống.
 \end{figure}
 
 Người duyệt có thể sửa một ô số, hoặc sửa mã số của một dòng khi mô hình đọc nhầm mã (BCTC bán niên 2026 của GVR: mã
-420a/420b bị đọc thành 421/421a). Hai loại sửa được ghi riêng: chỉ các ô số sửa tay mới được dùng làm dữ liệu vàng để
+420a/420b bị đọc thành 421/421a). Quản trị cũng sửa được ô của BCTC đã xuất bản khi phát hiện sai sau này; hệ thống kiểm
+lại ràng buộc, còn lệch thì BCTC trở về hàng duyệt. Với ô chưa có phép kiểm mà hai lần đọc khác nhau, người duyệt xem ảnh
+rồi bấm \enquote{đúng như ảnh} nếu lần đọc đầu đúng: ô thôi ở trạng thái cần xem lại, không tính là ô sửa tay, và xác
+nhận hết hiệu lực nếu số trong ô đổi sau đó. Hai loại sửa được ghi riêng: chỉ các ô số sửa tay mới được dùng làm dữ liệu vàng để
 đánh giá bước định vị ô sai (mục~\ref{sec:evalrepair}). Ví dụ BCTC bán niên của GVR chỉ có bản 72 dpi; sau khi đối
 chiếu ảnh phóng to, người duyệt sửa 33 ô số và 2 mã, và BCTC đạt mọi ràng buộc bắt buộc.
 

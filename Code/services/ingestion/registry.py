@@ -71,9 +71,13 @@ def upsert_document(conn: psycopg.Connection, doc: SourceDocument, source: str =
             info.audit_status, info.is_amended, doc.listed_at,
         ),
     ).fetchone()
-    if row[0] and info.content_kind == "full" and not info.is_amended and info.fiscal_period and info.scope:
-        # Cùng BCTC đã có từ nguồn khác (HOSE đăng trước): không đọc lại lần nữa
-        other = equivalent_document(conn, doc.ticker, info.fiscal_year, info.fiscal_period, info.doc_type, [info.scope],
+    if (row[0] and info.content_kind in ("full", "explanation") and not info.is_amended and info.fiscal_period
+            and info.scope):
+        # Cùng BCTC (hay công văn giải trình) đã có từ nguồn khác (HOSE đăng trước): không đọc, không báo lại lần nữa.
+        # Công văn: hai nguồn ghi phạm vi không thống nhất (bản hợp nhất hay bản duy nhất) nên coi như nhau
+        scopes = ([info.scope] if info.content_kind == "full" or info.scope == "separate"
+                  else ["consolidated", "standalone"])
+        other = equivalent_document(conn, doc.ticker, info.fiscal_year, info.fiscal_period, info.doc_type, scopes,
                                     exclude_id=row[1], other_than_source=source)
         if other is not None:
             conn.execute("UPDATE documents SET status = 'duplicate', duplicate_of = %s WHERE id = %s", (other[0], row[1]))
@@ -82,16 +86,17 @@ def upsert_document(conn: psycopg.Connection, doc: SourceDocument, source: str =
 
 def equivalent_document(conn: psycopg.Connection, ticker: str, year: int, period: str, doc_type: str, scopes: list[str],
                         exclude_id: int | None = None, other_than_source: str | None = None) -> tuple | None:
-    """BCTC đầy đủ, không phải bản điều chỉnh, cùng mã, kỳ, loại và phạm vi đã có trong kho:
-    (id, nguồn, giờ công bố chính thức, đã có file chưa)."""
+    """BCTC đầy đủ (hoặc công văn giải trình khi doc_type là "explanation"), không phải bản điều chỉnh, cùng mã, kỳ,
+    loại và phạm vi đã có trong kho: (id, nguồn, giờ công bố chính thức, đã có file chưa)."""
+    kind = "explanation" if doc_type == "explanation" else "full"
     return conn.execute(
         """SELECT d.id, d.source, d.published_at, EXISTS (SELECT 1 FROM document_files f WHERE f.document_id = d.id)
            FROM documents d
            WHERE d.ticker = %s AND d.fiscal_year = %s AND d.fiscal_period = %s AND d.doc_type = %s
-             AND d.content_kind = 'full' AND NOT d.is_amended AND d.duplicate_of IS NULL AND d.owner_user_id IS NULL
+             AND d.content_kind = %s AND NOT d.is_amended AND d.duplicate_of IS NULL AND d.owner_user_id IS NULL
              AND d.scope = ANY(%s) AND d.id <> %s AND (%s::text IS NULL OR d.source <> %s)
            ORDER BY (d.scope = 'consolidated') DESC, d.id LIMIT 1""",
-        (ticker, year, period, doc_type, scopes, exclude_id or 0, other_than_source, other_than_source)).fetchone()
+        (ticker, year, period, doc_type, kind, scopes, exclude_id or 0, other_than_source, other_than_source)).fetchone()
 
 
 def discover_hose(conn: psycopg.Connection, client: HoseClient, tickers: list[str], year: int) -> dict[str, int]:
@@ -100,8 +105,10 @@ def discover_hose(conn: psycopg.Connection, client: HoseClient, tickers: list[st
         tải được file (link Vietstock lỗi) thì tải file từ HOSE;
       * chưa có: thêm BCTC nguồn HOSE để đọc ngay, không chờ Vietstock. Chỉ thêm bản hợp nhất, hoặc bản duy nhất của công
         ty không có công ty con; tên tệp không ghi hợp nhất/riêng mà công ty có cả hai loại thì chờ Vietstock.
-    BCTC riêng và bản điều chỉnh không thêm (Vietstock vẫn lấy như trước)."""
-    stats = {"seen": 0, "new": 0, "published": 0, "attached": 0, "errors": 0}
+    BCTC riêng và bản điều chỉnh không thêm (Vietstock vẫn lấy như trước). Công văn giải trình kết quả kinh doanh cũng đi
+    theo đường này (hose.parse_letter): Vietstock ngừng phản hồi ngày 20/10/2026 thì công văn vẫn về kịp; công văn không
+    ghi hợp nhất hay riêng được gắn với BCTC hợp nhất nếu công ty có công ty con."""
+    stats = {"seen": 0, "new": 0, "letters_new": 0, "published": 0, "attached": 0, "errors": 0}
     for ticker in tickers:
         try:
             items = client.list_statements(ticker)
@@ -129,18 +136,20 @@ def discover_hose(conn: psycopg.Connection, client: HoseClient, tickers: list[st
                     print(f"  HOSE {ticker}: {st.title}: lấy file từ HOSE cho BCTC {doc_id} (nguồn {source} chưa tải được)")
                 conn.commit()
                 continue
-            if st.scope is None and has_both:
+            letter = st.doc_type == "explanation"
+            if st.scope is None and has_both and not letter:
                 continue
             conn.execute(
                 """INSERT INTO documents (ticker, source, source_doc_id, source_url, title_raw, file_ext, content_kind,
                                           doc_type, fiscal_year, fiscal_period, scope, is_amended, source_listed_at,
                                           published_at)
-                   VALUES (%s, 'hose', %s, %s, %s, %s, 'full', %s, %s, %s, %s, false, %s, %s)
+                   VALUES (%s, 'hose', %s, %s, %s, %s, %s, %s, %s, %s, %s, false, %s, %s)
                    ON CONFLICT (source, source_doc_id) DO NOTHING""",
-                (ticker, st.source_doc_id, st.url, st.title, st.file_ext, st.doc_type, st.fiscal_year, st.fiscal_period,
-                 st.scope or "standalone", st.posted_at, st.posted_at))
+                (ticker, st.source_doc_id, st.url, st.title, st.file_ext, "explanation" if letter else "full",
+                 st.doc_type, st.fiscal_year, st.fiscal_period,
+                 st.scope or ("consolidated" if has_both else "standalone"), st.posted_at, st.posted_at))
             conn.commit()
-            stats["new"] += 1
+            stats["letters_new" if letter else "new"] += 1
             print(f"  HOSE {ticker}: {st.title}: mới, HOSE đăng trước Vietstock")
     return stats
 

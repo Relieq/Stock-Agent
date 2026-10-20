@@ -44,3 +44,41 @@ def test_vietstock_scan_stops_after_consecutive_failures():
 
     stats = registry.discover(None, Down(), ["A", "B", "C", "D", "E"], 2026)
     assert Down.calls == registry.MAX_FAILS_IN_ROW and stats["errors"] == registry.MAX_FAILS_IN_ROW + 1
+
+
+def test_explanation_letters_on_hose_get_their_period_from_the_file_name():
+    from services.ingestion.hose import parse_letter
+
+    def letter(name, posted):
+        x = {"fileName": name, "fileType": ".pdf", "filePath": f"~/Uploads/UploadDocuments/1/{name}", "relatedType": 1,
+             "time": "", "type": "", "createdDate": int(datetime(*posted, 9, tzinfo=timezone.utc).timestamp())}
+        st = parse_letter("X", x)
+        return st and (st.fiscal_period, st.fiscal_year, st.scope)
+    # Tên tệp thật trên HOSE (VPB, MSN, SAB, STB, MWG, BSR 2025-2026)
+    assert letter("20261019 - VPB - Giai trinh bien dong loi nhuan sau thue quy 3 2026 va 9 thang 2026.pdf",
+                  (2026, 10, 19)) == ("Q3", 2026, None)
+    assert letter("20260811 - VPB - Giai trinh bien dong LNST tren BCTC ban nien soat xet.pdf",
+                  (2026, 8, 11)) == ("H1", 2026, None)
+    assert letter("20260717 - VPB - Giai trinh bien dong loi nhuan sau thue Q2.2026 va Q2.2025.pdf",
+                  (2026, 7, 17)) == ("Q2", 2026, None)
+    assert letter("20260313 - MSN - Giai trinh bien dong loi nhuan cho BCTC kiem toan 2025 - signed.pdf",
+                  (2026, 3, 13)) == ("FY", 2025, None)
+    assert letter("20260128 - MSN - CBTT link BCTC Q4.2025 va Giai trinh bien dong loi nhuan - signed.pdf",
+                  (2026, 1, 28)) == ("Q4", 2025, None)
+    assert letter("20260129 - SAB - GIAI TRINH BCTC HOP NHAT QUY 4 2025.pdf", (2026, 1, 29)) == ("Q4", 2025, "consolidated")
+    assert letter("20250829 - SAB - GIAI TRINH BCTC RIENG KIEM TOAN BAN NIEN 2025.pdf",
+                  (2025, 8, 29)) == ("H1", 2025, "separate")
+    assert letter("20260730 - MWG - CV giai trinh BCTC Q2-2026.pdf", (2026, 7, 31)) == ("Q2", 2026, None)
+    assert letter("20260130 - BSR - Giai trinh loi nhuan sau thue Quy 4 nam 2025.pdf", (2026, 1, 30)) == ("Q4", 2025, None)
+    assert letter("20260326 - BSR - Giai trinh mot so noi dung lien quan BCTC nam 2025 da kiem toan.pdf",
+                  (2026, 3, 26)) == ("FY", 2025, None)
+    assert letter("20260827 - BSR  - Giai trinh lien quan BCTC ban nien sau soat xet.pdf", (2026, 8, 28)) == ("H1", 2026, None)
+    assert letter("20261013 - NTC - TB ngay DKCC thuc hien chi tra co tuc.pdf", (2026, 10, 13)) is None
+
+
+def test_correction_notice_is_not_an_explanation_letter():
+    from services.ingestion.hose import parse_letter
+    name = "20260904 - VHM - Dinh Chinh Bao cao tai chinh hop nhat soat xet Q2 nam 2026 va giai trinh.pdf"
+    x = {"fileName": name, "fileType": ".pdf", "filePath": f"~/Uploads/UploadDocuments/1/{name}", "relatedType": 1,
+         "time": "", "type": "", "createdDate": 1788480000}
+    assert parse_letter("VHM", x) is None

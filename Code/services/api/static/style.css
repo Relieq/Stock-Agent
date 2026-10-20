@@ -63,6 +63,7 @@ td.ev-restated, .legend .ev-restated, .chip.ev-restated { background:var(--warnb
 td.ev-conflict, .legend .ev-conflict, .chip.ev-conflict { background:#f7b9b9; font-weight:600; }
 td.ev-second, .legend .ev-second, .chip.ev-second { background:#ebe7f5; }
 td.ev-second_differs, .legend .ev-second_differs, .chip.ev-second_differs { background:#fbe0c4; font-weight:600; }
+td.ev-image_ok, .legend .ev-image_ok, .chip.ev-image_ok { background:#dcefe2; }
 .legend span, .chip { padding:0 6px; border-radius:4px; margin-right:4px; white-space:nowrap; }
 td.ev-differs, .legend .ev-differs, .chip.ev-differs { background:#dfe9ff; }
 .nav { margin-left:auto; display:flex; gap:12px; }

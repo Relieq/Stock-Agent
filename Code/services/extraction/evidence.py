@@ -52,6 +52,8 @@ class Cells:
     # lũy kế trừ lũy kế, số kỳ trước hay được tính lại theo số cổ phiếu mới), chỉ so với lần đọc thứ hai
     eps: dict[tuple[str, str], dict[str, Decimal]] = field(default_factory=dict)
     template: str | None = None
+    # Ô hai lần đọc khác nhau mà người duyệt đã đối chiếu ảnh và xác nhận lần đọc đầu đúng: ô -> số lúc xác nhận
+    image_confirmed: dict[tuple[str, str, str], Decimal] = field(default_factory=dict)
     printed: set[tuple[str, str]] = field(default_factory=set)   # (báo cáo, mã hoặc tên đã bỏ dấu) của mọi dòng đã chép
     required_missing: list[tuple[str, str, str]] = field(default_factory=list)   # validate.missing_required
 
@@ -113,6 +115,8 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
                   required_missing=missing_required(statements, template))
     cells.verified = {(v["statement"], v["key"], v["column_kind"]) for v in record.get("cell_verifications", [])
                       if v.get("same")}
+    cells.image_confirmed = {(c["statement"], c["key"], c["column"]): Decimal(c["value"])
+                             for c in record.get("image_confirmed", [])}
 
     rules = {r.id: r for r in RULESETS[template].rules} if template else {}
     crosses = {x.id: x for x in RULESETS[template].cross_rules} if template else {}
@@ -287,6 +291,7 @@ STATUS_LABELS = {
     "restated": "Khác kỳ trước do trình bày lại",
     "second": "Chưa có phép kiểm; hai lần đọc độc lập trùng nhau",
     "second_differs": "Chưa có phép kiểm; hai lần đọc khác nhau, cần xem lại",
+    "image_ok": "Hai lần đọc khác nhau; người duyệt đã đối chiếu ảnh, lần đọc đầu đúng",
     "none": "Chưa kiểm được",
 }
 
@@ -359,6 +364,8 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | 
                 b = second_value(cells, second, cell, doc_type)
                 if b is not None:
                     entry["status"] = "second" if same_reading(vals[col], b) else "second_differs"
+                    if entry["status"] == "second_differs" and cells.image_confirmed.get(cell) == vals[col]:
+                        entry["status"] = "image_ok"
                     entry["second"] = str(b)
                     printed = b / cells.multiplier.get(st, Decimal(1))      # theo đơn vị in trên BCTC, để hiện trên web
                     entry["second_printed"] = (f"{printed:,.0f}".replace(",", ".") if printed == printed.to_integral()
@@ -380,6 +387,8 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | 
             b = second_value(cells, second, cell, doc_type) if second is not None else None
             if b is not None:
                 entry["status"] = "second" if a == b else "second_differs"
+                if entry["status"] == "second_differs" and cells.image_confirmed.get(cell) == a:
+                    entry["status"] = "image_ok"
                 entry["second"], entry["second_printed"] = str(b), f"{b:,.0f}".replace(",", ".")
             out[cell] = entry
     return out

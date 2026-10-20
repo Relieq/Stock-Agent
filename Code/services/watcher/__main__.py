@@ -207,7 +207,7 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
         lines += new_explanations
     stamp = datetime.now(VN_TZ).strftime("%d/%m %H:%M")
     print(f"[{stamp}] {stats['seen']} tài liệu trong danh sách, {stats['new']} mới (HOSE: {hstats['seen']} BCTC, "
-          f"{hstats['new']} mới, {hstats['attached']} lấy file thay Vietstock), {len(pending)} BCTC mới đã xử lý")
+          f"{hstats['new']} mới, {hstats['letters_new']} công văn mới, {hstats['attached']} lấy file thay Vietstock), {len(pending)} BCTC mới đã xử lý")
     if lines:
         body = "\n".join(lines)
         print(body)

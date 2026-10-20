@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 
 from services.alerts import notify_watchers
 from services.db import connect
-from services.extraction.verify import apply_manual_fix, approve_document
+from services.extraction.verify import apply_manual_fix, approve_document, confirm_reading
 from services.ondemand import month_spend, monthly_budget, request_ticker, request_upload, used_today
 from services.users import (end_session, finish_login, invite, list_users, remove_user, send_invitation, set_watch,
                             start_login, update_user, watchlist)
@@ -310,6 +310,16 @@ def review_fix(request: Request, doc_id: int, statement: str = Form(...), row: i
     user = require_admin(request)
     with connect() as conn:
         apply_manual_fix(conn, doc_id, statement, row, column, value.strip(), user.email, note)
+    return RedirectResponse(f"/tai-lieu/{doc_id}", status_code=303)
+
+
+@router.post("/duyet/{doc_id}/dung-nhu-anh")
+def review_confirm(request: Request, doc_id: int, statement: str = Form(...), key: str = Form(...),
+                   column: str = Form(...)):
+    """Ô hai lần đọc khác nhau: người duyệt đã xem ảnh, lần đọc đầu đúng."""
+    user = require_admin(request)
+    with connect() as conn:
+        confirm_reading(conn, doc_id, statement, key, column, user.email)
     return RedirectResponse(f"/tai-lieu/{doc_id}", status_code=303)
 
 

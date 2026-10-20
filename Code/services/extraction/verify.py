@@ -197,6 +197,22 @@ def apply_manual_fix(conn: psycopg.Connection, document_id: int, statement: str,
     return entry
 
 
+def confirm_reading(conn: psycopg.Connection, document_id: int, statement: str, key: str, column: str, by: str,
+                    note: str = "") -> dict:
+    """Người duyệt đối chiếu ảnh gốc một ô "hai lần đọc khác nhau" và thấy lần đọc đầu đúng: ghi lại để ô thôi ở trạng
+    thái cần xem lại, không sửa số nên không tính là ô sửa tay. Xác nhận gắn với số lúc đó; ô đổi số thì hết hiệu lực."""
+    record = _load_record(conn, document_id)
+    cells = cells_of(document_id, "", record)
+    value = cells.row(statement, key).get(column)
+    if value is None:
+        raise ValueError(f"Không có ô {statement} {key} {column}")
+    entry = {"statement": statement, "key": key, "column": column, "value": str(value), "by": by, "note": note,
+             "at": datetime.now(timezone.utc).isoformat()}
+    record.setdefault("image_confirmed", []).append(entry)
+    _finalize(conn, record)
+    return entry
+
+
 def approve_document(conn: psycopg.Connection, document_id: int, user_id: int | None, by: str, note: str = "") -> str:
     """Người duyệt đã đối chiếu các chỗ lệch với ảnh gốc và cho xuất bản BCTC chưa đạt kiểm chứng tự động. `note` ghi
     vì sao chỗ lệch còn lại không phải đọc sai (ví dụ chính BCTC cộng lệch)."""

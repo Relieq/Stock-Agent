@@ -26,6 +26,14 @@
     {% for k, v in n.items() if v %}<span class="ev-{{ k }} chip">{{ EVIDENCE[k] }} {{ v }} ({{ (100 * v / total) | round | int }}%)</span> {% endfor %}
   </div>{% endif %}
   {% if record.note %}<div class="warnbox">{{ record.note }}</div>{% endif %}
+  {% if d.second_differs %}<div class="warnbox"><b>Hai lần đọc khác nhau, cần xem lại</b> (ô chưa có phép kiểm; mở trang ảnh để đối chiếu):
+    <ul>{% for c in d.second_differs %}<li>{{ c.name }} · dòng {{ c.index }} "{{ c.label }}" · {{ c.column_name }}: lần đọc đầu
+      <b>{{ c.first }}</b>, lần đọc thứ hai {{ c.second }} (trang {{ c.page }})
+      {% if admin %}<form method="post" action="/duyet/{{ doc.id }}/dung-nhu-anh" class="inline">
+        <input type="hidden" name="statement" value="{{ c.statement }}"><input type="hidden" name="key" value="{{ c.key }}">
+        <input type="hidden" name="column" value="{{ c.column }}">
+        <button title="Đã xem ảnh gốc: số của lần đọc đầu đúng như in">Đúng như ảnh</button></form>{% endif %}</li>{% endfor %}</ul>
+    {% if admin %}<span class="small muted">Nếu lần đọc đầu sai thì sửa ô ở khung "Sửa tay" bên dưới.</span>{% endif %}</div>{% endif %}
   {% if d.missing %}<div class="warnbox"><b>Có thể thiếu dòng, cần xem lại</b> (phép cộng không bắt được việc thiếu cả một dòng):
     <ul>{% for t in d.missing %}<li>{{ t }}</li>{% endfor %}</ul></div>{% endif %}
   {% if record.stt_code_swapped or record.codes_inferred or record.cf_positional or record.labels_repaired or record.extensions or d.rereads %}
@@ -40,18 +48,19 @@
     </ul>
   </div>
   {% endif %}
-  {% if admin and doc.status == "needs_review" %}
+  {% if admin %}
   <div class="reviewbox">
-    <b>Duyệt tay</b> <span class="small muted">Đối chiếu các dòng tô đỏ với ảnh bên phải. Ô đọc sai: nhập vị trí dòng (cột #), cột và số nguyên văn như in.</span>
+    {% if doc.status == "needs_review" %}<b>Duyệt tay</b> <span class="small muted">Đối chiếu các dòng tô đỏ với ảnh bên phải.{% else %}<b>Sửa tay</b> <span class="small muted">BCTC đã xuất bản: chỉ sửa sau khi đối chiếu ảnh gốc; mọi lần sửa được ghi lại và hệ thống kiểm lại ràng buộc (còn lệch thì BCTC về hàng duyệt).{% endif %}
+      Ô đọc sai: nhập vị trí dòng (cột #), cột và số nguyên văn như in; mã số đọc sai: chọn cột "Mã số".</span>
     <form method="post" action="/duyet/{{ doc.id }}/sua" class="row">
       <select name="statement">{% for t in d.tables %}<option value="{{ t.statement }}">{{ t.name }}</option>{% endfor %}</select>
       <input name="row" type="number" min="0" placeholder="dòng #" required style="width:80px">
-      <select name="column">{% for k, n in [("end_period","Cuối kỳ"),("begin_year","Đầu năm"),("q_cur","Quý này"),("q_prev_year","Cùng kỳ"),("ytd_cur","Lũy kế"),("ytd_prev_year","Lũy kế năm trước")] %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select>
+      <select name="column">{% for k, n in [("end_period","Cuối kỳ"),("begin_year","Đầu năm"),("q_cur","Quý này"),("q_prev_year","Cùng kỳ"),("ytd_cur","Lũy kế"),("ytd_prev_year","Lũy kế năm trước"),("code","Mã số")] %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select>
       <input name="value" placeholder="số như in, ví dụ (1.234.567)" required>
       <input name="note" placeholder="ghi chú (trang...)">
       <button>Sửa ô</button>
     </form>
-    <form method="post" action="/duyet/{{ doc.id }}/xuat-ban" class="row"><button>Đã đối chiếu xong: xuất bản</button></form>
+    {% if doc.status == "needs_review" %}<form method="post" action="/duyet/{{ doc.id }}/xuat-ban" class="row"><button>Đã đối chiếu xong: xuất bản</button></form>{% endif %}
   </div>
   {% endif %}
   {% if record.manual_fixes %}<div class="small">Đã sửa tay {{ record.manual_fixes | length }} ô:
@@ -79,6 +88,7 @@
       <span class="ev-restated">khác kỳ trước do trình bày lại</span> <span class="ev-differs">hai BCTC in khác nhau (công ty/kiểm toán sửa số)</span>
       <span class="ev-second">chưa có phép kiểm, hai lần đọc trùng nhau</span>
       <span class="ev-second_differs">chưa có phép kiểm, hai lần đọc khác nhau</span>
+      <span class="ev-image_ok">hai lần đọc khác nhau, đã đối chiếu ảnh: lần đầu đúng</span>
       <span class="ev-conflict">cần xem lại</span></p>
     <div class="fswrap"><table class="fs">
       <thead><tr>{% if admin %}<th title="Vị trí dòng, dùng khi sửa tay">#</th>{% endif %}<th>STT</th><th>Mã</th><th>Chỉ tiêu</th><th>TM</th>{% for k, name in t.columns %}<th class="num">{{ name }}</th>{% endfor %}<th>Tr.</th></tr></thead>

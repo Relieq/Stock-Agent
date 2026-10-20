@@ -103,6 +103,7 @@ def detail(record: dict, evidence=None) -> dict:
 
     chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
     tables = []
+    second_differs = []       # ô hai lần đọc khác nhau: người duyệt xem ảnh rồi bấm "đúng như ảnh" hoặc sửa tay
     for st in extracted:
         keys = evidence.cells.item_keys.get(st.statement, []) if evidence else []
         rows = []
@@ -110,6 +111,12 @@ def detail(record: dict, evidence=None) -> dict:
             key = keys[i] if i < len(keys) else None
             ev = {col: evidence.status[(st.statement, key, col)] for col in it.values_raw
                   if key and (st.statement, key, col) in evidence.status} if evidence else {}
+            for col, e in ev.items():
+                if e["status"] == "second_differs":
+                    second_differs.append({"statement": st.statement, "name": STATEMENT_NAMES[st.statement],
+                                           "key": key, "column": col, "column_name": dict(COLUMNS[st.statement]).get(col, col),
+                                           "label": it.label, "first": it.values_raw.get(col),
+                                           "second": e.get("second_printed"), "page": it.page, "index": i})
             rows.append(Row(it.stt, it.code, it.label, it.note, it.page, it.values_raw,
                             bool(it.code) and it.code in flagged.get(st.statement, set()), ev, i))
         tables.append({"statement": st.statement, "name": STATEMENT_NAMES[st.statement], "unit": st.unit_raw,
@@ -132,6 +139,7 @@ def detail(record: dict, evidence=None) -> dict:
             "evidence_counts": evidence.counts() if evidence else None,
             "peers": evidence.peers if evidence else [],
             "missing": [m.describe() for m in evidence.missing] if evidence else [],
+            "second_differs": second_differs,
             "duplicate_codes": record.get("duplicate_codes") or {},
             "rereads": record.get("rereads", []), "reextracts": record.get("reextracts", []),
             "page_count": chosen["page_count"], "chosen": record["chosen"]}

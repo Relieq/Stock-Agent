@@ -95,6 +95,42 @@ def parse_entry(ticker: str, x: dict) -> HoseStatement | None:
         posted_at=datetime.fromtimestamp(int(x["createdDate"]), tz=timezone.utc))
 
 
+_LETTER = re.compile(r"giai trinh")
+_QUARTER = re.compile(r"\b(?:quy|q)\s*\.?\s*([1-4])\b(?:\s*(?:[./-]|nam)?\s*(20\d\d))?")
+_HALF = re.compile(r"ban nien|6 thang|giua nien do 20\d\d|6t20")
+_YEAR = re.compile(r"\b(20\d\d)\b")
+
+
+def parse_letter(ticker: str, x: dict) -> HoseStatement | None:
+    """Công văn giải trình kết quả kinh doanh đăng dưới dạng tin của công ty (tên tệp có "giải trình"); kỳ được giải
+    trình đọc từ tên tệp ("Q2.2026", "quy 3 nam 2026", "ban nien", "kiem toan 2025"), thiếu năm thì suy từ ngày đăng
+    (quý 4 và BCTC năm đăng vào năm sau). None nếu không phải công văn giải trình hoặc không đọc được kỳ."""
+    name = x.get("fileName") or ""
+    folded = _fold(re.sub(r"[_]+", " ", name))
+    if x.get("relatedType") == RELATED_FINANCIAL_STATEMENT or not _LETTER.search(folded) or _AMENDED.search(folded):
+        return None     # tệp đính chính BCTC kèm giải trình (VHM 04/09/2026) không phải công văn giải trình kỳ đó
+    posted = datetime.fromtimestamp(int(x["createdDate"]), tz=timezone.utc)
+    body = re.sub(r"^\d{8}\s*-\s*\w+\s*-\s*", "", folded)          # bỏ tiền tố "20261019 - VPB - "
+    years = [int(y) for y in _YEAR.findall(body)]
+    if (m := _QUARTER.search(body)) is not None:
+        period = f"Q{m.group(1)}"
+        year = int(m.group(2)) if m.group(2) else (years[0] if years else posted.year - (period == "Q4" and posted.month <= 3))
+    elif _HALF.search(body):
+        period, year = "H1", years[0] if years else posted.year
+    elif "kiem toan" in body or re.search(r"\bnam 20\d\d\b", body):
+        period, year = "FY", years[0] if years else posted.year - 1
+    else:
+        return None
+    path = x["filePath"]
+    m = re.search(r"UploadDocuments/(\d+)/", path)
+    return HoseStatement(
+        ticker=ticker, source_doc_id=f"{m.group(1) if m else ''}/{hashlib.sha1(name.encode()).hexdigest()[:12]}",
+        title=name, url=STATIC + quote(path.lstrip("~"), safe="/"),
+        file_ext=(x.get("fileType") or Path(name).suffix or "").lstrip(".").lower() or None,
+        doc_type="explanation", fiscal_year=year, fiscal_period=period, scope=scope_of(name), is_amended=False,
+        posted_at=posted)
+
+
 class HoseClient:
     def __init__(self, ids_path: Path | None = None, delay_seconds: float = 1.0, timeout: float = 30.0):
         self.session = requests.Session()
@@ -128,14 +164,15 @@ class HoseClient:
         return self.ids[ticker]
 
     def list_statements(self, ticker: str, page_size: int = 30) -> list[HoseStatement]:
-        """BCTC mới nhất của mã trên HOSE (trang đầu, mới nhất trước); mã không niêm yết trên HOSE thì rỗng."""
+        """BCTC và công văn giải trình mới nhất của mã trên HOSE (trang đầu, mới nhất trước); mã không niêm yết trên
+        HOSE thì rỗng. Công văn mang doc_type "explanation"."""
         cid = self.company_id(ticker)
         if cid is None:
             return []
         data = self._get(f"{API}/m/api/v1/1/mediafiles/1/{cid}?pageIndex=1&pageSize={page_size}")["data"]
         out, seen = [], set()
         for x in data.get("list") or []:
-            st = parse_entry(ticker, x)
+            st = parse_entry(ticker, x) or parse_letter(ticker, x)
             if st is not None and st.url not in seen:
                 seen.add(st.url)
                 out.append(st)

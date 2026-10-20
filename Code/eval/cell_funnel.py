@@ -13,6 +13,7 @@ phải đã được người đối chiếu với ảnh gốc; chỉ nhóm "s�
   7 lệch do chính BCTC: phép kiểm vẫn lệch nhưng người đã đối chiếu ảnh và duyệt BCTC (in sai trong bản công bố)
   8 chưa có phép kiểm nhưng người đọc thứ hai (mô hình khác hãng, services/extraction/second_read.py) đọc ra cùng số;
     ô hai lần đọc khác nhau vào nhóm 5. Nhóm 8 không tính vào "được xác nhận": trùng nhau không phải phép kiểm.
+  9 chưa có phép kiểm, hai lần đọc khác nhau, người duyệt đã đối chiếu ảnh và xác nhận lần đọc đầu đúng (không sửa ô)
 """
 
 from __future__ import annotations
@@ -31,7 +32,8 @@ NAMES = {1: "đúng ngay lần đọc đầu, có ràng buộc xác nhận", 2: 
          3: "thuộc báo cáo phải chép lại trang", 4: "sửa tay sau khi đối chiếu ảnh",
          5: "cần xem lại (nghi sai, chưa xử lý)", 6: "chưa kiểm được",
          7: "lệch do chính BCTC (đã đối chiếu ảnh, duyệt tay)",
-         8: "chưa có phép kiểm, hai lần đọc độc lập trùng nhau"}
+         8: "chưa có phép kiểm, hai lần đọc độc lập trùng nhau",
+         9: "hai lần đọc khác nhau, người đối chiếu ảnh xác nhận lần đọc đầu đúng"}
 
 
 def _digits(s: str | None) -> str:
@@ -78,6 +80,8 @@ def classify(conn, document_id: int) -> list[tuple[int, str, int, str, str, str]
                     cat = 5
                 elif status == "second":
                     cat = 8
+                elif status == "image_ok":
+                    cat = 9
                 elif status == "none" or (status in ("differs", "restated") and not s.get("sum")):
                     cat = 6
                 else:

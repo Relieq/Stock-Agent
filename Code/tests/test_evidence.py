@@ -143,3 +143,16 @@ def test_row_missing_from_a_report_is_found_by_the_same_number_on_another_report
     assert [m.key for m in missing_rows(q2, q1, "earlier")] == ["b.oi"]
     q2.printed = {("IS", "b.oi")}             # dòng có in nhưng để trống ("-"): không coi là thiếu
     assert missing_rows(q2, q1, "earlier") == []
+
+
+def test_reviewer_confirms_first_reading_from_the_image():
+    # VPB quý 3/2026: lãi cơ bản trên cổ phiếu lũy kế in 2.323, người đọc thứ hai đọc ra 4; người duyệt xem ảnh xác nhận
+    q3 = _cells(3, "Q3", {("IS", "10"): {"q_cur": 120}})
+    q3.eps = {("IS", "eps"): {"ytd_cur": D(2_323)}}
+    second = _cells(3, "Q3", {})
+    second.eps = {("IS", "eps"): {"ytd_cur": D(4)}}
+    assert cell_status(q3, [], second)[("IS", "eps", "ytd_cur")]["status"] == "second_differs"
+    q3.image_confirmed = {("IS", "eps", "ytd_cur"): D(2_323)}
+    assert cell_status(q3, [], second)[("IS", "eps", "ytd_cur")]["status"] == "image_ok"
+    q3.eps = {("IS", "eps"): {"ytd_cur": D(2_328)}}          # số đổi sau khi xác nhận: xác nhận hết hiệu lực
+    assert cell_status(q3, [], second)[("IS", "eps", "ytd_cur")]["status"] == "second_differs"

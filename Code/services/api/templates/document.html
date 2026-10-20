@@ -23,7 +23,7 @@
   {% if d.evidence_counts %}{% set n = d.evidence_counts %}{% set total = n.values() | sum %}
   <div class="small">Bằng chứng cho {{ total }} ô số
     (đối chiếu với: {% for _, p, rel in d.peers %}{{ p }}{% if not loop.last %}, {% endif %}{% else %}chưa có BCTC kỳ liền kề đã đọc{% endfor %}):
-    {% for k, v in n.items() if v %}<span class="ev-{{ k }} chip">{{ EVIDENCE[k] }} {{ v }} ({{ (100 * v / total) | round | int }}%)</span>{% endfor %}
+    {% for k, v in n.items() if v %}<span class="ev-{{ k }} chip">{{ EVIDENCE[k] }} {{ v }} ({{ (100 * v / total) | round | int }}%)</span> {% endfor %}
   </div>{% endif %}
   {% if record.note %}<div class="warnbox">{{ record.note }}</div>{% endif %}
   {% if d.missing %}<div class="warnbox"><b>Có thể thiếu dòng, cần xem lại</b> (phép cộng không bắt được việc thiếu cả một dòng):
@@ -80,26 +80,26 @@
       <span class="ev-second">chưa có phép kiểm, hai lần đọc trùng nhau</span>
       <span class="ev-second_differs">chưa có phép kiểm, hai lần đọc khác nhau</span>
       <span class="ev-conflict">cần xem lại</span></p>
-    <table class="fs">
+    <div class="fswrap"><table class="fs">
       <thead><tr>{% if admin %}<th title="Vị trí dòng, dùng khi sửa tay">#</th>{% endif %}<th>STT</th><th>Mã</th><th>Chỉ tiêu</th><th>TM</th>{% for k, name in t.columns %}<th class="num">{{ name }}</th>{% endfor %}<th>Tr.</th></tr></thead>
       <tbody>
       {% for r in t.rows %}
       <tr data-page="{{ r.page or (t.pages[0] if t.pages else 1) }}" {% if r.flagged %}class="flag"{% endif %}>
-        {% if admin %}<td class="muted small">{{ r.index }}</td>{% endif %}<td>{{ r.stt or "" }}</td>{% if r.code and "." in r.code and r.code.split(".")[-1].isdigit() %}<td class="code muted" title="BCTC không in mã dòng này: mã đặt theo vị trí dưới dòng tổng để kiểm phép cộng">{{ r.code }}</td>{% elif r.code and r.code.startswith("b.") %}<td class="code muted" title="BCTC ngân hàng không in mã số: mã chuẩn do hệ thống gán theo tên dòng">{{ r.code }}</td>{% else %}<td class="code">{{ r.code or "" }}</td>{% endif %}<td>{{ r.label }}</td><td>{{ r.note or "" }}</td>
+        {% if admin %}<td class="muted small">{{ r.index }}</td>{% endif %}<td>{{ r.stt or "" }}</td>{% if r.code and "." in r.code and r.code.split(".")[-1].isdigit() %}<td class="code muted" title="BCTC không in mã dòng này: mã đặt theo vị trí dưới dòng tổng để kiểm phép cộng">{{ r.code }}</td>{% elif r.code and r.code.startswith("b.") %}<td class="code muted" title="BCTC ngân hàng không in mã số: mã chuẩn do hệ thống gán theo tên dòng">{{ r.code }}</td>{% else %}<td class="code">{{ r.code or "" }}</td>{% endif %}<td class="lbl">{{ r.label }}</td><td>{{ r.note or "" }}</td>
         {% for k, name in t.columns %}{% set ev = r.evidence.get(k) %}<td class="num{% if ev %} ev-{{ ev.status }}{% endif %}"
           {% if ev %}title="{{ EVIDENCE[ev.status] }}{% if ev.sum %}&#10;Cộng tổng: {{ ev.sum | join(', ') }}{% endif %}{% if ev.period %}&#10;Giữa các kỳ: {{ ev.period | join(', ') }}{% endif %}{% if ev.differs %}&#10;Khác: {{ ev.differs | join(', ') }}{% endif %}{% if ev.conflict %}&#10;Cần xem lại: {{ ev.conflict | join(', ') }}{% endif %}{% if ev.second_printed %}&#10;Lần đọc thứ hai: {{ ev.second_printed }}{% endif %}"{% endif %}>{{ r.values.get(k) or "" }}</td>{% endfor %}
         <td class="muted">{{ r.page or "" }}</td>
       </tr>
       {% endfor %}
       </tbody>
-    </table>
+    </table></div>
   </div>
   {% endfor %}
 
   <div class="tab" id="tab-checks" hidden>
     <p class="small muted">Mỗi phép kiểm tra: dòng tổng in trên BCTC phải bằng phép cộng các dòng thành phần (mã trong ngoặc vuông),
       cho lệch tối đa ±1 đơn vị làm tròn mỗi số hạng. "Bắt buộc": trượt thì BCTC không được coi là đã kiểm chứng. Số: đồng.</p>
-    <table class="fs">
+    <div class="fswrap"><table class="fs">
       <thead><tr><th></th><th>Ràng buộc</th><th>Cột</th><th class="num">Dòng tổng in trên BCTC</th><th class="num">Cộng các dòng con</th><th class="num">Lệch</th></tr></thead>
       <tbody>
       {% for c in d.checks %}
@@ -112,11 +112,11 @@
       </tr>
       {% endfor %}
       </tbody>
-    </table>
+    </table></div>
 
     {% if d.period_conflicts %}
     <h3>Số khác giữa các BCTC</h3>
-    <table class="fs">
+    <div class="fswrap"><table class="fs">
       <thead><tr><th>Loại</th><th>Chỉ tiêu</th><th>Cột</th><th class="num">BCTC này</th><th class="num">Theo BCTC khác</th><th class="num">Lệch</th><th>Đánh giá</th></tr></thead>
       <tbody>
       {% for c in d.period_conflicts %}
@@ -125,22 +125,22 @@
         <td class="num">{{ c.value | dong }}</td><td class="num">{{ c.expected | dong }}</td><td class="num">{{ c.diff | dong }}</td><td class="small">{{ c.verdict }}</td></tr>
       {% endfor %}
       </tbody>
-    </table>
+    </table></div>
     {% endif %}
 
     {% if d.rereads or d.reextracts %}
     <h3>Các lần đọc lại khi lệch</h3>
-    <table class="fs">
+    <div class="fswrap"><table class="fs">
       <thead><tr><th>Báo cáo</th><th>Mã</th><th>Cột</th><th class="num">Lần đầu</th><th class="num">Đọc lại</th></tr></thead>
       <tbody>
       {% for r in d.rereads %}<tr {% if r.before != r.after %}class="changed"{% endif %}><td>{{ r.statement }}</td><td class="code">{{ r.code }}</td><td class="small">{{ r.column_kind }}</td><td class="num">{{ r.before }}</td><td class="num">{{ r.after }}</td></tr>{% endfor %}
       </tbody>
-    </table>
+    </table></div>
     {% for r in d.reextracts %}<p class="small">Chép lại {{ r.statement }} theo từng trang {{ r.pages }}: lệch {{ r.failed_before }} → {{ r.failed_after }} ({{ "giữ bản mới" if r.kept else "giữ bản cũ" }})</p>{% endfor %}
     {% endif %}
   </div>
 </div>
-
+<div class="gutter" title="Kéo để đổi độ rộng bảng số và ảnh trang"></div>
 <div class="right">
   <div class="pager">
     <button id="prev">‹</button> Trang <input id="pageno" type="number" min="1" max="{{ d.page_count }}"> / {{ d.page_count }} <button id="next">›</button>
@@ -167,7 +167,25 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tab').forEach(t => t.hidden = t.id !== 'tab-' + b.dataset.tab);
   const pages = document.getElementById('tab-' + b.dataset.tab).dataset.pages;
   if (pages) show(pages.split(',')[0]);
+  history.replaceState(null, '', '#' + b.dataset.tab);
 });
+{# Kéo vạch giữa để đổi độ rộng hai khung; nhớ trong trình duyệt #}
+const split = document.querySelector('.split');
+try { const w = localStorage.getItem('soi-left'); if (w) split.style.setProperty('--left', w); } catch (e) {}
+document.querySelector('.gutter').onmousedown = ev => {
+  ev.preventDefault();
+  const box = split.getBoundingClientRect();
+  const move = e => {
+    const w = Math.min(Math.max(e.clientX - box.left, 300), box.width - 260) + 'px';
+    split.style.setProperty('--left', w);
+    try { localStorage.setItem('soi-left', w); } catch (err) {}
+  };
+  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+  document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+};
+{# Mở thẳng một tab theo đường dẫn, ví dụ /tai-lieu/125#IS; tải lại trang vẫn giữ tab đang xem #}
+const startTab = document.querySelector('.tabs button[data-tab="' + location.hash.slice(1) + '"]');
+if (startTab) startTab.click();
 document.querySelectorAll('tr[data-page]').forEach(tr => tr.onclick = () => {
   document.querySelectorAll('tr.sel').forEach(x => x.classList.remove('sel'));
   tr.classList.add('sel');

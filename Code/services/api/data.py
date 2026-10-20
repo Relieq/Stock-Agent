@@ -130,6 +130,7 @@ def detail(record: dict, evidence=None) -> dict:
     return {"template": template, "sep": sep, "tables": tables, "checks": check_rows, "period_conflicts": period_rows,
             "evidence_counts": evidence.counts() if evidence else None,
             "peers": evidence.peers if evidence else [],
+            "missing": [m.describe() for m in evidence.missing] if evidence else [],
             "duplicate_codes": record.get("duplicate_codes") or {},
             "rereads": record.get("rereads", []), "reextracts": record.get("reextracts", []),
             "page_count": chosen["page_count"], "chosen": record["chosen"]}

@@ -154,10 +154,15 @@ def _evaluate_rules(ruleset: RuleSet, statements: dict[str, Statement]) -> list[
         missing = [c for _, c in terms if c not in st.values]
         tolerance = st.multiplier * (len(terms) + 1)   # ±1 đơn vị làm tròn cho mỗi số hạng
         for col, lhs in st.values[r.lhs].items():
-            rhs = Decimal(0)
+            rhs = flipped = Decimal(0)
             for sign, c in terms:
                 v = st.values.get(c, {}).get(col, Decimal(0))
                 rhs += sign * (abs(v) if c in r.abs_codes else v)
+                flipped += -sign * abs(v) if c in r.abs_codes else sign * v
+            # Mã lấy giá trị tuyệt đối: dấu in trên BCTC không cho biết chiều (lợi ích cổ đông không kiểm soát in trong
+            # ngoặc như khoản trừ, nhưng cũng có thể âm thật khi công ty con lỗ), nên khớp theo một trong hai chiều
+            if r.abs_codes and abs(lhs - flipped) < abs(lhs - rhs):
+                rhs = flipped
             checks.append(Check(r.id, col, abs(lhs - rhs) <= tolerance, lhs, rhs, tolerance, r.gate, missing))
 
     extras = dict(ruleset.group_extra)
@@ -220,6 +225,16 @@ def detect_template(statements: dict[str, Statement]) -> str | None:
 
 def validate(statements: dict[str, Statement], template: str) -> list[Check]:
     return _evaluate_rules(RULESETS[template], statements)
+
+
+def missing_required(statements: dict[str, Statement], template: str | None) -> list[tuple[str, str, str]]:
+    """Dòng bắt buộc theo mẫu biểu mà tài liệu không có số: [(báo cáo, mã thiếu, mã kéo theo hoặc None)]."""
+    out = []
+    for st_name, code, when in (RULESETS[template].required_rows if template in RULESETS else ()):
+        st = statements.get(st_name)
+        if st is not None and (when is None or any(st.values.get(when, {}).values())) and code not in st.values:
+            out.append((st_name, code, when))
+    return out
 
 
 def group_rule_codes(rule_id: str, codes_of: dict[str, set[str]], template: str | None) -> tuple[str, list[str]] | None:

@@ -56,6 +56,10 @@ class RuleSet:
     group_statements: tuple[str, ...] = ()
     group_gate: tuple[str, ...] = ()     # dòng cha (và mọi dòng con của nó) có phép kiểm nhóm là bắt buộc
     group_extra: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    # Dòng bắt buộc theo mẫu biểu: (báo cáo, mã, mã kéo theo). Có dòng "mã kéo theo" (None: luôn luôn) thì phải có dòng
+    # "mã" (ví dụ có lợi ích cổ đông không kiểm soát thì phải có LNST của cổ đông công ty mẹ). Phép cộng không bắt được
+    # việc thiếu dòng đứng cuối báo cáo như LNST: ràng buộc nào có dòng đó ở vế trái thì bị bỏ qua.
+    required_rows: tuple[tuple[str, str, str | None], ...] = ()
 
 
 def rule(statement: str, lhs: str, *codes: str, id: str | None = None, **kw) -> Rule:
@@ -143,9 +147,13 @@ _PBT_CROSS = (
 _CF_GROUPS = dict(group_statements=("CF",), group_gate=("08", "20", "30", "40"),
                   group_extra=(("08", ("01",)), ("20", ("08",)), ("20.1", ("08",))))
 
+# LNST (60); LNST của cổ đông công ty mẹ (61) khi có lợi ích cổ đông không kiểm soát (62)
+_IS_REQUIRED = (("IS", "60", None), ("IS", "61", "62"))
+
 TT200 = RuleSet(
     template="TT200",
     total_assets_code="270",
+    required_rows=_IS_REQUIRED,
     rules=_TT200_BS + _TT200_IS + _CF,
     cross_rules=_CASH_CROSS + _PBT_CROSS,
     **_CF_GROUPS,
@@ -181,6 +189,7 @@ _TT99_BS_DETAIL = (
 TT99 = RuleSet(
     template="TT99",
     total_assets_code="280",
+    required_rows=_IS_REQUIRED,
     rules=(
         rule("BS", "280", "100", "200"),
         rule("BS", "280", "440", id="BS_280_eq_440"),
@@ -226,6 +235,7 @@ TCTD = RuleSet(
                 "b.fixed_assets", "b.inv_property", "b.other_assets", "b.gov", "b.interbank_liab", "b.other_liab",
                 "b.te", "b.cfo.1", "b.cfo.2", "b.cfo.3", "b.cfi", "b.cff"),
     group_extra=(("b.te", ("b.mi",)),),
+    required_rows=(("IS", "b.npat", None), ("IS", "b.npat_parent", "b.mi")),
     rules=(
         rule("BS", "b.ta", "b.cash", "b.sbv", "b.interbank", "b.trading_sec", "b.deriv_asset", "b.loans",
              "b.debt_purchase", "b.inv_sec", "b.lt_invest", "b.fixed_assets", "b.inv_property", "b.other_assets",
@@ -246,9 +256,10 @@ TCTD = RuleSet(
         rule("IS", "b.pbt", "b.ppop", "-b.prov", id="IS_bank_pbt"),
         rule("IS", "b.cit", "b.cit_cur", "b.cit_def", id="IS_bank_cit"),
         rule("IS", "b.npat", "b.pbt", "-b.cit", id="IS_bank_npat"),
-        # Dấu của lợi ích cổ đông không kiểm soát không theo quy ước dấu chung của KQKD; lấy giá trị tuyệt đối.
-        # Chưa bắt buộc vì lợi ích cổ đông không kiểm soát có thể âm thật (công ty con lỗ).
-        rule("IS", "b.npat_parent", "b.npat", "-b.mi", id="IS_bank_parent", gate=False, abs_codes=("b.mi",)),
+        # Dấu của lợi ích cổ đông không kiểm soát không theo quy ước dấu chung của KQKD và có thể âm thật (công ty con
+        # lỗ): lấy giá trị tuyệt đối, khớp theo một trong hai chiều. Bắt buộc từ 20/10/2026: khớp 110/110 cột trên mọi
+        # BCTC ngân hàng đã đọc sau khi nhận đủ các cách ghi tên dòng LNST của cổ đông ngân hàng mẹ.
+        rule("IS", "b.npat_parent", "b.npat", "-b.mi", id="IS_bank_parent", abs_codes=("b.mi",)),
         rule("CF", "b.net", "b.cfo", "b.cfi", "b.cff", id="CF_bank_net"),
         rule("CF", "b.cash_end", "b.cash_begin", "b.net", "b.fx", id="CF_bank_cash_end"),
     ),
@@ -261,6 +272,7 @@ CTCK = RuleSet(
     template="CTCK",
     total_assets_code="270",
     expense_codes=("21", "40", "60"),
+    required_rows=(("IS", "200", None),),   # lợi nhuận kế toán sau thuế TNDN
     rules=(
         rule("BS", "100", "110", "130"),
         rule("BS", "200", "210", "220", "230", "240", "250"),

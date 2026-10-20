@@ -79,7 +79,10 @@ _PATTERNS: dict[str, list[tuple[str, list[str]]]] = {
                   r"^phân bổ (lãi|lỗ|lãi/lỗ)? ?cho cổ đông (không kiểm soát|thiểu số)$"]),   # BID bán niên 2026
         ("b.npat_parent", [r"(phân bổ cho|của|cho) (các )?cổ đông (của )?(ngân hàng|công ty mẹ)( mẹ)?$",
                            r"chủ sở hữu (của )?ngân hàng( mẹ)?$",
-                           r"^lợi nhuận (còn lại|sau thuế|thuần) (của )?(cổ đông )?(của )?ngân hàng( mẹ)?$"]),
+                           r"^lợi nhuận (còn lại|sau thuế|thuần) (của )?(cổ đông )?(của )?ngân hàng( mẹ)?$",
+                           # CTG, HDB: "Lợi nhuận thuần của chủ sở hữu"; MBB, VPB: "... thuộc về (cổ đông của) Ngân hàng mẹ"
+                           r"^lợi nhuận (sau thuế|thuần) của chủ sở hữu$",
+                           r"^lợi nhuận (sau thuế|thuần) thuộc về (các )?(cổ đông (của )?)?ngân hàng( mẹ)?$"]),
     ],
     "CF": [
         ("b.cfo", [r"^(lưu chuyển )?tiền thuần .*hoạt động (kinh doanh|kd)$"]),

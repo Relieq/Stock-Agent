@@ -90,9 +90,10 @@ class Card:
 class Facts:
     """Số đã chuẩn hóa của một tài liệu (đồng) kèm nguồn từng ô."""
 
-    def __init__(self, document_id: int, record: dict):
+    def __init__(self, document_id: int, record: dict, missing: set[tuple[str, str]] | None = None):
         extracted, statements, _, template, _ = _check_cached(record)
         self.document_id = document_id
+        self.missing = missing or set()     # (báo cáo, mã) có dấu hiệu thiếu dòng (evidence.MissingRow)
         self.template = template
         self.statements = statements
         self.flip_is = "IS" in statements and template in RULESETS and \
@@ -129,11 +130,33 @@ class Facts:
                 total = sum((p.value for p in parts if p.value is not None), Decimal(0))
                 return Value(total, None, "Cộng các khoản thu nhập thuần (BCTC không in dòng tổng)")
         if val.value is None and metric == "npat_parent":
-            # Một số BCTC (riêng, hoặc ngân hàng không có công ty con) không tách phần cổ đông công ty mẹ
-            alt = self.get(statement, self.code(statement, "npat"), column)
-            if alt.value is not None:
-                return Value(alt.value, alt.source, "BCTC không tách LNST của cổ đông công ty mẹ: dùng LNST")
+            return self._parent_profit(statement, column)
         return val
+
+    def _parent_profit(self, statement: str, column: str) -> Value:
+        """LNST của cổ đông công ty mẹ khi không đọc được dòng đó.
+
+        Có dòng lợi ích cổ đông không kiểm soát thì BCTC có tách, chỉ là dòng công ty mẹ bị đọc sót hoặc không nhận ra
+        tên: tính bằng LNST trừ phần không kiểm soát (theo đúng công thức của mẫu). Không có cả hai dòng: BCTC riêng
+        hay công ty không có công ty con thì LNST chính là phần của cổ đông công ty mẹ, trừ khi BCTC kỳ khác của cùng công
+        ty có dòng này (dấu hiệu đọc sót): khi đó để trống, không lấy LNST chung thay vào.
+        """
+        npat = self.get(statement, self.code(statement, "npat"), column)
+        mi_code = self.code(statement, "minority")
+        has_split = any(v for v in self.statements[statement].values.get(mi_code, {}).values())             if statement in self.statements and mi_code else False
+        if has_split:
+            mi = self.get(statement, mi_code, column)
+            if npat.value is None or mi.value is None:
+                return Value(None, None, "Không thấy dòng LNST của cổ đông công ty mẹ: cần xem lại")
+            share = abs(mi.value) if self.template == "TCTD" else mi.value
+            return Value(npat.value - share, None, "Không thấy dòng LNST của cổ đông công ty mẹ: tính bằng LNST trừ "
+                                                   "lợi ích cổ đông không kiểm soát")
+        if (statement, self.code(statement, "npat_parent")) in self.missing:
+            return Value(None, None, "BCTC kỳ khác có dòng LNST của cổ đông công ty mẹ mà bản này không thấy: cần xem lại")
+        if npat.value is not None:
+            # Một số BCTC (riêng, hoặc ngân hàng không có công ty con) không tách phần cổ đông công ty mẹ
+            return Value(npat.value, npat.source, "BCTC không tách LNST của cổ đông công ty mẹ: dùng LNST")
+        return Value(None)
 
 
 # ---- quy tắc hiển thị tăng trưởng ---------------------------------------------------------------------------------
@@ -386,7 +409,7 @@ def plan_progress(f: Facts, plans: dict[str, tuple[Decimal, str]]) -> dict | Non
 def build_card(document_id: int, ticker: str, year: int, period: str, record: dict,
                history: dict[tuple[int, str], Decimal] | None = None, evidence=None,
                plans: dict[str, tuple[Decimal, str]] | None = None) -> Card:
-    f = Facts(document_id, record)
+    f = Facts(document_id, record, {(m.statement, m.key) for m in evidence.missing} if evidence is not None else None)
     kind = "TCTD" if f.template == "TCTD" else ("corporate" if f.template in ("TT200", "TT99") else None)
     if kind is None:
         return Card(document_id, ticker, year, period, f.template, [], [],

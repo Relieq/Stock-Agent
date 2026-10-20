@@ -7,6 +7,7 @@ from services.extraction.validate import (
     ExtractedItem,
     ExtractedStatement,
     detect_template,
+    missing_required,
     normalize,
     summarize,
     validate,
@@ -202,7 +203,8 @@ def test_code_column_swapped_with_stt_is_recovered():
 
 
 def test_missing_code_is_inferred_only_when_numbers_prove_it():
-    # SSI quý 2/2026: dòng "KẾT QUẢ HOẠT ĐỘNG" (mã 70) bị chép thiếu mã
+    # SSI quý 2/2026: dòng "KẾT QUẢ HOẠT ĐỘNG" (mã 70) bị chép thiếu mã. Tên này nay được gán mã theo tên dòng tổng của
+    # mẫu CTCK; tên khác mẫu (chép sai chữ) thì chỉ suy mã khi phép cộng chứng minh được
     from services.extraction.pipeline import _check
     def r(code, label, cur, prev):
         return {"stt": None, "code": code, "label": label, "note": None, "page": 1,
@@ -213,7 +215,13 @@ def test_missing_code_is_inferred_only_when_numbers_prove_it():
     rec = _record({"IS": is_rows}, "securities")
     _, statements, _, template, checks = _check(rec)
     assert template == "CTCK"
-    assert rec["codes_inferred"] == [{"statement": "IS", "code": "70", "label": "KẾT QUẢ HOẠT ĐỘNG", "rule": "IS_90"}]
+    assert [d["code"] for d in rec["codes_from_labels"]] == ["70"] and rec["codes_inferred"] == []
+    assert all(c.passed for c in checks if c.gate)
+
+    is_rows[0]["label"] = "KẾT QUÁ HOẠT ĐỘNG KD"           # tên chép sai: không khớp tên dòng tổng nào
+    rec = _record({"IS": is_rows}, "securities")
+    _, statements, _, template, checks = _check(rec)
+    assert rec["codes_inferred"] == [{"statement": "IS", "code": "70", "label": "KẾT QUÁ HOẠT ĐỘNG KD", "rule": "IS_90"}]
     assert all(c.passed for c in checks if c.gate)
 
     is_rows[0]["values"]["q_prev_year"] = "1.100"      # số không khớp ở một cột thì không gán
@@ -253,6 +261,34 @@ def test_net_profit_row_without_code_gets_60_from_label():
     statements, _ = normalize([is_])
     checks = [c for c in validate(statements, "TT200") if c.rule_id in ("IS_60", "IS_60_split")]
     assert len(checks) == 2 and all(c.passed for c in checks)
+
+
+def test_securities_net_profit_row_without_code_gets_200_from_label():
+    # SSI quý 4/2025: dòng "LỢI NHUẬN KẾ TOÁN SAU THUẾ TNDN" không in mã 200, nên báo thiếu dòng LNST bắt buộc
+    from services.extraction.pipeline import _label_split_codes
+    is_ = ExtractedStatement("IS", "VND", [
+        ExtractedItem("90", "TỔNG LỢI NHUẬN KẾ TOÁN TRƯỚC THUẾ", {"q_cur": "1.003"}),
+        ExtractedItem("100", "CHI PHÍ THUẾ THU NHẬP DOANH NGHIỆP", {"q_cur": "183"}),
+        ExtractedItem(None, "LỢI NHUẬN KẾ TOÁN SAU THUẾ TNDN", {"q_cur": "820"}),
+        ExtractedItem("201", "Lợi nhuận sau thuế phân bổ cho chủ sở hữu", {"q_cur": "818"}),
+    ])
+    statements, _ = normalize([is_])
+    assert missing_required(statements, "CTCK") == [("IS", "200", None)]
+    assert [d["code"] for d in _label_split_codes([is_], statements, "CTCK")] == ["200"]
+    statements, _ = normalize([is_])
+    assert missing_required(statements, "CTCK") == []
+
+
+def test_required_rows_follow_the_template():
+    # Có lợi ích cổ đông không kiểm soát (62) mà không có LNST công ty mẹ (61): phép cộng 60 = 61 + 62 bị bỏ qua, nên
+    # phải báo riêng; BCTC không tách 61/62 (công ty không có công ty con) thì không báo
+    rows = [ExtractedItem("50", "Tổng lợi nhuận kế toán trước thuế", {"q_cur": "1.407"}),
+            ExtractedItem("60", "Lợi nhuận sau thuế", {"q_cur": "1.136"})]
+    statements, _ = normalize([ExtractedStatement("IS", "VND", rows)])
+    assert missing_required(statements, "TT200") == []
+    minority = ExtractedItem("62", "Lợi nhuận sau thuế của cổ đông không kiểm soát", {"q_cur": "135"})
+    statements, _ = normalize([ExtractedStatement("IS", "VND", rows + [minority])])
+    assert missing_required(statements, "TT200") == [("IS", "61", "62")]
 
 
 def test_output_limits_per_step():

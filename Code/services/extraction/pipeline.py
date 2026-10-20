@@ -35,6 +35,7 @@ from services.extraction.validate import (
     ExtractedStatement,
     detect_template,
     expenses_printed_negative,
+    missing_required,
     normalize,
     summarize,
     validate,
@@ -202,9 +203,10 @@ def _escalate(record: dict, client: VisionClient, doc, conn: psycopg.Connection 
     1. đọc lại đúng các ô liên quan ở độ phân giải cao hơn;
     2. vẫn lệch thì chép lại cả báo cáo đó, mỗi trang một lần gọi (sửa lỗi bỏ sót dòng), giữ bản ít lệch hơn,
        rồi đọc lại ô thêm một lần.
-    Trước đó: BCĐKT chưa kiểm được tổng tài sản = tổng nguồn vốn thì chép thêm trang kế tiếp (bước định vị trang có
-    thể bỏ sót trang nguồn vốn). Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
+    Trước đó: BCĐKT chưa kiểm được tổng tài sản = tổng nguồn vốn, hay KQKD không có dòng LNST, thì chép thêm trang kế
+    tiếp (bước định vị trang có thể bỏ sót trang nguồn vốn hay trang cuối KQKD). Bậc dùng mô hình mạnh hơn và duyệt tay chưa làm."""
     _extend_balance_sheet(record, client, doc)
+    _extend_income_statement(record, client, doc)
     _repair_by_constraints(record, client, doc, conn)
     for _ in range(REREAD_ROUNDS):
         if not _reread_failed(record, client, doc):
@@ -434,6 +436,30 @@ def _same_raw(a: str | None, b: str | None, sep: str) -> bool:
     return bool(da) and da.lstrip("0") == db.lstrip("0")
 
 
+def _extend_statement(record: dict, client: VisionClient, doc, st: str, done) -> bool:
+    """Chép thêm trang ngay sau trang cuối của báo cáo `st`; giữ trang thêm khi nhờ nó `done(checks, statements)` đúng."""
+    chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
+    used = {int(p) for pages in chosen["statement_pages"].values() for p in pages}
+    page = max(int(p) for p in chosen["statement_pages"][st]) + 1
+    if page > doc.page_count or page in used:
+        return False
+    image = _extract_image(doc, page, _rotation(record, page))
+    extra = fix_row_pages(client.json_from_images(prompts.extract_prompt(st), [(f"Trang {page}", image)],
+                                                  prompts.extract_schema(st), f"statement_{st}", step=f"extend_{st}",
+                                                  detail=_extract_detail(doc, [page])), [page])
+    before = record["raw"][st]
+    record["raw"][st] = before | {"rows": before.get("rows", []) + extra.get("rows", [])}
+    _, statements, _, _, checks = _check(record)
+    kept = done(checks, statements)
+    if kept:
+        chosen["statement_pages"][st] = [*chosen["statement_pages"][st], page]
+    else:
+        record["raw"][st] = before
+    record.setdefault("extensions", []).append({"statement": st, "page": page, "rows": len(extra.get("rows", [])),
+                                                "kept": kept, "model": client.cfg.model})
+    return kept
+
+
 def _extend_balance_sheet(record: dict, client: VisionClient, doc) -> bool:
     """Chép thêm trang ngay sau trang BCĐKT cuối cùng nếu chưa kiểm được tổng tài sản = tổng nguồn vốn.
 
@@ -443,26 +469,27 @@ def _extend_balance_sheet(record: dict, client: VisionClient, doc) -> bool:
     _, _, _, template, checks = _check(record)
     if not template or "BS" not in record["raw"] or any(BALANCE_RULE.search(c.rule_id) for c in checks):
         return False
-    chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
-    used = {int(p) for pages in chosen["statement_pages"].values() for p in pages}
-    page = max(int(p) for p in chosen["statement_pages"]["BS"]) + 1
-    if page > doc.page_count or page in used:
+    return _extend_statement(record, client, doc, "BS",
+                             lambda checks, _: any(c.gate and BALANCE_RULE.search(c.rule_id) for c in checks))
+
+
+def _extend_income_statement(record: dict, client: VisionClient, doc) -> bool:
+    """Chép thêm trang ngay sau trang KQKD cuối cùng nếu KQKD không có dòng LNST (dòng bắt buộc theo mẫu biểu).
+
+    Ví dụ TCX quý 2/2026: bước định vị trang bỏ sót trang cuối KQKD, mất từ lợi nhuận trước thuế trở xuống; mọi phép
+    cộng còn lại vẫn đúng nên BCTC từng được coi là đã kiểm chứng. Giữ trang thêm khi nhờ nó có dòng LNST.
+    """
+    _, statements, _, template, _ = _check(record)
+    need = {code for st, code, when in missing_required(statements, template) if st == "IS" and when is None}
+    if not need or "IS" not in record["raw"]:
         return False
-    image = _extract_image(doc, page, _rotation(record, page))
-    extra = fix_row_pages(client.json_from_images(prompts.extract_prompt("BS"), [(f"Trang {page}", image)],
-                                                  prompts.extract_schema("BS"), "statement_BS", step="extend_BS",
-                                                  detail=_extract_detail(doc, [page])), [page])
-    before = record["raw"]["BS"]
-    record["raw"]["BS"] = before | {"rows": before.get("rows", []) + extra.get("rows", [])}
-    _, _, _, _, checks = _check(record)
-    kept = any(c.gate and BALANCE_RULE.search(c.rule_id) for c in checks)
-    if kept:
-        chosen["statement_pages"]["BS"] = [*chosen["statement_pages"]["BS"], page]
-    else:
-        record["raw"]["BS"] = before
-    record.setdefault("extensions", []).append({"statement": "BS", "page": page, "rows": len(extra.get("rows", [])),
-                                                "kept": kept, "model": client.cfg.model})
-    return kept
+    failed_before = _gate_tally(record).get("IS", (0, 0))[0]
+
+    def done(_, statements) -> bool:
+        still = {code for st, code, _ in missing_required(statements, template) if st == "IS"}
+        return not need & still and _gate_tally(record).get("IS", (0, 0))[0] <= failed_before
+
+    return _extend_statement(record, client, doc, "IS", done)
 
 
 def _gate_failures(record: dict) -> dict[str, int]:
@@ -595,26 +622,58 @@ _SPLIT_LABELS = (("61",re.compile(r"sau thuế (thu nhập doanh nghiệp )?(c�
                  ("62", re.compile(r"cổ đông không kiểm soát|cổ đông thiểu số|lợi ích (của )?cổ đông không")))
 
 
+# Dòng tổng KQKD của công ty chứng khoán (mẫu B02-CTCK) theo tên: SSI quý 4/2025 và TCX bán niên 2026 in các dòng tổng
+# không kèm mã (TCX in công thức "(90 = 70 + 80)" thành một dòng riêng), nên mọi phép cộng KQKD bị bỏ qua
+_CTCK_IS_TOTALS = (
+    ("20", re.compile(r"^cộng doanh thu hoạt động( \(.*\))?$")),
+    ("40", re.compile(r"^cộng chi phí hoạt động( \(.*\))?$")),
+    ("50", re.compile(r"^cộng doanh thu hoạt động tài chính( \(.*\))?$")),
+    ("60", re.compile(r"^cộng chi phí tài chính( \(.*\))?$")),
+    ("62", re.compile(r"^([ivx]+\.?\s*)?chi phí quản lý( công ty chứng khoán)?$")),
+    ("70", re.compile(r"^([ivx]+\.?\s*)?kết quả hoạt động( \(.*\))?$")),
+    ("80", re.compile(r"^cộng kết quả hoạt động khác( \(.*\))?$")),
+    ("90", re.compile(r"^([ivx]+\.?\s*)?tổng lợi nhuận kế toán trước thuế( \(.*\))?$")),
+    ("100", re.compile(r"^([ivx]+\.?\s*)?chi phí thuế thu nhập doanh nghiệp( \(.*\))?$")),
+)
+
+
 # Dòng đầu LCTT gián tiếp đôi khi mất cả số thứ tự lẫn mã số (VIC quý 4/2025: "Lợi nhuận trước thuế" không có "01"),
 # và không suy được từ phép cộng 08 = 01 + ... + 07 vì dòng 07 cũng vắng mặt
 _CF_PBT_LABEL = re.compile(r"^(1\.?\s*)?lợi nhuận (kế toán )?trước thuế")
 
 
-def _label_split_codes(extracted, statements) -> list[dict]:
-    """Gán mã theo tên dòng cho các dòng quan trọng mà BCTC không in mã: 60/61/62 trên KQKD, 01 trên LCTT gián tiếp."""
+def _label_split_codes(extracted, statements, template: str = "TT200") -> list[dict]:
+    """Gán mã theo tên dòng cho các dòng quan trọng mà BCTC không in mã: 60/61/62 trên KQKD, 01 trên LCTT gián tiếp;
+    công ty chứng khoán: 200 (lợi nhuận kế toán sau thuế TNDN, SSI quý 4/2025 và TCX bán niên 2026 in không có mã)."""
     out = []
+    npat, pbt = ("200", "90") if template == "CTCK" else ("60", "50")
     st = statements.get("IS")
     ex = next((e for e in extracted if e.statement == "IS"), None)
-    has_60 = st is not None and "60" in st.values
-    if st is not None and ex is not None and not has_60 and "50" in st.values:
+    if template == "CTCK" and st is not None and ex is not None:
+        for code, pattern in _CTCK_IS_TOTALS:
+            if code in st.values:
+                continue
+            hit = next((it for it in ex.items if normalize_code(it.code) is None
+                        and pattern.search(unicodedata.normalize("NFC", it.label or "").strip().casefold())
+                        and any(v not in (None, "", "-") for v in it.values_raw.values())), None)
+            if hit is not None:
+                hit.code = code
+                out.append({"statement": "IS", "code": code, "label": hit.label, "rule": "label"})
+        if out:
+            statements, _ = normalize(extracted)
+            st = statements.get("IS")
+    has_60 = st is not None and npat in st.values
+    if st is not None and ex is not None and not has_60 and pbt in st.values:
         hit = next((it for it in ex.items if normalize_code(it.code) is None
                     and _NPAT_LABEL.search(unicodedata.normalize("NFC", it.label or "").strip().casefold())
                     and not any(p.search(unicodedata.normalize("NFC", it.label or "").casefold()) for _, p in _SPLIT_LABELS)
                     and any(v not in (None, "", "-") for v in it.values_raw.values())), None)
         if hit is not None:
-            hit.code = "60"
+            hit.code = npat
             has_60 = True
-            out.append({"statement": "IS", "code": "60", "label": hit.label, "rule": "label"})
+            out.append({"statement": "IS", "code": npat, "label": hit.label, "rule": "label"})
+    if template == "CTCK":
+        return out
     if st is not None and ex is not None and has_60 and "61" not in st.values and "62" not in st.values:
         for code, pattern in _SPLIT_LABELS:
             hit = next((it for it in ex.items if normalize_code(it.code) is None
@@ -640,7 +699,7 @@ def _label_split_codes(extracted, statements) -> list[dict]:
 
 def _check(record: dict):
     extracted, statements, sep, template, checks = _check_variants(record)
-    if template in ("TT200", "TT99") and (labelled := _label_split_codes(extracted, statements)):
+    if template in ("TT200", "TT99", "CTCK") and (labelled := _label_split_codes(extracted, statements, template)):
         statements, sep = normalize(extracted)
         checks = validate(statements, template)
         record["codes_from_labels"] = labelled

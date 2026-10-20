@@ -227,3 +227,34 @@ def test_label_variants_seen_in_h1_2026():
     extracted = [_st("IS", rows, "ytd_cur")]
     canonicalize(extracted)
     assert [it.code for it in extracted[0].items] == ["b.oi", "b.oe", "b.nother", None, "b.pbt", "b.mi", "b.npat_parent"]
+
+
+def test_parent_profit_label_variants():
+    # CTG, HDB: "Lợi nhuận thuần của chủ sở hữu"; MBB quý 1/2026, VPB: "... thuộc về (cổ đông của) Ngân hàng (mẹ)".
+    # Trước đây không nhận ra nên thẻ lấy LNST chung (gồm cả phần cổ đông không kiểm soát)
+    for label in ("Lợi nhuận thuần của chủ sở hữu", "Lợi nhuận sau thuế thuộc về Ngân hàng mẹ",
+                  "Lợi nhuận thuần thuộc về cổ đông của Ngân hàng",
+                  "Lợi nhuận sau thuế thuộc về cổ đông của Ngân hàng mẹ"):
+        rows = [(None, "Lợi nhuận sau thuế", "5.797.908"), (None, "Lợi ích của cổ đông không kiểm soát", "239.178"),
+                (None, label, "5.558.730")]
+        extracted = [_st("IS", rows, "ytd_cur")]
+        canonicalize(extracted)
+        assert [it.code for it in extracted[0].items] == ["b.npat", "b.mi", "b.npat_parent"], label
+
+
+def test_parent_profit_rule_accepts_minority_loss():
+    # Công ty con lỗ: LNST của cổ đông ngân hàng mẹ lớn hơn LNST chung; dấu in của dòng không kiểm soát không cho biết chiều
+    for minority, parent in (("(239.178)", "5.558.730"), ("(239.178)", "6.037.086"), ("239.178", "6.037.086")):
+        rows = [(None, "Lợi nhuận sau thuế", "5.797.908"), (None, "Lợi ích của cổ đông không kiểm soát", minority),
+                (None, "Lợi nhuận thuần của chủ sở hữu", parent)]
+        extracted = [_st("IS", rows, "ytd_cur")]
+        canonicalize(extracted)
+        statements, _ = normalize(extracted)
+        checks = [c for c in validate(statements, "TCTD") if c.rule_id == "IS_bank_parent"]
+        assert len(checks) == 1 and checks[0].passed and checks[0].gate
+    rows = [(None, "Lợi nhuận sau thuế", "8.862.910"), (None, "Lợi ích của cổ đông không kiểm soát", "219.284"),
+            (None, "Lợi nhuận sau thuế thuộc về cổ đông của Ngân hàng mẹ", "8.643.526")]   # VPB quý 3/2026, 72 dpi
+    extracted = [_st("IS", rows, "q_cur")]
+    canonicalize(extracted)
+    statements, _ = normalize(extracted)
+    assert not next(c for c in validate(statements, "TCTD") if c.rule_id == "IS_bank_parent").passed

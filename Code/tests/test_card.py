@@ -56,3 +56,27 @@ def test_other_income_flag_on_bank_debt_recovery():
     down = _Facts("TT200", **{"other_profit.q_cur": "50", "other_profit.q_prev_year": "0",
                               "pbt.q_cur": "90", "pbt.q_prev_year": "100"})
     assert flag_other_income(down) is None
+
+
+def _bank_is(*rows):
+    return {"company_template": "bank", "raw": {"IS": {"unit_text": "Đơn vị tính: triệu đồng", "rows": [
+        {"stt": None, "code": None, "label": label, "note": None, "page": 1, "values": {"q_cur": value}}
+        for label, value in rows]}}}
+
+
+def test_parent_profit_is_computed_when_its_row_is_missing():
+    # VPB quý 3/2026, bản scan 72 dpi: dòng "Lợi nhuận thuần cổ đông ngân hàng" bị đọc sót; trước đây thẻ lấy LNST chung
+    from services.metrics.card import Facts
+    rec = _bank_is(("Tổng lợi nhuận trước thuế", "11.030.887"), ("Chi phí thuế TNDN", "(2.167.977)"),
+                   ("Lợi nhuận sau thuế", "8.862.910"), ("Lợi ích của cổ đông không kiểm soát", "(219.284)"))
+    v = Facts(1, rec).metric("IS", "npat_parent", "q_cur")
+    assert v.value == D("8643626") * 10**6 and "trừ" in v.computed
+
+
+def test_parent_profit_is_left_blank_when_another_report_has_the_row():
+    from services.metrics.card import Facts
+    rec = _bank_is(("Tổng lợi nhuận trước thuế", "11.030.887"), ("Chi phí thuế TNDN", "(2.167.977)"),
+                   ("Lợi nhuận sau thuế", "8.862.910"))
+    assert Facts(1, rec).metric("IS", "npat_parent", "q_cur").value == D("8862910") * 10**6   # ngân hàng không tách
+    v = Facts(1, rec, {("IS", "b.npat_parent")}).metric("IS", "npat_parent", "q_cur")
+    assert v.value is None and "cần xem lại" in v.computed

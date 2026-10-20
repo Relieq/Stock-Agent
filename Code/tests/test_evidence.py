@@ -123,3 +123,23 @@ def test_first_quarter_earnings_per_share_quarter_equals_year_to_date():
     assert {status[("IS", "eps70", c)]["status"] for c in q1.eps[("IS", "eps70")]} == {"sum"}   # BSR quý 1/2026
     q1.eps[("IS", "eps70")]["q_prev_year"] = D(98)
     assert cell_status(q1, [], second, "fs_quarter")[("IS", "eps70", "q_prev_year")]["status"] == "conflict"
+
+
+def test_row_missing_from_a_report_is_found_by_the_same_number_on_another_report():
+    from services.extraction.evidence import missing_rows
+    # Quý 1 và quý 2 cùng năm in cùng số đầu năm. Quý 2 đánh mã khác (TT99) nhưng có đúng số đó: không thiếu
+    q1 = _cells(1, "Q1", {("BS", "330"): {"begin_year": 389}, ("BS", "337"): {"begin_year": 389},
+                          ("BS", "300"): {"begin_year": 1000}})
+    q1.sum_evidence = {("BS", k, "begin_year"): ["x"] for k in ("330", "337", "300")}
+    q2 = _cells(2, "Q2", {("BS", "300"): {"begin_year": 1000}, ("BS", "331"): {"begin_year": 389}})
+    assert missing_rows(q2, q1, "earlier") == []
+    # Quý 2 không có dòng nào mang số 389: thiếu cả hai dòng 330, 337
+    q2 = _cells(2, "Q2", {("BS", "300"): {"begin_year": 1000}})
+    assert [m.key for m in missing_rows(q2, q1, "earlier")] == ["330", "337"]
+    # Dòng KQKD có lũy kế ở quý trước thì quý này phải có dòng cùng mã hoặc cùng tên
+    q1 = _cells(1, "Q1", {("IS", "b.oi"): {"ytd_cur": 50}})
+    q1.sum_evidence = {("IS", "b.oi", "ytd_cur"): ["x"]}
+    q2 = _cells(2, "Q2", {("IS", "b.nother"): {"ytd_cur": 70}})
+    assert [m.key for m in missing_rows(q2, q1, "earlier")] == ["b.oi"]
+    q2.printed = {("IS", "b.oi")}             # dòng có in nhưng để trống ("-"): không coi là thiếu
+    assert missing_rows(q2, q1, "earlier") == []

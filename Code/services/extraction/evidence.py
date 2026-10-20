@@ -28,7 +28,7 @@ from services.extraction.bank import clean_label, fold
 from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.pipeline import _check_cached
 from services.extraction.rules import RULESETS
-from services.extraction.validate import group_rule_codes
+from services.extraction.validate import group_rule_codes, missing_required
 
 EPS = re.compile(r"(lai|lo).*tren (mot )?co phieu")
 RESTATED = re.compile(r"trình bày lại|điều chỉnh lại|restated", re.IGNORECASE)
@@ -51,6 +51,9 @@ class Cells:
     # Lãi trên cổ phiếu (đồng, không theo đơn vị của bảng): không đưa vào phép cộng hay đối chiếu kỳ (quý không bằng
     # lũy kế trừ lũy kế, số kỳ trước hay được tính lại theo số cổ phiếu mới), chỉ so với lần đọc thứ hai
     eps: dict[tuple[str, str], dict[str, Decimal]] = field(default_factory=dict)
+    template: str | None = None
+    printed: set[tuple[str, str]] = field(default_factory=set)   # (báo cáo, mã hoặc tên đã bỏ dấu) của mọi dòng đã chép
+    required_missing: list[tuple[str, str, str]] = field(default_factory=list)   # validate.missing_required
 
     def row(self, st: str, key: str) -> dict[str, Decimal]:
         return self.values.get((st, key)) or self.eps.get((st, key), {})
@@ -65,6 +68,7 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
     values: dict[tuple[str, str], dict[str, Decimal]] = {}
     labels: dict[tuple[str, str], str] = {}
     item_keys: dict[str, list[str | None]] = {}
+    printed: set[tuple[str, str]] = set()
     eps: dict[tuple[str, str], dict[str, Decimal]] = {}
     mult = {st: s.multiplier for st, s in statements.items()}
     for ex in extracted:
@@ -75,6 +79,9 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
         for it in ex.items:
             keys.append(None)
             code = normalize_code(it.code)
+            printed.add((st, fold(clean_label(it.label))))
+            if code:
+                printed.add((st, code))
             if EPS.search(fold(clean_label(it.label))):
                 # lãi trên cổ phiếu tính bằng đồng, không theo đơn vị của bảng
                 base = "eps" + (code or label_key(it.label))
@@ -102,7 +109,8 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
                 keys[-1] = key
     restated = {(st, c.get("kind")) for st, raw in record["raw"].items() for c in raw.get("columns", [])
                 if RESTATED.search(c.get("header") or "")}
-    cells = Cells(document_id, period, values, labels, mult, restated, item_keys, eps=eps)
+    cells = Cells(document_id, period, values, labels, mult, restated, item_keys, eps=eps, template=template, printed=printed,
+                  required_missing=missing_required(statements, template))
     cells.verified = {(v["statement"], v["key"], v["column_kind"]) for v in record.get("cell_verifications", [])
                       if v.get("same")}
 
@@ -378,6 +386,82 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | 
 
 
 # BCTC quý và BCTC cùng ngày kết thúc kỳ: (kỳ quý, loại BCTC cả kỳ, kỳ của BCTC cả kỳ)
+@dataclass
+class MissingRow:
+    """Dòng tài liệu này lẽ ra phải có nhưng không thấy: theo mẫu biểu, hoặc vì BCTC khác của cùng công ty in khác 0 ở
+    dòng đó một con số mà tài liệu này cũng phải in (cùng ngày, hoặc lũy kế kỳ trước nằm trong lũy kế kỳ này)."""
+    statement: str
+    key: str
+    label: str
+    reason: str                         # "required" (mẫu biểu) / "peer" (BCTC khác)
+    peer_id: int | None = None
+    peer_period: str | None = None
+    peer_column: str | None = None
+    peer_value: Decimal | None = None
+    by_value: bool = False              # đã tìm cả theo con số (cột phải in cùng số với BCTC đối chiếu)
+
+    def describe(self) -> str:
+        """Viết cho người duyệt."""
+        name = f'{STATEMENT_NAMES.get(self.statement, self.statement)}: dòng "{self.label.strip()}"'
+        if self.reason == "required":
+            return f"{name} bắt buộc theo mẫu biểu nhưng không thấy trong bản đã đọc"
+        amount = f"{abs(self.peer_value) / Decimal(10**9):,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return (f"{name} có ở BCTC {self.peer_period} ({COLUMN_NAMES.get(self.peer_column, self.peer_column)} {amount} "
+                f"tỷ) nhưng bản này không có dòng nào cùng mã{', cùng tên hay cùng số' if self.by_value else ' hay cùng tên'}; "
+                f"có thể đọc sót, hoặc công ty đổi cách trình bày")
+
+
+STATEMENT_NAMES = {"BS": "Cân đối kế toán", "IS": "Kết quả kinh doanh", "CF": "Lưu chuyển tiền tệ"}
+COLUMN_NAMES = {"end_period": "cuối kỳ", "begin_year": "đầu năm", "q_cur": "quý này", "q_prev_year": "cùng kỳ",
+                "ytd_cur": "lũy kế", "ytd_prev_year": "lũy kế năm trước"}
+
+
+# Tên dòng bắt buộc theo mẫu biểu, dùng khi tài liệu không có dòng đó để lấy tên
+REQUIRED_NAMES = {"60": "Lợi nhuận sau thuế thu nhập doanh nghiệp", "61": "Lợi nhuận sau thuế của cổ đông công ty mẹ",
+                  "b.npat": "Lợi nhuận sau thuế", "b.npat_parent": "Lợi nhuận sau thuế của cổ đông ngân hàng mẹ",
+                  "200": "Lợi nhuận kế toán sau thuế TNDN"}
+
+# Cột của BCTC đối chiếu phải in cùng một con số với tài liệu này, theo quan hệ giữa hai BCTC (xem neighbours): cột đầu
+# năm của BCĐKT giữa các quý trong năm; số kỳ này của KQKD, LCTT năm trước là cột cùng kỳ năm trước của năm nay. Quý 2/4
+# với bán niên/năm và cuối năm trước với đầu năm nay không dùng: soát xét, kiểm toán hay đổi số và cách trình bày.
+PEER_SAME = {
+    "earlier": {"BS": ("begin_year",)},
+    "later": {"BS": ("begin_year",)},
+    "prev_year_same": {"IS": ("q_cur", "ytd_cur"), "CF": ("ytd_cur", "q_cur")},
+}
+# Lũy kế của quý trước nằm trong lũy kế quý này: dòng KQKD, LCTT đã có số ở quý trước thì quý này cũng phải có dòng đó
+# (số có thể khác nên tìm theo mã hoặc tên dòng)
+PEER_CONTAINED = {"earlier": {"IS": ("ytd_cur", "q_cur", "ytd_prev_year", "q_prev_year"),
+                              "CF": ("ytd_cur", "q_cur", "ytd_prev_year", "q_prev_year")}}
+
+
+def missing_rows(cells: Cells, peer: Cells, relation: str) -> list[MissingRow]:
+    """Dòng của BCTC đối chiếu (đã khớp cộng tổng, số khác 0 ở cột liên quan) mà tài liệu này không có.
+
+    Cột cùng số (PEER_SAME): thiếu khi không có dòng cùng khóa và cũng không dòng nào in đúng con số đó, vì cùng một
+    công ty có thể đánh mã khác nhau giữa hai BCTC (TT200/TT99) và đổi chữ trong tên dòng. Cột lũy kế (PEER_CONTAINED):
+    thiếu khi không có dòng cùng khóa và không dòng nào cùng tên."""
+    out = []
+    for (st, key), pv in peer.values.items():
+        if (st, key) in cells.values or (st, key) in cells.printed:
+            continue
+        evidenced = [c for c in pv if pv[c] and (st, key, c) in peer.sum_evidence]
+        col = next((c for c in PEER_SAME.get(relation, {}).get(st, ()) if c in evidenced), None)
+        by_value = col is not None
+        if by_value:
+            tol = max(cells.multiplier.get(st, Decimal(1)), peer.multiplier.get(st, Decimal(1))) * 3
+            target = abs(pv[col])
+            if any(abs(abs(v) - target) <= tol for (s, _), vals in cells.values.items() if s == st for v in vals.values()):
+                continue
+        else:
+            col = next((c for c in PEER_CONTAINED.get(relation, {}).get(st, ()) if c in evidenced), None)
+            if col is None or (st, fold(clean_label(peer.labels.get((st, key), "")))) in cells.printed:
+                continue
+        out.append(MissingRow(st, key, peer.labels.get((st, key), key), "peer", peer.document_id, peer.period, col, pv[col],
+                              by_value))
+    return out
+
+
 SAME_DATE = {("Q2", "fs_semiannual", "H1"), ("Q4", "fs_annual", "FY")}
 
 
@@ -386,7 +470,8 @@ def neighbours(conn, document_id: int) -> list[tuple[int, str, str]]:
 
     Quan hệ: "earlier"/"later" = quý liền trước/liền sau; "report" = BCTC cả kỳ cùng ngày kết thúc với quý này
     (bán niên cho quý 2, năm cho quý 4); "quarter" = BCTC quý cùng ngày kết thúc với BCTC cả kỳ này;
-    "prev_year_end"/"next_year_start" = quý 4 năm trước / quý 1 năm sau (cuối năm trước là đầu năm nay).
+    "prev_year_end"/"next_year_start" = quý 4 năm trước / quý 1 năm sau (cuối năm trước là đầu năm nay);
+    "prev_year_same" = BCTC cùng kỳ năm trước (chỉ dùng để tìm dòng thiếu, xem missing_rows).
     Kỳ của BCTC khác năm được ghi kèm năm, ví dụ "Q4/2025".
     """
     row = conn.execute("SELECT ticker, scope, fiscal_year, fiscal_period, doc_type FROM documents WHERE id = %s",
@@ -405,6 +490,7 @@ def neighbours(conn, document_id: int) -> list[tuple[int, str, str]]:
         if period == "Q4":
             wanted.append(("fs_quarter", "Q1", "next_year_start", year + 1))
     wanted += [("fs_quarter", q, "quarter", year) for q, t, rp in SAME_DATE if t == doc_type and rp == period]
+    wanted.append((doc_type, period, "prev_year_same", year - 1))
     out = []
     for t, p, relation, y in wanted:
         hit = conn.execute(
@@ -425,6 +511,7 @@ class DocumentEvidence:
     period_checks: list[PeriodCheck]
     status: dict[tuple[str, str, str], dict]
     peers: list[tuple[int, str, str]]
+    missing: list[MissingRow] = field(default_factory=list)
 
     def counts(self) -> dict[str, int]:
         out = {k: 0 for k in STATUS_LABELS}
@@ -454,18 +541,23 @@ def document_evidence(conn, document_id: int, load=None, cells_fn=None) -> Docum
     cells = cells_fn(document_id, period[0], record)
     second = second_cells(document_id, period[0], record, cells_fn)
     checks: list[PeriodCheck] = []
+    missing = [MissingRow(st, code, REQUIRED_NAMES.get(code, code), "required")
+               for st, code, _ in cells.required_missing]
     peers = neighbours(conn, document_id)
     for peer_id, peer_period, relation in peers:
         peer_record = _load(peer_id)
         if peer_record is None:
             continue
         peer = cells_fn(peer_id, peer_period, peer_record)
+        seen = {(m.statement, m.key) for m in missing}
+        missing += [m for m in missing_rows(cells, peer, relation) if (m.statement, m.key) not in seen]
         checks += {"earlier": lambda: compare_periods(peer, cells), "later": lambda: compare_periods(cells, peer),
                    "report": lambda: compare_same_date(cells, peer), "quarter": lambda: compare_same_date(peer, cells),
                    "prev_year_end": lambda: compare_year_start(peer, cells),
                    "next_year_start": lambda: compare_year_start(cells, peer),
+                   "prev_year_same": lambda: [],     # chỉ dùng để tìm dòng thiếu
                    }[relation]()
-    return DocumentEvidence(cells, checks, cell_status(cells, checks, second, period[1]), peers)
+    return DocumentEvidence(cells, checks, cell_status(cells, checks, second, period[1]), peers, missing)
 
 
 def second_cells(document_id: int, period: str, record: dict, cells_fn=None) -> Cells | None:

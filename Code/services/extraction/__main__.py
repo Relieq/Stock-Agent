@@ -132,6 +132,8 @@ def cmd_evidence(args) -> None:
                   f"{n['period'] + n['both']}; khác giữa hai BCTC {n['differs']}; cần xem lại {n['conflict']}; "
                   f"trình bày lại {n['restated']}; chưa kiểm nhưng hai lần đọc trùng {n['second']}, khác "
                   f"{n['second_differs']} (đối chiếu: {peers})")
+            for m in ev.missing:
+                print(f"    CÓ THỂ THIẾU DÒNG {m.describe()}")
             if args.all:
                 for (st, key, col), x in ev.status.items():
                     if x["status"] == "second_differs":

@@ -26,6 +26,8 @@
     {% for k, v in n.items() if v %}<span class="ev-{{ k }} chip">{{ EVIDENCE[k] }} {{ v }} ({{ (100 * v / total) | round | int }}%)</span>{% endfor %}
   </div>{% endif %}
   {% if record.note %}<div class="warnbox">{{ record.note }}</div>{% endif %}
+  {% if d.missing %}<div class="warnbox"><b>Có thể thiếu dòng, cần xem lại</b> (phép cộng không bắt được việc thiếu cả một dòng):
+    <ul>{% for t in d.missing %}<li>{{ t }}</li>{% endfor %}</ul></div>{% endif %}
   {% if record.stt_code_swapped or record.codes_inferred or record.cf_positional or record.labels_repaired or record.extensions or d.rereads %}
   <div class="infobox"><b>Hệ thống đã tự sửa</b> (ràng buộc kế toán xác nhận phương án sửa; nên đối chiếu ảnh):
     <ul>

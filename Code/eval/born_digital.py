@@ -22,7 +22,7 @@ from difflib import SequenceMatcher
 from services.db import connect
 from services.extraction.bank import clean_label, fold
 from services.extraction.numbers import normalize_code, parse_amount
-from services.extraction.pipeline import _load_record, open_record_pdf
+from services.extraction.pipeline import _check, _load_record, open_record_pdf
 from services.extraction.sources import page_texts
 
 AMOUNT = re.compile(r"^\(?-?\d{1,3}([.,]\d{3})+\)?$|^\(?-?\d+\)?$")
@@ -275,6 +275,38 @@ def compare_record(record: dict, doc, doc_id, verbose: bool = False, truth_sep: 
     return tally
 
 
+def flagged(record: dict, conn=None, doc_id: int | None = None) -> list[str]:
+    """Lý do hệ thống (theo bộ kiểm tra hiện tại) không để BCTC đọc ở bản này đi thẳng ra ngoài: ràng buộc bắt buộc lệch
+    (vào hàng đọc lại/duyệt), hoặc có dấu hiệu thiếu dòng (cần xem lại). BCTC trong kho thì đối chiếu cả BCTC kỳ khác."""
+    from services.extraction.evidence import cells_of, document_evidence
+    _, _, _, _, checks = _check(record)
+    out = [f"lệch {c.rule_id}" for c in checks if c.gate and not c.passed]
+    if conn is not None and doc_id is not None:
+        cache: dict[int, dict | None] = {}
+
+        def load(x):
+            if x == doc_id:
+                return record
+            if x not in cache:
+                try:
+                    cache[x] = _load_record(conn, x)
+                except RuntimeError:
+                    cache[x] = None
+            return cache[x]
+        ev = document_evidence(conn, doc_id, load=load)
+        missing = ev.missing if ev else []
+    else:
+        missing = [code for _, code, _ in cells_of(0, "", record).required_missing]
+    return out + [f"thiếu dòng {getattr(m, 'key', m)}" for m in missing]
+
+
+def _tally_flag(t: Counter, reasons: list[str]) -> None:
+    """Ô sai (sai/thiếu/thừa ở mức tự động) nằm trong BCTC bị báo hay lọt qua."""
+    wrong = sum(v for k, v in t.items() if k.startswith("tự động") and k != "tự động: đúng")
+    t["BCTC bị báo"] += bool(reasons)
+    t["ô sai trong BCTC bị báo" if reasons else "ô sai lọt qua"] += wrong
+
+
 @dataclass
 class Level:
     name: str
@@ -423,17 +455,20 @@ def degraded_main(args) -> None:
                     client = client or VisionClient()
                     rec = run_degraded(conn, client, d, lv)
                 t = compare_record(rec, src, d, args.verbose, truth_sep=original.get("thousands_sep"))
+                reasons = flagged(rec, conn, d)
+                _tally_flag(t, reasons)
                 n = sum(v for k, v in t.items() if k.startswith("tự động"))
                 ok = t["tự động: đúng"]
                 print(f"[{d}] {original['ticker']} {LEVELS[lv].name}: {ok}/{n} ô đúng"
-                      + (f" ({100 * ok / n:.2f}%)" if n else "") + f"; ràng buộc bắt buộc lệch {rec.get('gate_failed')}; "
+                      + (f" ({100 * ok / n:.2f}%)" if n else "") + f"; hệ thống báo: {', '.join(reasons) or 'không'}; "
                       f"{rec.get('usd', 0):.3f} USD; {dict(t)}", flush=True)
                 totals.setdefault(lv, Counter()).update(t)
     for lv, t in totals.items():
         n = sum(v for k, v in t.items() if k.startswith("tự động"))
         ok = t["tự động: đúng"]
         if n:
-            print(f"{LEVELS[lv].name}: {ok}/{n} ô đúng ({100 * ok / n:.2f}%)")
+            print(f"{LEVELS[lv].name}: {ok}/{n} ô đúng ({100 * ok / n:.2f}%); {t['BCTC bị báo']} BCTC bị báo, "
+                  f"chứa {t['ô sai trong BCTC bị báo']} ô sai; {t['ô sai lọt qua']} ô sai lọt qua")
     if client:
         print(f"Tổng chi phí lần chạy này: {client.usage.usd:.3f} USD")
 
@@ -479,18 +514,21 @@ def files_main(args) -> None:
             if lv not in args.level:
                 continue
             t = compare_record(rec, src, name, args.verbose, truth_sep=sep)
+            reasons = flagged(rec)
+            _tally_flag(t, reasons)
             n = sum(v for k, v in t.items() if k.startswith("tự động"))
             ok = t["tự động: đúng"]
             label = "bản gốc" if lv == "goc" else LEVELS[lv].name
             print(f"[{name}] {label}: {ok}/{n} ô đúng" + (f" ({100 * ok / n:.2f}%)" if n else "")
-                  + f"; ràng buộc bắt buộc lệch {rec.get('gate_failed')}; {rec.get('usd', 0):.3f} USD; {dict(t)}",
+                  + f"; hệ thống báo: {', '.join(reasons) or 'không'}; {rec.get('usd', 0):.3f} USD; {dict(t)}",
                   flush=True)
             totals.setdefault(lv, Counter()).update(t)
     for lv, t in totals.items():
         n = sum(v for k, v in t.items() if k.startswith("tự động"))
         if n:
             print(f"{'bản gốc' if lv == 'goc' else LEVELS[lv].name}: {t['tự động: đúng']}/{n} ô đúng "
-                  f"({100 * t['tự động: đúng'] / n:.2f}%)")
+                  f"({100 * t['tự động: đúng'] / n:.2f}%); {t['BCTC bị báo']} BCTC bị báo, chứa "
+                  f"{t['ô sai trong BCTC bị báo']} ô sai; {t['ô sai lọt qua']} ô sai lọt qua")
     if client:
         print(f"Tổng chi phí lần chạy này: {client.usage.usd:.3f} USD")
 

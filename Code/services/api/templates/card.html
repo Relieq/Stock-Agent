@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ ticker }} {{ period }}/{{ year }} · Soi{% endblock %}
 {% macro num(v) -%}
-  {%- if v.value is none %}<span class="muted">–</span>
+  {%- if v.value is none %}<span class="muted" title="{{ v.computed or '' }}">–</span>
   {%- elif v.source and v.source.page %}<button class="src" data-doc="{{ v.source.document_id }}" data-page="{{ v.source.page }}"
      title="{{ v.source.label }} (mã {{ v.source.code }}), trang {{ v.source.page }}: in là {{ v.source.raw }}">{{ v.value | tien }}</button>
   {%- else %}<span title="{{ v.computed or '' }}">{{ v.value | tien }}{% if v.computed %}*{% endif %}</span>{% endif -%}

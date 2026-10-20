@@ -173,6 +173,7 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
             best = (score, cand, doc, st_pages)
     _, cand, doc, st_pages = best
     record["chosen"] = cand.name
+    check_landscape_rotations(record, client, doc)
 
     # 2. Chép bảng từng báo cáo
     record["raw"] = {}
@@ -638,6 +639,26 @@ def _reextract_failed_statements(record: dict, client: VisionClient, doc) -> boo
                         "rows_before": len(before.get("rows", [])), "rows_after": len(merged["rows"]),
                         "kept": kept, "model": client.cfg.model})
     return improved
+
+
+def check_landscape_rotations(record: dict, client: VisionClient, doc) -> list[int]:
+    """Trang báo cáo in khổ ngang (bước định vị cho xoay 90 hoặc 270 độ): bước định vị đôi khi chọn nhầm chiều, ảnh
+    xoay xong bị lộn ngược (TCX quý 4/2025 trang 11: định vị cho 270, đúng là 90). Mô hình vẫn đọc được số trên ảnh
+    ngược, nhưng web hiện trang ngược và bước đọc lại ô cắt ảnh ngược. Hỏi lại xem ảnh nào trong hai chiều có chữ đứng
+    thẳng, chiều kia đúng thì đổi. Trả về các trang đã đổi."""
+    chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
+    pages = sorted({int(p) for ps in chosen["statement_pages"].values() for p in ps})
+    flipped = []
+    for page in pages:
+        rot = _rotation(record, page)
+        if rot in (90, 270) and _confirm_upside_down(client, doc, page, rot):
+            saved = chosen.setdefault("rotations", {})
+            saved.pop(page, None)
+            saved[str(page)] = (rot + 180) % 360
+            flipped.append(page)
+    if flipped:
+        record["landscape_flipped"] = flipped
+    return flipped
 
 
 def _confirm_upside_down(client: VisionClient, doc, page: int, rotation: int) -> bool:

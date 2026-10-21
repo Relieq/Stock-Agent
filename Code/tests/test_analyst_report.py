@@ -236,14 +236,14 @@ def test_fail_stale_danh_dau_loi_bao_cao_ket(monkeypatch):
 
 
 def test_fail_stale_bao_loi_bao_cao_cho_doc_chua_gui_yeu_cau(monkeypatch):
-    """Web chết giữa lúc bấm "Đọc thêm" và lúc gửi yêu cầu: chờ đọc mà không có yêu cầu nào -> lỗi; có yêu cầu thì giữ."""
+    """Web chết giữa lúc bấm "Đọc thêm" và lúc gửi yêu cầu: chưa có danh sách yêu cầu (NULL) -> lỗi; có yêu cầu hoặc danh sách rỗng thì giữ."""
     saved, admin = [], []
     state = {7: ("waiting_data", None), 8: ("waiting_data", [41]), 9: ("waiting_data", [])}
 
     class Conn:
         def execute(self, sql, params=None):
             if "FROM reports WHERE created_at" in sql:
-                assert "cardinality(request_ids) = 0" in sql
+                assert "request_ids IS NULL" in sql and "cardinality" not in sql
                 return SimpleNamespace(fetchall=lambda: [(7,), (8,), (9,)])
             if "pg_try_advisory_lock" in sql:
                 return SimpleNamespace(fetchone=lambda: (True,))
@@ -253,7 +253,7 @@ def test_fail_stale_bao_loi_bao_cao_cho_doc_chua_gui_yeu_cau(monkeypatch):
 
     monkeypatch.setattr(report, "save", lambda conn, rid, **f: saved.append((rid, f)))
     monkeypatch.setattr(report, "notify_admin", lambda *a: admin.append(a))
-    assert report.fail_stale(Conn()) == ["báo cáo 7: bị gián đoạn -> failed", "báo cáo 9: bị gián đoạn -> failed"]
-    assert saved == [(7, {"status": "failed", "error": report.NOT_SENT_ERROR}),
-                     (9, {"status": "failed", "error": report.NOT_SENT_ERROR})]
-    assert len(admin) == 2
+    # danh sách rỗng (9) là hợp lệ: mọi yêu cầu bị từ chối, bộ canh chạy tiếp để viết với số đã có
+    assert report.fail_stale(Conn()) == ["báo cáo 7: bị gián đoạn -> failed"]
+    assert saved == [(7, {"status": "failed", "error": report.NOT_SENT_ERROR})]
+    assert len(admin) == 1

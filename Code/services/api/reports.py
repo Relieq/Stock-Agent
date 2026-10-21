@@ -31,7 +31,7 @@ def confirm_view(items: list[dict], used: int, quota: int) -> dict:
     for m in items:
         try:
             label = period_label(m["year"], m["period"], "quarter")
-        except (KeyError, ValueError, IndexError):
+        except (KeyError, ValueError, IndexError, TypeError):
             label = f"{m.get('period')}/{m.get('year')}"
         if not m.get("can_read", True) or m.get("error"):
             state = "no"

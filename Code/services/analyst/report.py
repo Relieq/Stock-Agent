@@ -311,12 +311,13 @@ def run(report_id: int, resume=None, client=None, expect: str | None = None) -> 
 
 def fail_stale(conn, minutes: int = 30) -> list[str]:
     """Báo cáo ở trạng thái đang chạy quá lâu mà không còn lượt chạy nào giữ khóa (dịch vụ khởi động lại giữa chừng)
-    thì đánh dấu lỗi và báo quản trị. Tương tự báo cáo chờ đọc BCTC mà chưa có yêu cầu đọc nào (web dừng giữa lúc bấm
-    "Đọc thêm" và lúc gửi yêu cầu): luồng còn dừng ở nút xác nhận nên bộ canh không bao giờ chạy tiếp được."""
+    thì đánh dấu lỗi và báo quản trị. Tương tự báo cáo chờ đọc BCTC mà chưa có danh sách yêu cầu đọc (NULL: web dừng giữa lúc bấm
+    "Đọc thêm" và lúc gửi yêu cầu, luồng còn dừng ở nút xác nhận nên bộ canh không chạy tiếp được). Danh sách rỗng là
+    trạng thái hợp lệ (mọi yêu cầu đều bị từ chối): bộ canh chạy tiếp để viết với số đã có."""
     rows = conn.execute(
         """SELECT id FROM reports WHERE created_at < now() - make_interval(mins => %s) AND (
                status IN ('planning', 'writing')
-               OR (status = 'waiting_data' AND (request_ids IS NULL OR cardinality(request_ids) = 0)))
+               OR (status = 'waiting_data' AND request_ids IS NULL))
            ORDER BY id""", (minutes,)).fetchall()
     out = []
     for (rid,) in rows:
@@ -328,7 +329,7 @@ def fail_stale(conn, minutes: int = 30) -> list[str]:
                 continue
             if cur[0] in RUNNING:
                 err = STALE_ERROR
-            elif cur[0] == "waiting_data" and not cur[1]:
+            elif cur[0] == "waiting_data" and cur[1] is None:
                 err = NOT_SENT_ERROR
             else:
                 continue

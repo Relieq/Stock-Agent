@@ -10,3 +10,15 @@ def test_only_owner_and_admin_can_view():
 
 def test_samples_cover_the_three_kinds():
     assert len(SAMPLES) == 3
+
+
+def test_xac_nhan_hien_so_tien_kieu_viet_va_bao_bctc_het_han_muc():
+    from services.api.reports import confirm_view
+    items = [{"ticker": "FPT", "year": 2025, "period": "Q3", "can_read": True, "usd": 0.083},
+             {"ticker": "TCB", "year": 2025, "period": "Q3", "can_read": True, "usd": 0.083},
+             {"ticker": "VCB", "year": 2025, "period": "Q3", "can_read": False, "note": "đang chờ duyệt tay"}]
+    v = confirm_view(items, used=4, quota=5)
+    assert v["remaining"] == 1 and v["skipped"] == 1
+    assert [i["state"] for i in v["rows"]] == ["read", "quota", "no"]
+    assert v["rows"][0]["label"] == "quý 3/2025" and v["rows"][0]["usd"] == "0,08"
+    assert confirm_view([], used=9, quota=5)["remaining"] == 0

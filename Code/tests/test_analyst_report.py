@@ -217,13 +217,13 @@ def test_fail_stale_danh_dau_loi_bao_cao_ket(monkeypatch):
             self.locks = []
 
         def execute(self, sql, params=None):
-            if "FROM reports WHERE status IN" in sql:
+            if "FROM reports WHERE created_at" in sql:
                 return SimpleNamespace(fetchall=lambda: [(7,), (8,)])
             if "pg_try_advisory_lock" in sql:
                 got = params[1] == 7                # báo cáo 8 còn lượt chạy sống giữ khóa
                 return SimpleNamespace(fetchone=lambda: (got,))
             if "SELECT status" in sql:
-                return SimpleNamespace(fetchone=lambda: ("writing",))
+                return SimpleNamespace(fetchone=lambda: ("writing", None))
             self.locks.append(sql)
             return SimpleNamespace()
 
@@ -233,3 +233,27 @@ def test_fail_stale_danh_dau_loi_bao_cao_ket(monkeypatch):
     assert report.fail_stale(c) == ["báo cáo 7: bị gián đoạn -> failed"]
     assert saved == [(7, {"status": "failed", "error": report.STALE_ERROR})]
     assert len(admin) == 1 and len(c.locks) == 1
+
+
+def test_fail_stale_bao_loi_bao_cao_cho_doc_chua_gui_yeu_cau(monkeypatch):
+    """Web chết giữa lúc bấm "Đọc thêm" và lúc gửi yêu cầu: chờ đọc mà không có yêu cầu nào -> lỗi; có yêu cầu thì giữ."""
+    saved, admin = [], []
+    state = {7: ("waiting_data", None), 8: ("waiting_data", [41]), 9: ("waiting_data", [])}
+
+    class Conn:
+        def execute(self, sql, params=None):
+            if "FROM reports WHERE created_at" in sql:
+                assert "cardinality(request_ids) = 0" in sql
+                return SimpleNamespace(fetchall=lambda: [(7,), (8,), (9,)])
+            if "pg_try_advisory_lock" in sql:
+                return SimpleNamespace(fetchone=lambda: (True,))
+            if "SELECT status" in sql:
+                return SimpleNamespace(fetchone=lambda: state[params[0]])
+            return SimpleNamespace()
+
+    monkeypatch.setattr(report, "save", lambda conn, rid, **f: saved.append((rid, f)))
+    monkeypatch.setattr(report, "notify_admin", lambda *a: admin.append(a))
+    assert report.fail_stale(Conn()) == ["báo cáo 7: bị gián đoạn -> failed", "báo cáo 9: bị gián đoạn -> failed"]
+    assert saved == [(7, {"status": "failed", "error": report.NOT_SENT_ERROR}),
+                     (9, {"status": "failed", "error": report.NOT_SENT_ERROR})]
+    assert len(admin) == 2

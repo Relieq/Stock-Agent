@@ -239,6 +239,7 @@ def is_waiting(state) -> bool:
 
 LOCK_CLASS = 4242       # khóa tư vấn (advisory lock) theo từng báo cáo: (LOCK_CLASS, report_id)
 STALE_ERROR = "Bị gián đoạn (dịch vụ khởi động lại giữa chừng)"
+NOT_SENT_ERROR = "Bị gián đoạn trước khi gửi yêu cầu đọc"
 
 
 def _try_lock(conn, report_id: int) -> bool:
@@ -310,20 +311,29 @@ def run(report_id: int, resume=None, client=None, expect: str | None = None) -> 
 
 def fail_stale(conn, minutes: int = 30) -> list[str]:
     """Báo cáo ở trạng thái đang chạy quá lâu mà không còn lượt chạy nào giữ khóa (dịch vụ khởi động lại giữa chừng)
-    thì đánh dấu lỗi và báo quản trị."""
+    thì đánh dấu lỗi và báo quản trị. Tương tự báo cáo chờ đọc BCTC mà chưa có yêu cầu đọc nào (web dừng giữa lúc bấm
+    "Đọc thêm" và lúc gửi yêu cầu): luồng còn dừng ở nút xác nhận nên bộ canh không bao giờ chạy tiếp được."""
     rows = conn.execute(
-        """SELECT id FROM reports WHERE status IN ('planning', 'writing')
-             AND created_at < now() - make_interval(mins => %s) ORDER BY id""", (minutes,)).fetchall()
+        """SELECT id FROM reports WHERE created_at < now() - make_interval(mins => %s) AND (
+               status IN ('planning', 'writing')
+               OR (status = 'waiting_data' AND (request_ids IS NULL OR cardinality(request_ids) = 0)))
+           ORDER BY id""", (minutes,)).fetchall()
     out = []
     for (rid,) in rows:
         if not _try_lock(conn, rid):        # vẫn có lượt chạy sống
             continue
         try:
-            cur = conn.execute("SELECT status FROM reports WHERE id = %s", (rid,)).fetchone()
-            if cur is None or cur[0] not in RUNNING:
+            cur = conn.execute("SELECT status, request_ids FROM reports WHERE id = %s", (rid,)).fetchone()
+            if cur is None:
                 continue
-            save(conn, rid, status="failed", error=STALE_ERROR)
-            _safely("gửi thư báo lỗi cho quản trị", notify_admin, f"[Soi] Báo cáo {rid} bị gián đoạn", STALE_ERROR)
+            if cur[0] in RUNNING:
+                err = STALE_ERROR
+            elif cur[0] == "waiting_data" and not cur[1]:
+                err = NOT_SENT_ERROR
+            else:
+                continue
+            save(conn, rid, status="failed", error=err)
+            _safely("gửi thư báo lỗi cho quản trị", notify_admin, f"[Soi] Báo cáo {rid} bị gián đoạn", err)
             out.append(f"báo cáo {rid}: bị gián đoạn -> failed")
         finally:
             _safely("nhả khóa", _unlock, conn, rid)

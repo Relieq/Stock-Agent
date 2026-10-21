@@ -1,8 +1,6 @@
 <article class="report">
   <h1>{{ r.question }}</h1>
-  {% if r.plan %}<p class="small muted">Agent hiểu yêu cầu là:
-    {{ {"compare": "so sánh các mã", "yoy": "so với cùng kỳ năm trước", "rank": "vị trí trong nhóm"}[r.plan.kind] }}
-    · mã {{ r.plan.tickers | join(", ") }} · {{ r.plan_label }}</p>{% endif %}
+  {% include "_plan_line.html" %}
   {% for n in r.notes %}<p class="note small">{{ n }}</p>{% endfor %}
   {% for sec in r.sections %}
     <h2>{{ sec.heading }}</h2>

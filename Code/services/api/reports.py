@@ -7,8 +7,10 @@ from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 
 from services.analyst import render, report
+from services.analyst.plan import label as period_label
 from services.api.accounts import _back, templates, user_of
 from services.db import connect
+from services.ondemand import used_today
 from services.users import site_url
 
 router = APIRouter()
@@ -19,6 +21,27 @@ SAMPLES = ["So sánh kết quả kinh doanh quý 3/2026 của VCB và TCB",
 
 def can_view(row: dict, user) -> bool:
     return user is not None and (user.is_admin or row["user_id"] == user.id)
+
+
+def confirm_view(items: list[dict], used: int, quota: int) -> dict:
+    """Danh sách BCTC thiếu cho màn xác nhận: số tiền và kỳ kiểu Việt, và BCTC nào sẽ không đọc được vì hết hạn mức
+    (yêu cầu đọc gửi lần lượt theo thứ tự, mỗi BCTC đọc được tính một lượt)."""
+    remaining = max(quota - used, 0)
+    out, left, skipped = [], remaining, 0
+    for m in items:
+        try:
+            label = period_label(m["year"], m["period"], "quarter")
+        except (KeyError, ValueError, IndexError):
+            label = f"{m.get('period')}/{m.get('year')}"
+        if not m.get("can_read", True) or m.get("error"):
+            state = "no"
+        elif left > 0:
+            state, left = "read", left - 1
+        else:
+            state, skipped = "quota", skipped + 1
+        out.append({"ticker": m.get("ticker"), "label": label, "state": state, "note": m.get("note") or m.get("error"),
+                    "usd": f"{(m.get('usd') or 0):.2f}".replace(".", ",")})
+    return {"rows": out, "remaining": remaining, "quota": quota, "skipped": skipped}
 
 
 def _row(rid: int, request: Request) -> dict:
@@ -42,13 +65,14 @@ def _run_in_background(rid: int, resume=None, expect: str | None = None) -> None
 def reports_page(request: Request, tb: str | None = None):
     user = user_of(request)
     with connect() as conn:
-        rows = report.mine(conn, user.id)
+        rows = [r | {"status_text": render.STATUS_TEXT.get(r["status"], r["status"])}
+                for r in report.mine(conn, user.id)]
     return templates().TemplateResponse(request, "reports.html", {"rows": rows, "samples": SAMPLES, "tb": tb,
                                                                   "limit": report.REPORTS_PER_DAY})
 
 
 @router.post("/bao-cao")
-def reports_submit(request: Request, background: BackgroundTasks, question: str = Form(...)):
+def reports_submit(request: Request, background: BackgroundTasks, question: str = Form("")):
     user = user_of(request)
     if not question.strip():
         return _back("/bao-cao", "Bạn gõ câu hỏi trước đã.")
@@ -65,8 +89,15 @@ def reports_submit(request: Request, background: BackgroundTasks, question: str 
 @router.get("/bao-cao/{rid}")
 def report_page(request: Request, rid: int):
     row = _row(rid, request)
-    r = render.context(row, admin=user_of(request).is_admin)
-    return templates().TemplateResponse(request, "report.html", {"r": r, "refresh": row["status"] in report.RUNNING})
+    user = user_of(request)
+    r = render.context(row, admin=user.is_admin)
+    confirm = None
+    if row["status"] == "awaiting_confirmation":
+        with connect() as conn:        # hạn mức đọc BCTC của người tạo báo cáo (quản trị xem hộ thì vẫn là của người tạo)
+            cur = conn.execute("SELECT daily_quota FROM users WHERE id = %s", (row["user_id"],)).fetchone()
+            confirm = confirm_view(r["missing"], used_today(conn, row["user_id"]), cur[0] if cur else 0)
+    return templates().TemplateResponse(request, "report.html", {"r": r, "confirm": confirm,
+                                                                  "refresh": row["status"] in report.RUNNING})
 
 
 @router.post("/bao-cao/{rid}/xac-nhan")

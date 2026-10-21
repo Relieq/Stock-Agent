@@ -12,7 +12,7 @@
 <p class="small muted">Mỗi người tối đa {{ limit }} báo cáo mỗi ngày; báo cáo trùng câu hỏi khi số liệu chưa đổi được dùng lại, không tính.</p>
 <h2>Báo cáo của tôi</h2>
 <table class="list">
-  {% for b in rows %}<tr><td><a href="/bao-cao/{{ b.id }}">{{ b.question }}</a></td><td class="small muted">{{ b.status }}</td><td class="small muted">{{ b.created_at | gio }}</td></tr>
+  {% for b in rows %}<tr><td><a href="/bao-cao/{{ b.id }}">{{ b.question }}</a></td><td class="small muted">{{ b.status_text }}</td><td class="small muted">{{ b.created_at | gio }}</td></tr>
   {% else %}<tr><td class="muted">Chưa có báo cáo nào.</td></tr>{% endfor %}
 </table>
 {% endblock %}

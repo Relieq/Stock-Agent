@@ -25,8 +25,8 @@ def card_email(card, info) -> tuple[str, str]:
     for x in card.metrics[:3] if card.template != "TCTD" else card.metrics:
         if x.q_cur.value is None:
             continue
-        lines.append(f"- {x.name} quý: {('−' if x.q_cur.value < 0 else '') + ty(x.q_cur.value)}"
-                     + (f" ({x.q_change})" if x.q_change else ""))
+        # q_change đã gồm số kỳ này và cùng kỳ ("+17,9% (từ 9.925 tỷ lên 11.700 tỷ)", "lỗ thu hẹp từ … còn …")
+        lines.append(f"- {x.name} quý: " + (x.q_change or ('−' if x.q_cur.value < 0 else '') + ty(x.q_cur.value)))
     if card.plan:
         lines.append(f"- Lũy kế {card.plan['name']} đạt {card.plan['pct_text']} kế hoạch năm ({ty(card.plan['plan'])})")
     if card.flags:

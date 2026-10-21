@@ -134,6 +134,8 @@ Code tính sẵn các phép so sánh hay dùng để mô hình không phải tí
 - tỷ trọng (ví dụ lợi nhuận khác chiếm bao nhiêu phần LNTT);
 - số lần ("gấp 2,3 lần").
 
+Dòng tỷ trọng (ví dụ lợi nhuận khác trên LNTT) chưa làm trong P3; cờ "lợi nhuận phần lớn ngoài hoạt động chính" của thẻ đã nêu tỷ trọng đó.
+
 Quy tắc hiển thị:
 
 - Lợi nhuận âm ở kỳ này hoặc cùng kỳ thì không ghi %, mà tả bằng lời như thẻ KQKD.
@@ -168,6 +170,8 @@ Bộ kiểm tra là code, không gọi mô hình, chạy trên từng câu:
    - "Khoảng/gần": lệch tối đa 5%.
    - "Hơn/trên": số thật phải lớn hơn; "dưới": số thật phải nhỏ hơn.
 3. **Kiểm từ chỉ chiều.** "Tăng/giảm", "cải thiện/suy giảm", "lãi/lỗ", "nhanh hơn/chậm hơn", "cao hơn/thấp hơn", "cao nhất/thấp nhất" phải khớp dấu hoặc thứ tự trong bảng. Chi phí tính theo độ lớn.
+   - Số đứng sau "lãi/lỗ" phải đúng dấu: số tiền ngay sau "lỗ" chỉ khớp khoản lỗ trong bảng, ngay sau "lãi" chỉ khớp khoản lãi.
+   - Thứ hạng "thứ N/M", "thứ N trong M", "đứng thứ N" phải đúng: N là vị trí của mã trong dòng xếp hạng, M là số mã của dòng đó.
 4. **Các lỗi khác:**
    - số không có trong dòng nào câu đã ghi ("số không có nguồn");
    - câu dẫn mã dòng không tồn tại;
@@ -210,7 +214,7 @@ Trạng thái của đồ thị lưu bằng gói lưu trạng thái Postgres ch�
   - cột kỳ này và cùng kỳ;
   - thanh xếp hạng trong nhóm.
 
-**PDF.** `/bao-cao/{id}.pdf` dựng từ chính HTML của trang bằng WeasyPrint. Phông chữ tiếng Việt cài trong ảnh Docker.
+**PDF.** `/bao-cao/{id}/pdf` dựng từ chính HTML của trang bằng WeasyPrint. Phông chữ tiếng Việt cài trong ảnh Docker.
 
 **Quyền xem.** Chỉ người tạo và quản trị viên xem được. Chia sẻ bằng PDF.
 
@@ -226,7 +230,7 @@ Trạng thái của đồ thị lưu bằng gói lưu trạng thái Postgres ch�
 
 ## 11. Đo lường
 
-**Bộ câu yêu cầu** `Data/golden/agent_requests.jsonl`, khoảng 50 câu, mỗi câu kèm kế hoạch đúng. Các câu phủ:
+**Bộ câu yêu cầu** `Code/eval/data/agent_requests.jsonl` (nằm trong `Code/` để container thấy), khoảng 50 câu, mỗi câu kèm kế hoạch đúng. Các câu phủ:
 
 - ba loại yêu cầu;
 - nhiều cách nói: trang trọng, nói tắt, không dấu, sai chính tả nhẹ, kỳ nói bằng chữ;

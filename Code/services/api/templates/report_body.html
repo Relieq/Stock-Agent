@@ -1,0 +1,21 @@
+<article class="report">
+  <h1>{{ r.question }}</h1>
+  {% if r.plan %}<p class="small muted">Agent hiểu yêu cầu là:
+    {{ {"compare": "so sánh các mã", "yoy": "so với cùng kỳ năm trước", "rank": "vị trí trong nhóm"}[r.plan.kind] }}
+    · mã {{ r.plan.tickers | join(", ") }} · {{ r.plan_label }}</p>{% endif %}
+  {% for n in r.notes %}<p class="note small">{{ n }}</p>{% endfor %}
+  {% for sec in r.sections %}
+    <h2>{{ sec.heading }}</h2>
+    <p>{% for s in sec.sentences %}{{ s | safe }} {% endfor %}</p>
+  {% endfor %}
+  {% for c in r.charts %}<figure class="chart">{{ c }}</figure>{% endfor %}
+  {% if r.facts %}
+  <h2>Bảng số</h2>
+  <table class="facts">
+    {% for f in r.facts %}<tr id="{{ f.id }}"><td class="muted">{{ f.id }}</td><td>{{ f.text }}
+      {% if f.links %}<span class="small muted">· nguồn: {% for label, url in f.links %}<a href="{{ url }}" target="_blank" rel="noopener">{{ label }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+  <p class="small muted ai">Nội dung do AI viết từ số liệu đã kiểm chứng; không phải khuyến nghị đầu tư. Mọi con số do
+    chương trình tính từ BCTC đã công bố và được kiểm lại trước khi hiển thị.</p>
+</article>

@@ -5,8 +5,9 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8 PIP_NO_CACHE_DIR=1
 WORKDIR /app/Code
 
-# Phông có đủ dấu tiếng Việt cho ảnh thẻ chia sẻ (services/metrics/share.py)
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
+# Phông có đủ dấu tiếng Việt cho ảnh thẻ chia sẻ và PDF báo cáo; pango cho WeasyPrint
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core \
+        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 && rm -rf /var/lib/apt/lists/*
 
 # Cài thư viện trước (đọc từ pyproject.toml) để lớp này được cache khi chỉ sửa code
 COPY pyproject.toml .

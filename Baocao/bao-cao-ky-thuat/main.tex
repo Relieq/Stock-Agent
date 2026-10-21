@@ -42,6 +42,10 @@
 \setcounter{tocdepth}{2}
 \hypersetup{hidelinks}
 \setlist{itemsep=1pt,topsep=3pt}
+% Hình nổi lớn (biểu đồ agent, ảnh trang báo cáo) được đặt đầu trang kèm chữ thay vì đẩy xuống cuối chương
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.8}
 
 \newcommand{\enquote}[1]{“#1”}
 \newcommand{\code}[1]{\texttt{#1}}
@@ -182,20 +186,18 @@ ràng buộc đòi hỏi. Chỉ số liệu đã qua kiểm chứng mới đư�
 báo và xếp hạng. Mỗi con số trên giao diện đều mở được đúng trang BCTC gốc.
 
 Trên 11 BCTC có sẵn đáp án (file xuất thẳng từ Excel, Word, có lớp chữ gốc), hệ thống đọc từ ảnh và \textbf{đúng
-3.105/3.107 ô (99,94\%)}; khi làm mờ ảnh giống bản scan 72 dpi vẫn đúng 98,8\%. Trên 119 BCTC của VN30 (quý 4/2025 đến
-bán niên 2026, khoảng 35.000 ô số, phần lớn là bản scan không có đáp án), \textbf{97 BCTC (81,5\%) được hệ thống
+3.105/3.107 ô (99,94\%)}; khi làm mờ ảnh giống bản scan 72 dpi vẫn đúng 98,8\%. Trên 119 BCTC, chủ yếu của nhóm VN30 (quý
+4/2025 đến bán niên 2026, khoảng 35.000 ô số, phần lớn là bản scan không có đáp án), \textbf{97 BCTC (81,5\%) được hệ thống
 xử lý trọn mà không cần người}, và ước tính \textbf{khoảng 99,5\% ô số đúng mà không cần người sửa}; trong đó 95,1\% có
 phép kiểm kế toán tự động xác nhận, 3,5\% có hai lần đọc độc lập của hai mô hình khác hãng trùng nhau. Người chỉ phải
 sửa 152 ô (0,4\%), trung bình 8 ô ở mỗi BCTC cần sửa. Chi phí gọi mô hình để đọc một BCTC trung bình
-khoảng 0,12 USD (trung vị 0,08 USD), chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
+khoảng 0,12 USD, chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
 trong chính BCTC.
 
 Trên lớp số liệu đã kiểm chứng này, một \textbf{agent} nhận câu hỏi tự do của người dùng (ví dụ \enquote{so sánh KQKD quý
 3/2026 của TCB, LPB và VPB}), tự lập kế hoạch, lấy số, viết báo cáo kèm bảng và biểu đồ; mọi con số và từ tăng/giảm,
 cao hơn/thấp hơn trong lời văn được code kiểm lại với bảng số trước khi người đọc thấy. Trên 58 câu hỏi mẫu (có 5 câu
-do người dùng thử viết), agent \textbf{hiểu đúng yêu cầu ở cả 58 câu} với cả hai nhà cung cấp mô hình. Phần đo chất lượng lời văn trên cả bộ câu, chỉ số
-tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho người dùng thật được liệt kê ở
-Chương~\ref{chap:ketluan} dưới dạng đề mục.
+do người dùng thử viết), agent \textbf{hiểu đúng yêu cầu ở cả 58 câu} với cả hai nhà cung cấp mô hình.
 \end{abstract}
 
 \chapter*{Danh mục thuật ngữ và viết tắt}
@@ -249,14 +251,9 @@ Bài toán cụ thể gồm ba phần:
 \end{enumerate}
 
 \section{Mục tiêu nghiên cứu}
-\begin{itemize}
-  \item Xây dựng quy trình đọc BCTC lấy \textbf{đủ các cột} so sánh: quý này, cùng kỳ, lũy kế, đầu năm.
-  \item Xây dựng bộ \textbf{ràng buộc kế toán khai báo theo từng mẫu} BCTC để tự kiểm chứng số đọc được.
-  \item Phát triển bộ máy \textbf{tự định vị và tự sửa ô đọc sai} dựa trên ràng buộc, giảm tối đa duyệt tay.
-  \item Xây dựng \textbf{sản phẩm web} trình bày số liệu đã kiểm chứng, có nguồn cho từng số.
-  \item Xây dựng \textbf{agent tạo báo cáo theo câu hỏi} của người dùng, trong đó mọi con số trong lời văn được kiểm lại
-        bằng code.
-\end{itemize}
+Mục tiêu là một hệ thống đọc BCTC ngay khi công bố, tự kiểm chứng và tự sửa số đọc sai bằng ràng buộc kế toán để
+người ít phải duyệt tay, rồi đưa số đã kiểm chứng tới người dùng qua thẻ KQKD và agent tạo báo cáo, mỗi số đều có
+nguồn. Mỗi mục tiêu cụ thể ứng với một đóng góp ở mục~\ref{sec:donggop}.
 
 \section{Phạm vi và đóng góp}
 \subsection{Phạm vi}
@@ -269,7 +266,7 @@ Bài toán cụ thể gồm ba phần:
         giao dịch; nội dung do AI tạo được gắn nhãn~\cite{luatai}.
 \end{itemize}
 
-\subsection{Đóng góp}
+\subsection{Đóng góp}\label{sec:donggop}
 \begin{enumerate}
   \item \textbf{Trích xuất đủ các cột} của từng báo cáo. Hệ thống khóa trước~\cite{prevcohort} chỉ lưu một giá trị cho
         mỗi chỉ tiêu.
@@ -286,15 +283,10 @@ Bài toán cụ thể gồm ba phần:
 \end{enumerate}
 
 \section{Cấu trúc báo cáo}
-\begin{itemize}
-  \item Chương~\ref{chap:nen} trình bày kiến thức nền về BCTC Việt Nam, ràng buộc kế toán và các công nghệ sử dụng.
-  \item Chương~\ref{chap:lienquan} điểm lại hệ thống của khóa trước, các sản phẩm hiện có và các nghiên cứu liên quan,
-        từ đó chỉ ra khoảng trống mà đề tài nhắm tới.
-  \item Chương~\ref{chap:thietke} mô tả phân tích, thiết kế và cài đặt hệ thống, trong đó có công nghệ lõi tự định vị và
-        tự sửa ô đọc sai.
-  \item Chương~\ref{chap:danhgia} trình bày kết quả thực nghiệm và đánh giá.
-  \item Chương~\ref{chap:ketluan} kết luận và liệt kê các phần dự kiến làm tiếp.
-\end{itemize}
+Chương~\ref{chap:nen} trình bày kiến thức nền về BCTC, ràng buộc kế toán và công nghệ sử dụng.
+Chương~\ref{chap:lienquan} điểm lại hệ thống của khóa trước và các sản phẩm liên quan. Chương~\ref{chap:thietke} mô tả
+thiết kế và cài đặt, trong đó có công nghệ lõi tự định vị và tự sửa ô đọc sai. Chương~\ref{chap:danhgia} trình bày kết
+quả đo. Chương~\ref{chap:ketluan} kết luận và liệt kê việc dự kiến làm tiếp.
 
 % ============================================================================
 % CHƯƠNG 2: CƠ SỞ LÝ THUYẾT VÀ CÔNG NGHỆ
@@ -460,9 +452,12 @@ từ mô hình.
 Ngôn ngữ, web & Python 3.12, FastAPI, Jinja2 (giao diện tạm; trang công khai dự kiến Next.js) \\
 CSDL & PostgreSQL 16 + pgvector, migration đánh số \\
 Đọc PDF, vẽ ảnh & PyMuPDF \\
-Mô hình đọc ảnh & Mô hình thị giác qua API kiểu OpenAI (hiện dùng một mô hình cỡ nhỏ, giá rẻ), đầu ra JSON theo schema \\
-Chạy & Docker Compose: \code{db}, \code{web}, \code{watcher}, \code{app} \\
-Kiểm thử & pytest, 117 bài kiểm thử; dữ liệu mẫu là tiêu đề và BCTC thật \\
+Mô hình đọc ảnh & Hai nhà cung cấp (Claude và OpenAI), mô hình cỡ nhỏ, giá rẻ; một nhà lỗi thì tự chuyển sang nhà
+còn lại; đầu ra JSON theo schema \\
+Agent tạo báo cáo & LangGraph (đồ thị trạng thái, lưu trạng thái vào PostgreSQL) \\
+Xuất PDF & WeasyPrint \\
+Chạy & Docker Compose: CSDL, web, bộ canh và một container chạy lệnh một lần \\
+Kiểm thử & pytest, 339 bài kiểm thử; dữ liệu mẫu là tiêu đề và BCTC thật \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -571,7 +566,7 @@ khái quát hóa: người dùng được mời làm được mọi việc của
 \toprule
 Tác nhân & Người dùng được mời \\
 Tiền điều kiện & Đã đăng nhập \\
-Luồng chính & 1. Người dùng chọn mã (từ bảng xếp hạng, lịch công bố hoặc đường dẫn \code{/ma/<mã>}) và kỳ.\newline
+Luồng chính & 1. Người dùng chọn mã (từ bảng xếp hạng, lịch công bố hoặc đường dẫn riêng của mã) và kỳ.\newline
 2. Hệ thống chọn BCTC quý dùng cho thẻ: ưu tiên hợp nhất, bản đăng sau cùng.\newline
 3. Hệ thống tính thẻ từ số đã kiểm chứng: các chỉ tiêu, tăng trưởng, cờ cảnh báo, nguồn của từng số.\newline
 4. Người dùng bấm vào một số để mở đúng trang BCTC gốc. \\
@@ -599,7 +594,7 @@ Luồng thay thế & 2a. Kho đã có BCTC đã đọc: trả kết quả ngay, 
 2b. Hết hạn mức trong ngày: từ chối và báo cho người dùng.\newline
 4a. Chi phí đọc theo yêu cầu đã chạm trần tháng: yêu cầu nằm chờ sang tháng sau.\newline
 4b. Không tìm thấy mã hoặc BCTC: từ chối kèm lý do. \\
-Hậu điều kiện & Yêu cầu có trạng thái \code{done} hoặc \code{rejected} \\
+Hậu điều kiện & Yêu cầu ở trạng thái đã xong hoặc bị từ chối \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -626,24 +621,7 @@ Hậu điều kiện & Báo cáo có trạng thái xong hoặc lỗi kèm lý do
 \end{tabularx}
 \end{table}
 
-\begin{table}[H]
-\centering\small
-\caption{Đặc tả use case \enquote{Duyệt tay BCTC}}\label{tab:uc-duyet}
-\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{3.2cm}X@{}}
-\toprule
-Tác nhân & Quản trị viên \\
-Tiền điều kiện & BCTC ở trạng thái \code{needs\_review} \\
-Luồng chính & 1. Quản trị viên mở hàng duyệt và chọn một BCTC.\newline
-2. Hệ thống hiện bảng số đã đọc, các ràng buộc còn lệch và ảnh trang gốc.\newline
-3. Quản trị viên đối chiếu với ảnh, nhập số đúng cho ô đọc sai kèm ghi chú.\newline
-4. Hệ thống ghi lịch sử sửa và kiểm tra lại ràng buộc; đạt thì chuyển \code{verified}. \\
-Luồng thay thế & 3a. Ảnh cho thấy chính BCTC tự in lệch: quản trị viên duyệt xuất bản; hệ thống chuyển \code{approved} và
-gửi email cho người theo dõi mã.\newline
-4a. Vẫn còn lệch: quay lại bước 2. \\
-Hậu điều kiện & Mỗi lần sửa được lưu (người sửa, số cũ, số mới), dùng làm dữ liệu vàng để đánh giá \\
-\bottomrule
-\end{tabularx}
-\end{table}
+Use case \enquote{Duyệt tay BCTC} được tả bằng biểu đồ hoạt động ở mục~\ref{sec:duyettay}.
 
 \subsection{Yêu cầu chức năng}
 \begin{table}[H]
@@ -671,7 +649,7 @@ F10 & Agent tạo báo cáo theo câu hỏi của người dùng, kiểm từng 
   \item \textbf{Đúng số:} chỉ công bố số đã qua ràng buộc bắt buộc hoặc đã được duyệt tay.
   \item \textbf{Truy vết:} mỗi số mở được trang BCTC gốc; mỗi lần sửa được ghi lại người sửa và lý do.
   \item \textbf{Chi phí:} trung bình khoảng 0,12 USD để đọc một BCTC; có trần chi phí theo ngày và theo tháng (mục~\ref{sec:token}).
-  \item \textbf{Độ trễ:} có thẻ trong vài phút sau khi BCTC xuất hiện trên nguồn (sẽ đo trong mùa quý 3/2026).
+  \item \textbf{Độ trễ:} có thẻ trong vài phút sau khi BCTC xuất hiện trên nguồn.
   \item \textbf{Riêng tư:} tài liệu người dùng tải lên chỉ người đó thấy.
   \item \textbf{Pháp lý:} không đưa khuyến nghị đầu tư; nội dung do AI tạo được gắn nhãn.
 \end{itemize}
@@ -686,7 +664,8 @@ F10 & Agent tạo báo cáo theo câu hỏi của người dùng, kiểm từng 
   \item \textbf{Kiểm chứng xong mới công bố:} ràng buộc kế toán là cổng chất lượng.
   \item \textbf{Quy tắc khai báo theo mẫu và phiên bản}, không viết cứng trong code.
   \item \textbf{Có phiên bản, không ghi đè:} BCTC công bố lại tạo phiên bản mới; mỗi lần trích xuất ghi phiên bản pipeline.
-  \item \textbf{Không khóa vào một nhà cung cấp mô hình:} gọi mô hình qua giao diện kiểu OpenAI.
+  \item \textbf{Không khóa vào một nhà cung cấp mô hình:} mọi lần gọi mô hình đi qua một lớp chung. Hiện dùng hai nhà
+        cung cấp (Claude và OpenAI); một nhà lỗi hoặc hết tiền thì hệ thống tự chuyển sang nhà còn lại.
 \end{enumerate}
 
 \subsection{Các thành phần}
@@ -694,11 +673,11 @@ F10 & Agent tạo báo cáo theo câu hỏi của người dùng, kiểm từng 
 \centering
 \begin{tikzpicture}[font=\small\sffamily]
   \node[box=26mm] (src) at (0,0) {Nguồn công bố\\Vietstock, HOSE\\(sau: HNX)};
-  \node[box=26mm] (w) at (3.8,0) {Watcher\\quét định kỳ};
+  \node[box=26mm] (w) at (3.8,0) {Bộ canh\\quét định kỳ};
   \node[db] (reg) at (7.6,0) {Kho tài liệu\\(SHA-256)};
   \node[rbox=26mm] (hr) at (3.8,-2.4) {Duyệt tay\\(admin)};
   \node[box=30mm] (pipe) at (7.6,-2.4) {Pipeline đọc\\\& kiểm chứng};
-  \node[abox=28mm] (llm) at (12.4,-2.4) {Mô hình thị giác\\(API kiểu OpenAI)};
+  \node[abox=28mm] (llm) at (12.4,-2.4) {Mô hình thị giác\\(Claude, OpenAI)};
   \node[box=26mm] (met) at (3.8,-4.8) {Metrics:\\thẻ KQKD, cờ};
   \node[db] (db) at (7.6,-4.8) {PostgreSQL\\số + nguồn};
   \node[gbox=30mm] (web) at (3.8,-7.0) {Web: thẻ, mùa BCTC,\\lịch, ảnh chia sẻ};
@@ -728,7 +707,7 @@ F10 & Agent tạo báo cáo theo câu hỏi của người dùng, kiểm từng 
 
 \subsection{Phân rã module}
 Mã nguồn chia thành các gói Python theo bốn tầng (Hình~\ref{fig:goi}). Gói ở tầng trên chỉ dùng gói ở tầng dưới, không
-có chiều ngược lại. Phụ thuộc chi tiết (Bảng~\ref{tab:phuthuoc}) lấy từ các câu lệnh \code{import} thực tế.
+có chiều ngược lại; điều này đã được kiểm trên mã nguồn.
 
 \begin{figure}[H]
 \centering
@@ -760,30 +739,8 @@ có chiều ngược lại. Phụ thuộc chi tiết (Bảng~\ref{tab:phuthuoc})
   \draw[dep] ([xshift=-12mm]L0.south east) -- ([xshift=-12mm]L0.south east |- L2.north);
   \draw[dep] ([xshift=25mm]L1.south west) -- ([xshift=25mm]L1.south west |- L3.north);
 \end{tikzpicture}
-\caption{Biểu đồ gói theo tầng. Mũi tên đứt nét đầu hở là quan hệ phụ thuộc giữa các tầng; phụ thuộc giữa từng gói ở
-Bảng~\ref{tab:phuthuoc}.}\label{fig:goi}
+\caption{Biểu đồ gói theo tầng. Mũi tên đứt nét đầu hở là quan hệ phụ thuộc giữa các tầng.}\label{fig:goi}
 \end{figure}
-
-\begin{table}[H]
-\centering\small
-\caption{Phụ thuộc giữa các gói (lấy từ câu lệnh \code{import}; mọi gói nghiệp vụ và xử lý dữ liệu đều dùng \code{db})}\label{tab:phuthuoc}
-\begin{tabularx}{\linewidth}{@{}lX@{}}
-\toprule
-\textbf{Gói} & \textbf{Dùng các gói} \\ \midrule
-api & users, ondemand, metrics, analyst, costs, alerts, extraction, ingestion \\
-watcher & ondemand, alerts, analyst, extraction, ingestion, llm, notify \\
-analyst & metrics, ondemand, users, extraction, ingestion, costs, llm, notify \\
-ondemand & extraction, ingestion, metrics, alerts, users, costs, llm, notify \\
-alerts & metrics, users, notify \\
-users & notify \\
-metrics & extraction \\
-costs & ingestion, llm \\
-extraction & ingestion, llm, costs \\
-ingestion & (chỉ db) \\
-db, llm, notify & (không dùng gói nội bộ nào) \\
-\bottomrule
-\end{tabularx}
-\end{table}
 
 \subsection{Triển khai}
 Hiện hệ thống chạy trên máy phát triển bằng Docker Compose; khi triển khai thật sẽ chuyển nguyên cụm container lên một
@@ -801,7 +758,7 @@ máy chủ ảo (VPS) (Hình~\ref{fig:trienkhai}).
   \end{scope}
   \node[udnode,text width=24mm] (browser) at (-5.4,-1.3) {«device»\\\textbf{Trình duyệt}\\của người dùng};
   \node[udnode,text width=26mm] (vs) at (9.8,1.2) {«external»\\\textbf{Vietstock, HOSE}};
-  \node[udnode,text width=26mm] (llm) at (9.8,-1.3) {«external»\\\textbf{Nhà cung cấp mô hình}\\(API kiểu OpenAI)};
+  \node[udnode,text width=26mm] (llm) at (9.8,-1.3) {«external»\\\textbf{Nhà cung cấp mô hình}\\(Claude, OpenAI)};
   \node[udnode,text width=26mm] (smtp) at (9.8,-3.8) {«external»\\\textbf{Máy chủ email}\\(SMTP)};
   \draw[thick] (browser) -- node[above,guard]{HTTPS} (web);
   \draw[thick] (web) -- node[left,guard]{SQL} (db);
@@ -840,7 +797,7 @@ thức.}\label{fig:trienkhai}
   \draw[flow] (nr) -- node[right,guard]{sửa tay [đạt]} (v);
 \end{tikzpicture}
 \caption{Biểu đồ trạng thái của một tài liệu. Chấm đen là trạng thái đầu; nhãn trên mũi tên là sự kiện, phần trong ngoặc
-vuông là điều kiện. Chỉ \code{verified} và \code{approved} được hiển thị trên thẻ và bảng xếp hạng.}\label{fig:trangthai}
+vuông là điều kiện. Chỉ BCTC đã kiểm chứng hoặc đã duyệt tay được hiển thị trên thẻ và bảng xếp hạng.}\label{fig:trangthai}
 \end{figure}
 
 \subsection{Luồng xử lý một BCTC mới}
@@ -892,12 +849,12 @@ theo UML (\code{1}: đúng một, \code{0..1}: không hoặc một, \code{0..*}:
 
 Một số điểm thiết kế:
 \begin{itemize}
-  \item \code{documents} là một công bố (mã, loại, kỳ, phạm vi, trạng thái); \code{document\_files} là từng phiên bản file
-        (băm SHA-256), nên BCTC công bố lại tạo dòng mới chứ không ghi đè.
-  \item \code{line\_items} lưu từng ô số theo cột (\code{column\_kind}), kèm chuỗi gốc, trang và phiên bản pipeline;
-        \code{validations} lưu kết quả từng ràng buộc. Toàn bộ đầu ra của mô hình và lịch sử đọc lại, sửa tay được lưu
-        thêm thành bản ghi JSON theo từng file để kiểm tra lại mà không phải gọi mô hình.
-  \item \code{documents.owner\_user\_id} khác rỗng là BCTC do người dùng tải lên, không xuất hiện trong dữ liệu công khai.
+  \item Bảng công bố lưu mỗi công bố (mã, loại, kỳ, phạm vi, trạng thái); bảng phiên bản file lưu từng file của công
+        bố đó (băm SHA-256), nên BCTC công bố lại tạo dòng mới chứ không ghi đè.
+  \item Bảng ô số lưu từng ô theo cột (quý này, cùng kỳ, lũy kế, đầu năm\ldots), kèm chuỗi gốc, trang và phiên bản
+        pipeline; bảng kết quả kiểm lưu kết quả từng ràng buộc. Toàn bộ đầu ra của mô hình và lịch sử đọc lại, sửa tay
+        được lưu thêm thành bản ghi JSON theo từng file để kiểm tra lại mà không phải gọi mô hình.
+  \item Công bố có ghi người tải lên là BCTC riêng của người dùng, không xuất hiện trong dữ liệu công khai.
 \end{itemize}
 
 \begin{figure}[H]
@@ -914,42 +871,28 @@ Một số điểm thiết kế:
 
 \section{Thu thập tài liệu}
 \subsection{Lấy danh sách và nhận dạng tiêu đề}
-Watcher gọi API danh sách tài liệu của Vietstock (logic kế thừa từ khóa trước) cho các mã đang theo dõi. Từ tiêu đề tiếng
+Bộ canh gọi API danh sách tài liệu của Vietstock (logic kế thừa từ khóa trước) cho các mã đang theo dõi. Từ tiêu đề tiếng
 Việt, bộ luật nhận dạng xác định bộ khóa: mã, loại báo cáo (quý, bán niên, năm),
 kỳ, phạm vi (hợp nhất, riêng, duy nhất), trạng thái soát xét hay kiểm toán, và có phải bản điều chỉnh hay không.
 Bộ luật được kiểm thử trên toàn bộ tiêu đề thật của VN30 năm 2025--2026. Lần chạy đầu nhận dạng đúng 174/174 tài liệu.
 
-Cùng lượt quét, watcher lấy cả mục \enquote{Giải trình KQKD} của Vietstock: công văn công ty phải gửi khi lợi nhuận
-biến động từ 10\% so với cùng kỳ hoặc khi số sau soát xét, kiểm toán khác số tự lập. Công văn được lưu như một loại tài
-liệu riêng, gắn với kỳ BCTC mà nó giải trình, không đi vào bước đọc số; thẻ KQKD của kỳ đó dẫn tới công văn. Năm
-2025--2026 có 93 công văn (không tính bản trùng) của 21/30 mã VN30, phần lớn là bản scan dài hai trang. Đây là nguồn dữ liệu cho phần tìm nguyên
-nhân biến động ở giai đoạn sau.
+Bộ canh cũng lấy công văn giải trình KQKD (công ty phải gửi khi lợi nhuận biến động từ 10\% so với cùng kỳ hoặc khi
+số sau soát xét khác số tự lập) và lưu thành một loại tài liệu riêng, không đọc số; thẻ KQKD của kỳ đó dẫn tới công
+văn. Năm 2025--2026 có 93 công văn (không tính bản trùng) của 21/30 mã VN30.
 
 \subsection{Nguồn thứ hai: trang công bố thông tin của HOSE}
 Chỉ dựa vào Vietstock thì hệ thống phụ thuộc vào một trang đăng lại: Vietstock có lúc đăng tiêu đề BCTC mà link file
 chưa dùng được, có lượt phản hồi chậm đến mức bỏ qua nhiều mã, và giờ Vietstock đăng không phải giờ công bố chính thức.
-Vì vậy watcher lấy thêm danh sách tệp mà mỗi công ty đăng trên trang của Sở Giao dịch Chứng khoán TP.HCM (HOSE), nơi
-niêm yết toàn bộ VN30. Mỗi tệp BCTC trên HOSE ghi rõ kỳ (quý, bán niên, năm) và thời điểm HOSE đăng; hợp nhất hay riêng
-được nhận theo tên tệp (các cách viết đã gặp như \enquote{hợp nhất}, \enquote{HN}, \enquote{riêng lẻ}, \enquote{RL},
-\enquote{công ty mẹ}).
+Vì vậy bộ canh lấy thêm danh sách tệp mà mỗi công ty đăng trên trang của Sở Giao dịch Chứng khoán TP.HCM (HOSE), nơi
+niêm yết toàn bộ VN30. Mỗi tệp BCTC trên HOSE ghi rõ kỳ và thời điểm HOSE đăng; hợp nhất hay riêng được nhận theo tên
+tệp.
 
 So trên 233 BCTC VN30 có ở cả hai nguồn (quý 4/2025 đến quý 3/2026), HOSE đăng trước Vietstock ở 161 BCTC, Vietstock
 đăng trước ở 62 và cách nhau dưới 15 phút ở 10. Chênh lệch trung vị nhỏ (HOSE sớm hơn 0,6 giờ), nhưng 10\% số BCTC có
 trên HOSE sớm hơn từ 15,5 giờ trở lên, và 10\% khác lại có trên Vietstock sớm hơn từ 7,1 giờ trở lên. Vì vậy hệ thống
-dùng cả hai nguồn và đọc BCTC từ nguồn nào có trước:
-\begin{itemize}
-  \item BCTC đã có từ Vietstock: giờ HOSE đăng được ghi làm giờ công bố chính thức; nếu Vietstock chưa tải được file thì
-        lấy file từ HOSE.
-  \item BCTC chưa có: thêm BCTC từ HOSE để đọc ngay. Khi Vietstock đăng cùng BCTC đó (cùng mã, kỳ, loại, phạm vi), bản
-        của Vietstock được đánh dấu trùng, không đọc lại. Bản riêng, bản điều chỉnh, và tệp không ghi hợp nhất hay riêng
-        của công ty có cả hai loại thì vẫn chờ Vietstock.
-  \item BCTC đã đăng tiêu đề quá 6 giờ mà cả hai nguồn đều chưa có file dùng được thì gửi email cho quản trị.
-  \item Vietstock lỗi ba mã liền nhau (quá tải) thì lượt quét bỏ các mã còn lại để chuyển ngay sang HOSE, lượt sau thử lại.
-  \item Công văn giải trình kết quả kinh doanh cũng được lấy từ HOSE. Trên HOSE công văn là tin thường của công ty, nên
-        nhận theo tên tệp có chữ \enquote{giải trình} và đọc kỳ được giải trình từ tên tệp (thiếu năm thì suy từ ngày
-        đăng); tệp đính chính BCTC kèm giải trình không tính là công văn. Lần chạy đầu bổ sung 3 công văn mà Vietstock
-        không có (ACB quý 2, MCH quý 2 và bán niên 2026).
-\end{itemize}
+dùng cả hai nguồn, đọc BCTC từ nguồn nào có trước và đánh dấu bản đến sau là trùng, không đọc lại; giờ HOSE đăng được
+ghi làm giờ công bố chính thức. BCTC đã đăng tiêu đề quá 6 giờ mà cả hai nguồn đều chưa có file dùng được thì hệ thống
+gửi email cho quản trị.
 
 \subsection{Lưu trữ và phiên bản}
 \begin{itemize}
@@ -961,8 +904,7 @@ dùng cả hai nguồn và đọc BCTC từ nguồn nào có trước:
   \item Lưu thời điểm nguồn đăng, thời điểm hệ thống thấy, và giờ công bố chính thức lấy từ HOSE.
 \end{itemize}
 Kho hiện có 643 tài liệu của 31 mã (VN30 và một mã người dùng yêu cầu thêm), trong đó 121 BCTC đã được đọc và 93 công
-văn giải trình. Người dùng
-được mời cũng có thể tải lên BCTC riêng; tài liệu tải lên chỉ người đó thấy, không xuất hiện trong dữ liệu công khai.
+văn giải trình.
 
 \section{Đọc và kiểm chứng BCTC}
 \subsection{Quy trình}
@@ -978,10 +920,10 @@ văn giải trình. Người dùng
   \node[dnode, below=6mm of e] (f) {};
   \node[act=64mm, below=10mm of f] (g) {Leo thang: định vị ô sai, đọc lại ô, chép lại trang (mục~\ref{sec:leothang})};
   \node[dnode, below=6mm of g] (h) {};
-  \node[act=40mm, below=10mm of h] (nr) {Lưu, trạng thái \textit{needs\_review}};
+  \node[act=40mm, below=10mm of h] (nr) {Lưu, trạng thái cần duyệt};
   \node[stop, below=of nr] (x2) {};
   \node[dnode] (m) at ($(h)+(5.6,0)$) {};
-  \node[act=36mm, below=10mm of m] (ok) {Lưu, trạng thái \textit{verified}};
+  \node[act=36mm, below=10mm of m] (ok) {Lưu, trạng thái đã kiểm chứng};
   \node[stop, below=of ok] (x1) {};
   \draw[flow] (s)--(a); \draw[flow] (a)--(b); \draw[flow] (b)--(c); \draw[flow] (c)--(d); \draw[flow] (d)--(e);
   \draw[flow] (e)--(f);
@@ -1003,7 +945,7 @@ là JSON theo schema cố định (Listing~\ref{lst:json}). Code mới là phầ
   \item suy dấu phân cách hàng nghìn của cả tài liệu từ các nhóm 3 chữ số và phép cộng kiểm tra;
   \item đọc đơn vị từ dòng \enquote{Đơn vị tính} và tiêu đề cột;
   \item hiểu số trong ngoặc là số âm;
-  \item chuẩn hóa mã số và gán mã chuẩn cho ngân hàng (\code{b.nii}, \code{b.toi}\ldots) theo tên dòng đã bỏ dấu.
+  \item chuẩn hóa mã số; với ngân hàng, gán mã chuẩn cho từng dòng theo tên dòng đã bỏ dấu.
 \end{itemize}
 
 \begin{center}
@@ -1023,19 +965,11 @@ phương án làm số ràng buộc đạt nhiều nhất mà không làm mất 
 \begin{itemize}
   \item \textbf{Đảo cột STT và mã số} theo từng trang của từng báo cáo.
   \item \textbf{Nhãn ngân hàng bị xuống dòng:} ghép lại tên dòng rồi so khớp với danh sách nhãn.
-  \item \textbf{Mã thiếu:} một dòng không in mã nhưng bằng đúng phần còn thiếu của một ràng buộc thì được gán mã đó.
-        Riêng dòng \enquote{LNST của cổ đông công ty mẹ / không kiểm soát} được gán mã 61/62 theo tên dòng (bài học từ
-        lỗi VIC, mục~\ref{sec:doichieu}). Công ty chứng khoán có BCTC in các dòng tổng KQKD không kèm mã (SSI quý
-        4/2025, TCX bán niên 2026), nên các dòng tổng này cũng được gán mã theo tên dòng của mẫu.
-  \item \textbf{Mã theo vị trí:} dòng không in mã nằm giữa hai dòng tổng được gán mã con của dòng tổng phía dưới
-        (ví dụ \code{20.1}, \code{20.2}) để kiểm phép \enquote{dòng tổng = tổng các dòng thành phần}. Ở LCTT doanh nghiệp,
-        dòng tổng (08, 20, 30, 40, 50, 60, 70) được nhận theo tên dòng khi không có mã. Dòng tổng tạm không tên
-        (ví dụ tiền từ hoạt động kinh doanh trước lãi vay và thuế đã nộp ở BCTC MSN) được nhận ra vì số của nó bằng tổng
-        các dòng trước nó ở mọi cột. Ngân hàng dùng cùng cách này cho BCĐKT và LCTT. Trên web, mã đặt theo vị trí được
-        hiện mờ để không bị nhầm với mã in trên BCTC.
-  \item \textbf{Ngoại lệ thật của BCTC:} mã 269 (lợi thế thương mại) thuộc tài sản dài hạn khác; nhiều dòng LCTT cùng
-        một mã thì cộng lại; hai dòng chi tiết BCĐKT khác tên nhưng in cùng mã (VJC in mã 321 cho cả vay ngắn hạn và nợ
-        thuê tài chính ngắn hạn) cũng được cộng lại.
+  \item \textbf{Mã thiếu:} dòng không in mã được suy mã từ phép cộng (bằng đúng phần còn thiếu của một ràng buộc) hoặc
+        từ tên dòng (LNST của cổ đông công ty mẹ, các dòng tổng KQKD của công ty chứng khoán).
+  \item \textbf{Mã theo vị trí:} dòng không in mã nằm giữa hai dòng tổng được gán mã con của dòng tổng phía dưới, để kiểm
+        phép \enquote{dòng tổng = tổng các dòng thành phần}. Trên web, mã này được hiện mờ.
+  \item \textbf{Dòng trùng mã:} nhiều dòng in cùng một mã thì được cộng lại.
 \end{itemize}
 
 \subsection{Thang leo thang khi còn lệch}\label{sec:leothang}
@@ -1048,32 +982,25 @@ phương án làm số ràng buộc đạt nhiều nhất mà không làm mất 
         số ràng buộc đạt không giảm.
   \item \textbf{Chép lại cả báo cáo} (BCĐKT, KQKD hoặc LCTT) khi báo cáo đó vẫn còn ràng buộc bắt buộc lệch, hoặc
         BCĐKT, KQKD chưa có ràng buộc nào đạt. Bậc này nhắm vào các lỗi mà đọc lại từng ô không sửa được: bỏ sót dòng,
-        lệch hàng, chép nhầm cả cột, trang lộn ngược. Nó khác lần chép đầu ở ba điểm:
-        \begin{itemize}
-          \item Lần đầu gửi mọi trang của báo cáo trong một lần gọi; bậc này gửi \textbf{mỗi trang một lần gọi} rồi ghép
-                các dòng theo thứ tự trang. Mỗi lượt trả lời ngắn hơn nên mô hình ít bỏ sót dòng ở chỗ chuyển trang.
-          \item Luôn dùng ảnh nét ở mức \code{original} (mục~\ref{sec:anhnet}).
-          \item Nếu chép lại vẫn lệch, lần lượt xoay \textbf{từng trang một} thêm 180 độ rồi chép lại, vì một số file scan
-                có trang lộn ngược (VHM quý 1/2026). Bản chép ở hướng xoay ít lệch hơn chưa chắc vì trang lộn ngược
-                (mô hình đôi khi tình cờ đọc tốt hơn ở hướng sai), nên hướng xoay chỉ được lưu lại khi xác nhận được:
-                theo chiều các dòng chữ nếu file có lớp chữ, hoặc hỏi mô hình ảnh nào trong hai hướng có chữ đứng thẳng.
-                Hướng này dùng để hiện ảnh trang trên web và để đọc lại ô.
-        \end{itemize}
-        Bản mới chỉ được giữ khi hiệu số \enquote{ràng buộc đạt trừ ràng buộc lệch} tốt hơn bản cũ (hoặc bằng nhưng có
-        nhiều ràng buộc đạt hơn) và số ràng buộc đạt không giảm. Chỉ so số ràng buộc lệch là chưa đủ: bản chép lại làm
-        mất mã số thì chạy được ít ràng buộc hơn nên trông như ít lệch hơn (KQKD quý 2/2026 của TCX: lệch từ 2 xuống 0,
-        nhưng số ràng buộc kiểm được giảm từ 28 xuống 12). Kết quả đo ở mục~\ref{sec:evalchep}.
+        lệch hàng, chép nhầm cả cột, trang lộn ngược. Bậc này chép \textbf{mỗi trang một lần gọi}, với ảnh nét gửi đi
+        không bị thu nhỏ (mục~\ref{sec:anhnet}). Nếu vẫn lệch, hệ thống thử xoay từng trang thêm 180 độ, và chỉ giữ hướng
+        xoay khi xác nhận được chữ đứng thẳng. Bản mới chỉ được giữ khi hiệu số \enquote{ràng buộc đạt trừ ràng buộc
+        lệch} tốt hơn bản cũ và số ràng buộc đạt không giảm; chỉ so số ràng buộc lệch là chưa đủ, vì bản làm mất mã số
+        kiểm được ít ràng buộc hơn nên trông như ít lệch hơn. Kết quả đo ở mục~\ref{sec:evalchep}.
   \item Vẫn lệch thì chuyển duyệt tay. Người duyệt xem ảnh trang cạnh bảng số, sửa từng ô. Mỗi lần sửa được ghi lại và
         trở thành \textbf{dữ liệu vàng} để đánh giá.
 \end{enumerate}
 
-\subsection{Duyệt tay}
+\subsection{Duyệt tay}\label{sec:duyettay}
 BCTC còn lệch sau mọi bậc leo thang được đưa vào hàng duyệt. Hình~\ref{fig:duyettay} chia việc theo hai làn: quản trị
-viên và hệ thống.
+viên và hệ thống. Người duyệt sửa được một ô số hoặc mã số của một dòng, kể cả ở BCTC đã xuất bản; hệ thống kiểm lại
+ràng buộc, còn lệch thì BCTC trở về hàng duyệt. Với ô chưa có phép kiểm mà hai lần đọc khác nhau, người duyệt xem ảnh
+rồi xác nhận \enquote{đúng như ảnh}; việc này không tính là sửa tay. Chỉ các ô sửa tay mới được dùng làm dữ liệu vàng
+để đánh giá bước định vị ô sai (mục~\ref{sec:evalrepair}).
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=5mm]
+\begin{tikzpicture}[node distance=5mm, scale=0.8, transform shape]
   \draw[thick] (0,0.6) rectangle (14.6,-12.6); \draw[thick] (7.3,0.6) -- (7.3,-12.6); \draw[thick] (0,0) -- (14.6,0);
   \node[font=\footnotesize\sffamily\bfseries] at (3.65,0.3) {Quản trị viên};
   \node[font=\footnotesize\sffamily\bfseries] at (10.95,0.3) {Hệ thống};
@@ -1086,9 +1013,9 @@ viên và hệ thống.
   \node[act=26mm] (a3) at (5.45,-6.2) {Nhập số đúng và ghi chú};
   \node[act=50mm] (s2) at (10.95,-6.2) {Ghi lịch sử sửa, kiểm tra lại ràng buộc};
   \node[dnode] (d2) at (10.95,-7.6) {};
-  \node[act=40mm] (s3) at (10.95,-9.0) {Đặt trạng thái \textit{verified}};
+  \node[act=40mm] (s3) at (10.95,-9.0) {Đặt trạng thái đã kiểm chứng};
   \node[stop] (x1) at (10.95,-10.1) {};
-  \node[act=50mm] (s4) at (10.95,-11.2) {Đặt trạng thái \textit{approved}, gửi email người theo dõi};
+  \node[act=50mm] (s4) at (10.95,-11.2) {Đặt trạng thái đã duyệt tay, gửi email người theo dõi};
   \node[stop] (x2) at (10.95,-12.2) {};
   \draw[flow] (s)--(a1); \draw[flow] (a1)--(s1); \draw[flow] (s1.south) |- (a2.east);
   \draw[flow] (a2)--(d1);
@@ -1102,20 +1029,13 @@ viên và hệ thống.
 \caption{Biểu đồ hoạt động của việc duyệt tay, chia làn theo người thực hiện.}\label{fig:duyettay}
 \end{figure}
 
-Người duyệt có thể sửa một ô số, hoặc sửa mã số của một dòng khi mô hình đọc nhầm mã (BCTC bán niên 2026 của GVR: mã
-420a/420b bị đọc thành 421/421a). Quản trị cũng sửa được ô của BCTC đã xuất bản khi phát hiện sai sau này; hệ thống kiểm
-lại ràng buộc, còn lệch thì BCTC trở về hàng duyệt. Bấm đúp vào một ô trong bảng số thì khung sửa được điền sẵn báo
-cáo, dòng, cột và số đang lưu, người duyệt chỉ cần gõ lại số như in. Với ô chưa có phép kiểm mà hai lần đọc khác nhau, người duyệt xem ảnh
-rồi bấm \enquote{đúng như ảnh} nếu lần đọc đầu đúng: ô thôi ở trạng thái cần xem lại, không tính là ô sửa tay, và xác
-nhận hết hiệu lực nếu số trong ô đổi sau đó. Hai loại sửa được ghi riêng: chỉ các ô số sửa tay mới được dùng làm dữ liệu vàng để
-đánh giá bước định vị ô sai (mục~\ref{sec:evalrepair}). Ví dụ BCTC bán niên của GVR chỉ có bản 72 dpi; sau khi đối
-chiếu ảnh phóng to, người duyệt sửa 33 ô số và 2 mã, và BCTC đạt mọi ràng buộc bắt buộc.
-
-\subsection{Bằng chứng cho từng ô}
+\subsection{Bằng chứng cho từng ô}\label{sec:bangchung}
 Sau khi kiểm chứng, mỗi ô số được xếp vào một loại bằng chứng: khớp cả phép cộng lẫn giữa các kỳ; chỉ khớp giữa các kỳ;
 chỉ khớp phép cộng; hai BCTC in khác nhau (doanh nghiệp hoặc kiểm toán sửa số); khác kỳ trước do trình bày lại; cần xem
-lại; hoặc chưa kiểm được. Ô chưa kiểm được còn được so với lần đọc thứ hai (mục~\ref{sec:nguoidoc2}) và tách thành hai
-lần đọc trùng nhau hoặc khác nhau. Giao diện tô màu từng ô theo loại này (Hình~\ref{fig:webtailieu}).
+lại; hoặc chưa kiểm được. Ô chưa kiểm được còn được so với lần đọc thứ hai và tách thành hai lần đọc trùng nhau hoặc
+khác nhau. Lần đọc thứ hai là bước cuối của quy trình, chạy sau khi đã báo tin cho người theo dõi để không làm chậm
+thông báo: nhà cung cấp mô hình còn lại chỉ chép lại những báo cáo còn ô chưa có phép kiểm nào xác nhận. Giao diện tô
+màu từng ô theo loại bằng chứng (Hình~\ref{fig:webtailieu}).
 
 \begin{figure}[H]
 \centering
@@ -1138,12 +1058,8 @@ qua chứ không báo lệch. Hệ thống kiểm thêm hai điều, không gọ
         số lũy kế ở quý trước thì quý này cũng phải có dòng cùng mã hoặc cùng tên.
 \end{itemize}
 Khi KQKD thiếu dòng LNST, hệ thống tự chép thêm trang ngay sau trang KQKD cuối (mục~\ref{sec:leothang}). Các trường hợp
-còn lại hiện thành ô cảnh báo \enquote{có thể thiếu dòng, cần xem lại} trên trang tài liệu và được đếm vào số cần xem
-lại, nhưng không làm BCTC mất trạng thái đạt kiểm chứng, vì công ty cũng có thể tự đổi cách trình bày giữa hai kỳ. Trên
-thẻ, khi không thấy dòng LNST của cổ đông công ty mẹ: nếu có dòng không kiểm soát thì LNST công ty mẹ được tính bằng LNST
-trừ phần đó, theo công thức của mẫu; nếu không có cả hai dòng mà BCTC kỳ khác lại có dòng công ty mẹ thì ô được để
-trống, không lấy LNST chung thay vào. Chỉ BCTC không tách hai phần này (BCTC riêng, công ty không có công ty con) mới
-dùng LNST chung.
+còn lại chỉ hiện cảnh báo \enquote{có thể thiếu dòng, cần xem lại}, không chặn BCTC, vì công ty cũng có thể tự đổi cách
+trình bày giữa hai kỳ.
 
 \section{Công nghệ lõi: tự định vị và tự sửa ô đọc sai}\label{sec:loi}
 \subsection{Ý tưởng}
@@ -1218,17 +1134,11 @@ biệt về dấu phân cách và dấu ngoặc.
 \end{ghichu}
 
 \subsection{Chuẩn bị ảnh cho bước đọc lại}\label{sec:anhnet}
-Đọc lại chỉ có ích khi mô hình nhìn rõ hơn lần đầu. Hai điều quyết định độ rõ của ảnh mà mô hình thực sự nhìn thấy:
-\begin{itemize}
-  \item \textbf{API có thu nhỏ ảnh hay không.} Ở mức mặc định, API của mô hình thu ảnh về cạnh dài tối đa 2048 điểm ảnh
-        và khoảng 2,5 triệu điểm ảnh~\cite{openaivision}. Vẽ trang to hơn mức này rồi gửi đi không giúp gì, vì API thu
-        về đúng cỡ ảnh lần chép đầu. Soi gửi các ảnh đọc lại ở mức \code{original}, giữ nguyên tới khoảng 10 triệu điểm ảnh.
-  \item \textbf{Phóng ảnh scan như thế nào.} Ảnh scan 72 dpi (như BCTC bán niên của GVR) chỉ có chữ số cao khoảng 7 điểm
-        ảnh. Khi vẽ trang ở độ phân giải cao, thư viện vẽ PDF phóng ảnh scan bằng cách nhân bản điểm ảnh, nên chữ số bị
-        răng cưa và dễ nhầm 3 với 8. Soi vẽ trang đúng độ phân giải của ảnh scan gốc (một điểm ảnh trang ứng với một điểm
-        ảnh scan), rồi phóng một lần bằng nội suy Lanczos tới khoảng 288 dpi, để chữ số cao khoảng 28 điểm ảnh. Mức phóng
-        không vượt quá 3 lần ảnh gốc, vì phóng thêm không tạo ra thông tin mới.
-\end{itemize}
+Đọc lại chỉ có ích khi mô hình nhìn rõ hơn lần đầu. Ở mức mặc định, API của mô hình thu nhỏ ảnh
+lớn~\cite{openaivision}, nên vẽ trang to hơn rồi gửi đi không giúp gì; Soi gửi ảnh đọc lại ở mức không thu nhỏ. Với
+bản scan, thư viện vẽ PDF phóng ảnh bằng cách nhân bản điểm ảnh, làm chữ số bị răng cưa và dễ nhầm 3 với 8. Soi vẽ
+trang đúng độ phân giải của ảnh scan gốc rồi phóng một lần bằng nội suy Lanczos, tối đa 3 lần, vì phóng thêm không tạo
+ra thông tin mới.
 Soi không chuyển ảnh sang trắng đen và không dùng mô hình tăng độ phân giải: trên bản scan chất lượng thấp, các bước xử lý ảnh
 truyền thống (ảnh xám, chuyển trắng đen) không cải thiện mà có khi còn làm OCR kém đi~\cite{ocrpipelines}, còn mô hình
 tăng độ phân giải có thể tạo ra chi tiết không có thật trong vùng chữ~\cite{textsr}. Với chữ số tài chính, một nét giả là
@@ -1251,33 +1161,16 @@ suy luận được tính vào $N_{\text{ra}}$. Soi giảm cả hai đại lư�
 
 \subsection{Giảm token vào}
 \begin{itemize}
-  \item \textbf{Chỉ gửi trang cần thiết:} bước định vị dùng ảnh nhỏ (cạnh dài 900 px) của tối đa 30 trang đầu; bước
-        chép bảng chỉ gửi đúng các trang BCĐKT, KQKD, LCTT (cạnh dài 2000 px), không gửi cả tài liệu.
+  \item \textbf{Chỉ gửi trang cần thiết:} bước định vị dùng ảnh nhỏ của các trang đầu; bước chép bảng chỉ gửi đúng các
+        trang BCĐKT, KQKD, LCTT, không gửi cả tài liệu.
   \item \textbf{Đọc lại theo ô:} khi lệch, chỉ hỏi lại vài ô được bước định vị đề xuất, không chép lại cả báo cáo.
         Chép lại cả trang chỉ là bậc sau cùng trước khi chuyển duyệt tay.
   \item \textbf{Giả thuyết rẻ trước:} đảo cột, ghép nhãn, suy mã thiếu đều làm bằng code, không gọi mô hình.
-  \item \textbf{Đọc một lần, dùng nhiều lần:} BCTC được đọc một lần khi công bố; file trùng nhận ra bằng SHA-256; ai hỏi
-        sau cũng dùng lại kết quả trong kho. Thay đổi quy tắc thì kiểm tra lại trên kết quả đã lưu, không đọc lại ảnh.
 \end{itemize}
 
 \subsection{Giới hạn token ra}
-Mỗi bước gọi mô hình có trần token ra riêng (Bảng~\ref{tab:tranra}), đặt khoảng 3--4 lần mức lớn nhất đo được, để chặn
-trường hợp mô hình trả lời dài bất thường. Đầu ra luôn theo khuôn JSON cố định nên mô hình không viết thêm lời thừa.
-
-\begin{table}[H]
-\centering\small
-\caption{Trần token ra theo bước và mức đo được (trung bình mỗi lần gọi, lớn nhất trên các BCTC)}\label{tab:tranra}
-\begin{tabular}{@{}lrr@{}}
-\toprule
-\textbf{Bước} & \textbf{Đo được (lớn nhất)} & \textbf{Trần} \\ \midrule
-Định vị trang & 1.267 & 6.000 \\
-Chép một báo cáo (BCĐKT, KQKD, LCTT) & 5.697 & 24.000 \\
-Chép lại một trang & 4.143 & 16.000 \\
-Đọc lại ô (kiểm chứng, sửa lỗi, đọc phóng to) & 1.156 & 6.000 \\
-Nhận diện file người dùng tải lên & -- & 3.000 \\
-\bottomrule
-\end{tabular}
-\end{table}
+Mỗi bước gọi mô hình có trần token ra riêng, khoảng 3--4 lần mức lớn nhất đo được, để chặn trường hợp mô hình trả lời
+dài bất thường. Đầu ra luôn theo khuôn JSON cố định nên mô hình không viết thêm lời thừa.
 
 \subsection{Đo và giới hạn chi phí}
 \begin{itemize}
@@ -1289,23 +1182,6 @@ Nhận diện file người dùng tải lên & -- & 3.000 \\
         sang tháng sau, giao diện báo cho người dùng biết.
 \end{itemize}
 
-\begin{table}[H]
-\centering\small
-\caption{Token mỗi báo cáo so với hệ thống của khóa trước}\label{tab:tokenss}
-\begin{tabularx}{\linewidth}{@{}p{4.2cm}XX@{}}
-\toprule
-& \textbf{Khóa trước} & \textbf{Soi} \\ \midrule
-Token vào mỗi báo cáo & 272.054 & 59.112 \\
-Token ra mỗi báo cáo & 41.106 & 16.218 \\
-Chi phí mỗi báo cáo & 0,04 USD & 0,117 USD (trung vị 0,084) \\
-Ghi chú & Một báo cáo, gửi toàn bộ văn bản OCR cho nhiều bước & Trung bình 29 BCTC quý 4/2025, quy trình hiện tại, đã gồm mọi lần đọc lại \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-Soi dùng ít token vào hơn khoảng 4,7 lần, nhưng chi phí mỗi báo cáo cao hơn vì mô hình đọc ảnh đắt hơn mô hình khóa trước dùng
-cho văn bản OCR, và vì Soi đọc lại để kiểm chứng. Đổi lại, Soi không cần GPU để chạy OCR và mỗi số đều đã được kiểm chứng.
-
 \section{Thẻ KQKD và giao diện}
 \subsection{Thẻ KQKD}
 Thẻ được tính hoàn toàn bằng code từ số đã kiểm chứng. Mỗi giá trị trên thẻ mang theo nguồn: tài liệu, trang, dòng và
@@ -1313,6 +1189,7 @@ chuỗi gốc. Doanh nghiệp thường có các chỉ tiêu doanh thu thuần, 
 có thu nhập lãi thuần, tổng thu nhập hoạt động, chi phí dự phòng, LNTT và LNST của cổ đông ngân hàng mẹ. Công ty chứng
 khoán (mẫu B02-CTCK) có cộng doanh thu hoạt động, cộng chi phí hoạt động, lợi nhuận kế toán trước thuế và LNST phân bổ
 cho chủ sở hữu; các cờ dựa trên lợi nhuận gộp và dòng tiền kinh doanh không áp dụng cho mẫu này và được ghi là chưa xét.
+BCTC không có dòng LNST của cổ đông công ty mẹ nhưng có dòng không kiểm soát thì thẻ lấy LNST trừ phần không kiểm soát.
 
 \textbf{Quy tắc hiển thị tăng trưởng:} chỉ in \% khi cả hai kỳ đều lãi. Khi có kỳ lỗ, thẻ mô tả bằng lời, ví dụ
 \enquote{lỗ thu hẹp từ 6,8 tỷ còn 3,2 tỷ}, thay vì in \enquote{+53,6\%} gây hiểu nhầm.
@@ -1368,12 +1245,9 @@ Facebook, Zalo; chỉ thẻ đã kiểm chứng mới có trang chia sẻ công 
 \end{figure}
 
 \subsection{Xuất file Excel}
-Từ thẻ KQKD hoặc trang tài liệu, người dùng tải được BCTC đã kiểm chứng hoặc đã duyệt dưới dạng file Excel. Mỗi báo
-cáo (BCĐKT, KQKD, LCTT) là một trang tính; số để dạng số theo đơn vị hệ thống đã dùng khi đọc BCTC (ghi ở dòng đầu trang
-tính), số trong ngoặc thành số âm. Cạnh mỗi cột số là cột bằng chứng của từng ô (khớp cộng tổng, khớp giữa các kỳ, hai
-lần đọc trùng, chưa kiểm được\ldots), tô cùng màu như trên web, kèm số trang trong file gốc. Trang \enquote{Nguồn} ghi
-BCTC gốc và link, giờ công bố sớm nhất, trạng thái kiểm chứng, các ô người duyệt đã sửa tay, và lưu ý đây là thông tin
-chứ không phải khuyến nghị đầu tư. Như vậy số đem ra khỏi hệ thống vẫn mang theo nguồn và mức độ đã được kiểm.
+Từ thẻ KQKD hoặc trang tài liệu, người dùng tải được BCTC đã kiểm chứng dưới dạng file Excel, mỗi báo cáo một trang
+tính, cạnh mỗi cột số là cột bằng chứng của từng ô và số trang trong file gốc. Một trang tính riêng ghi BCTC gốc, giờ
+công bố, các ô đã sửa tay và lưu ý đây không phải khuyến nghị đầu tư, nên số đem ra khỏi hệ thống vẫn mang theo nguồn.
 
 \subsection{Người dùng và quyền riêng tư}
 Giai đoạn thử nghiệm chỉ dành cho người được mời, đăng nhập bằng link gửi qua email. Người dùng theo dõi mã để nhận
@@ -1391,7 +1265,7 @@ Agent là một đồ thị trạng thái (LangGraph) gồm các bước ở Hì
 bước, nên báo cáo dừng chờ được (chờ người dùng xác nhận, chờ bộ canh đọc thêm BCTC, có khi vài giờ) rồi chạy tiếp đúng
 chỗ, kể cả khi dịch vụ khởi động lại.
 
-\begin{figure}[H]
+\begin{figure}[tbp]
 \centering
 \begin{tikzpicture}[node distance=5mm]
   \node[start] (s) {};
@@ -1453,9 +1327,9 @@ tư}, chỉ người tạo và quản trị viên xem được. Mỗi người t
 tháng của phần đọc theo yêu cầu, chạm trần thì không tạo báo cáo mới. Câu hỏi trùng mà số liệu chưa đổi thì dùng lại
 báo cáo cũ.
 
-\begin{figure}[H]
+\begin{figure}[tbp]
 \centering
-\fbox{\includegraphics[width=0.9\linewidth]{bao-cao-agent.png}}
+\fbox{\includegraphics[width=0.72\linewidth]{bao-cao-agent.png}}
 \caption{Trang báo cáo agent tạo cho câu hỏi \enquote{So sánh kết quả kinh doanh quý 3/2026 của TCB, LPB và VPB}
 (phần đầu; bảng số đầy đủ có 30 dòng).}\label{fig:agent-ui}
 \end{figure}
@@ -1468,6 +1342,10 @@ báo cáo cũ.
 Mục đầu tiên trả lời câu hỏi chính: \textbf{hệ thống tự đọc đúng được bao nhiêu mà không cần người sửa}. Các mục sau là
 chi tiết của từng phép đo dùng để trả lời câu hỏi đó.
 
+\textbf{Phạm vi đo:} trừ khi ghi khác, các phép đo trong chương này dùng chung 119 BCTC đã đạt kiểm chứng hoặc đã duyệt
+tay tính đến ngày 19/10/2026, gồm BCTC của 30 mã VN30 và một BCTC của một mã ngoài VN30 do người dùng yêu cầu, các kỳ
+từ quý 4/2025 đến bán niên 2026, tổng cộng 35.196 ô số. Các chỗ khác trong chương ghi gọn là \enquote{119 BCTC}.
+
 \section{Kết quả chính: bao nhiêu số đúng mà không cần người sửa}\label{sec:ketquachinh}
 Một ô được tính là \enquote{đúng mà không cần người sửa} nếu số hệ thống lưu là số in trên BCTC và không có người nào
 phải sửa ô đó. Câu hỏi này được trả lời bằng hai cách bổ sung cho nhau:
@@ -1475,7 +1353,7 @@ phải sửa ô đó. Câu hỏi này được trả lời bằng hai cách bổ
   \item \textbf{Đo trực tiếp bằng đáp án có sẵn} (mục~\ref{sec:dapan}): 11 BCTC được công ty xuất thẳng từ Excel, Word
         hoặc phần mềm nên trong file có sẵn chữ gốc, tức đáp án cho mọi ô. Hệ thống vẫn đọc các file này từ ảnh như bản
         scan, rồi so từng ô với chữ gốc. Đây là bằng chứng mạnh nhất, nhưng chỉ phủ 4 công ty.
-  \item \textbf{Ước tính trên toàn bộ 119 BCTC VN30} (quý 4/2025 đến bán niên 2026, 35.196 ô), phần lớn là bản scan
+  \item \textbf{Ước tính trên toàn bộ 119 BCTC} (35.196 ô), phần lớn là bản scan
         không có đáp án: ghép phép kiểm kế toán, lần đọc thứ hai và các lần người đối chiếu ảnh.
 \end{itemize}
 Bảng~\ref{tab:ketquachinh} tóm tắt cả hai.
@@ -1490,11 +1368,11 @@ Bảng~\ref{tab:ketquachinh} tóm tắt cả hai.
 Ô đúng mà không cần người sửa, ảnh gốc & \textbf{3.105/3.107 (99,94\%)} \\
 Ô đúng khi làm mờ ảnh giống bản scan 200 dpi và 120 dpi & 100\% \\
 Ô đúng khi làm mờ ảnh giống bản scan 72 dpi & 98,8\% \\ \midrule
-\multicolumn{2}{@{}l}{\textit{Ước tính trên 119 BCTC VN30, theo BCTC}} \\
+\multicolumn{2}{@{}l}{\textit{Ước tính trên 119 BCTC, theo BCTC}} \\
 BCTC không cần người làm gì: hệ thống tự đọc, tự kiểm chứng, tự sửa & \textbf{97/119 (81,5\%)} \\
 BCTC người chỉ cần xem ảnh rồi duyệt (chính BCTC in lệch, số đọc đúng) & 4/119 \\
 BCTC người phải sửa ít nhất một ô & 19/119 \\ \midrule
-\multicolumn{2}{@{}l}{\textit{Ước tính trên 119 BCTC VN30, theo ô số}} \\
+\multicolumn{2}{@{}l}{\textit{Ước tính trên 119 BCTC, theo ô số}} \\
 Ô đúng mà không cần người sửa (ước tính) & \textbf{khoảng 99,5\%} \\
 \quad trong đó có phép kiểm tự động xác nhận & 95,1\% \\
 \quad trong đó chưa có phép kiểm, hai lần đọc độc lập trùng nhau & 3,5\% \\
@@ -1506,7 +1384,7 @@ Chi phí gọi mô hình để đọc một BCTC & 0,12 USD \\
 \end{tabularx}
 \end{table}
 
-Hai cách cho kết quả nhất quán: đo trực tiếp được 99,94\%, ước tính trên toàn bộ VN30 được khoảng 99,5\%. Phép đo trực
+Hai cách cho kết quả nhất quán: đo trực tiếp được 99,94\%, ước tính trên toàn bộ 119 BCTC được khoảng 99,5\%. Phép đo trực
 tiếp được trình bày ở mục~\ref{sec:dapan}. Các dòng ước tính được hiểu như sau:
 \begin{itemize}
   \item \textbf{95,1\% ô có phép kiểm tự động xác nhận} là phần chắc chắn nhất: số khớp một phép cộng của chính BCTC hoặc
@@ -1520,39 +1398,26 @@ tiếp được trình bày ở mục~\ref{sec:dapan}. Các dòng ước tính �
         người đọc thứ hai đã tìm ra lỗi ở khoảng 3\% số ô; nếu nhóm 306 ô này sai cùng tỷ lệ thì còn khoảng 10 ô
         sai. Con số 99,5\% ở trên đã trừ phần ước tính này. Kể cả khi giả định cả 306 ô đều sai, tỷ lệ đúng vẫn không
         dưới 98,7\%.
-  \item \textbf{152 ô người phải sửa} nằm ở 18 BCTC (cộng một BCTC chỉ sửa mã số của dòng). Có hai nguồn:
-        \begin{itemize}
-          \item 80 ô ở 8 BCTC do hệ thống tự báo (BCTC chờ duyệt, hoặc ô lệch so với BCTC kỳ khác), tập trung ở hai
-                BCTC khó: bán niên 2026 của GVR (file 72 dpi, 33 ô) và quý 4/2025 của VHM (trang lộn ngược, 29 ô);
-          \item 78 ô ở 12 BCTC đã đạt kiểm chứng nhưng vẫn còn sai, do người đọc thứ hai và các công thức mới cho công ty
-                chứng khoán chỉ ra, chủ yếu là các khối dòng bị chép lệch một dòng nằm ngoài mọi phép cộng. Từ mùa quý
-                3/2026, lần đọc thứ hai chạy tự động nên các chỗ như vậy được hệ thống tự đánh dấu \enquote{cần xem lại},
-                không phải chờ người tìm.
-        \end{itemize}
-        (Hai nhóm cộng lại là 158 ô; 6 ô trong đó là số bị chép nhầm vào ô vốn để trống nên sau khi sửa không còn
-        là ô số. 2 BCTC có ô thuộc cả hai nhóm.)
+  \item \textbf{152 ô người phải sửa} nằm ở 18 BCTC (cộng một BCTC chỉ sửa mã số của dòng). 80 lượt sửa ở 8 BCTC do hệ
+        thống tự báo (BCTC chờ duyệt, hoặc ô lệch so với BCTC kỳ khác); 78 lượt sửa ở 12 BCTC đã đạt kiểm chứng do
+        người đọc thứ hai chỉ ra sau, chủ yếu là các khối dòng chép lệch một dòng nằm ngoài mọi phép cộng
+        (mục~\ref{sec:nguoidoc2}). Hai nhóm cộng lại là 158 lượt sửa, nhiều hơn 152 ô vì 6 lượt sửa xóa số bị chép nhầm
+        vào ô vốn để trống nên sau khi sửa không còn là ô số; 2 BCTC thuộc cả hai nhóm. Từ mùa quý 3/2026, lần đọc thứ
+        hai chạy tự động nên các chỗ như vậy được hệ thống tự đánh dấu \enquote{cần xem lại}.
 \end{itemize}
 
 Con số 99,5\% đo công việc của người vận hành: trong tất cả số đã đọc, bao nhiêu không cần người sửa. Với
 \textbf{người dùng xem thẻ KQKD}, điều cần biết là số hiện trên thẻ thuộc nhóm nào. Trên 119 BCTC, thẻ hiện 1.460 số;
 1.339 số lấy thẳng từ một ô đều có phép kiểm xác nhận hoặc đã được đọc lại xác nhận, 5 số là chỗ chính BCTC in lệch
 mà người duyệt đã xem ảnh, 116 số còn lại được code cộng từ nhiều ô của BCTC. Không số nào lấy thẳng từ một ô thuộc nhóm chỉ
-có một lần đọc. Các ô chưa có bằng chứng chỉ nằm ở bảng chi tiết của trang tài liệu và được tô màu riêng.
-
-Phép kiểm đủ dòng (mục~\ref{sec:evalduydong}) đã tìm ra một lỗi lấy nhầm dòng trên thẻ mà phép kiểm số không thấy: ở 7
-BCTC ngân hàng (CTG, HDB, MBB, VPB), dòng LNST của cổ đông ngân hàng mẹ được ghi theo cách khác (\enquote{Lợi nhuận
-thuần của chủ sở hữu}, \enquote{Lợi nhuận sau thuế thuộc về Ngân hàng mẹ}) nên không được nhận ra, và 18 số
-\enquote{LNST của cổ đông ngân hàng mẹ} trên thẻ thực ra là LNST chung, cao hơn số đúng từ 0,4\% đến 4,6\%. Lỗi đã
-được sửa; các con số trên thẻ ở trên được tính sau khi sửa.
+có một lần đọc. Các ô chưa có bằng chứng chỉ nằm ở bảng chi tiết của trang tài liệu và được tô màu riêng. Các con số
+trên thẻ được tính sau khi đã sửa lỗi lấy nhầm dòng LNST của cổ đông ngân hàng mẹ mà phép kiểm đủ dòng tìm ra
+(mục~\ref{sec:evalduydong}).
 
 Hai con số 81,5\% và 99,5\% khác nhau vì đơn vị đếm khác nhau. Một BCTC có khoảng 300 ô; chỉ cần một ô phải sửa
 (hoặc người phải xem ảnh rồi duyệt) là cả BCTC bị tính \enquote{cần người}. Lỗi lại dồn vào một số ít BCTC khó: riêng
-bán niên 2026 của GVR (file 72 dpi) và quý 4/2025 của VHM (trang lộn ngược) đã chiếm gần 40\% số ô phải sửa. Ở 22 BCTC cần
-người, phần lớn các ô vẫn do máy đọc đúng, nên tính theo ô thì tỷ lệ đúng cao hơn nhiều so với tỷ lệ BCTC không cần
-người.
-
-Nói gọn: với khoảng 0,12 USD mỗi BCTC, Soi tự xử lý trọn 4/5 số BCTC; ở phần còn lại, người chỉ phải xem trung bình 8 ô
-mỗi BCTC thay vì nhập lại cả ba báo cáo (khoảng 300 ô). Trên các BCTC có đáp án, chỉ 2 trong 3.107 ô sai.
+bán niên 2026 của GVR (file 72 dpi, 33 ô) và quý 4/2025 của VHM (trang lộn ngược, 29 ô) đã chiếm gần 40\% số ô phải
+sửa. Ở 19 BCTC phải sửa, người chỉ sửa trung bình 8 ô mỗi BCTC thay vì nhập lại cả ba báo cáo.
 
 \section{Đo bằng đáp án có sẵn}\label{sec:dapan}
 \subsection{Ý tưởng và bộ dữ liệu}
@@ -1561,16 +1426,14 @@ không có người gán nhãn. Một số ít công ty xuất BCTC thẳng từ
 chữ gốc, đúng từng chữ số kế toán đã gõ. Soi luôn đọc BCTC từ ảnh trang, kể cả khi file có lớp chữ, nên với các file này
 ta có đáp án cho mọi ô mà không cần người gán nhãn.
 
-Loại file này rất hiếm. Trong 119 BCTC VN30 chỉ có 5 file; trong 77 BCTC quý 2 hoặc bán niên 2026 của các mã HOSE, HNX
+Loại file này rất hiếm. Trong 119 BCTC chỉ có 5 file; trong 77 BCTC quý 2 hoặc bán niên 2026 của các mã HOSE, HNX
 và UPCoM ngoài VN30 được quét thêm chỉ có 2 file. Thông tin phần mềm tạo file cho thấy phần lớn số còn lại đi ra từ máy
 scan. Bộ đáp án gom được 11 BCTC của 4 công ty, gồm 6 BCTC ngân hàng (VPB từ quý 3/2025 đến quý 3/2026, ACB quý 1/2026)
 và 5 BCTC doanh nghiệp thường (GVR quý 4/2025; PLC quý 2, quý 3, quý 4/2025 và quý 2/2026), tổng cộng 3.107 ô số. Một file của TIG bị loại vì
 lớp chữ của nó do máy nhận dạng từ ảnh chứ không phải chữ gốc: có lỗi chính tả và số bị tách vỡ.
 
-Đáp án được dựng lại từ vị trí chữ trên trang theo hai cách: dùng bộ nhận diện bảng cho bảng có kẻ ô, hoặc gom chữ
-thành hàng theo tung độ và xếp số vào cột theo mép phải cho bảng không kẻ ô. Mỗi báo cáo dùng cách ghép được nhiều
-dòng hơn; cách chọn chỉ dựa vào việc ghép dòng, không dựa vào việc số có khớp hay không. Số \enquote{0} và ô để trống
-được coi là như nhau, vì trên BCTC chúng cùng nghĩa.
+Đáp án được dựng lại từ vị trí chữ trên trang; cách dựng được chọn chỉ theo số dòng ghép được, không dựa vào việc số có
+khớp với kết quả đọc hay không. Số \enquote{0} và ô để trống được coi là như nhau, vì trên BCTC chúng cùng nghĩa.
 
 \subsection{Kết quả theo chất lượng ảnh}
 Để biết độ đúng giảm thế nào trên bản scan xấu, mỗi BCTC còn được dựng lại thành file chỉ gồm ảnh ở ba mức: giống bản
@@ -1595,8 +1458,9 @@ Giống bản scan xấu (72 dpi) & 3.064/3.102 & 98,8\% \\
 Tổng số ô ở các mức chênh nhau vài ô vì ở bản làm mờ có ô \enquote{0} được đọc thành ô trống hoặc ngược lại, mà hai
 dạng này được tính là như nhau.
 
-Ở ảnh gốc, 2 ô sai là một lỗi duy nhất: lãi trên cổ phiếu của ACB quý 1/2026 chỉ in ở cột lũy kế nhưng bị chép sang cột
-quý. Lỗi này đã được phép kiểm \enquote{số quý bằng số lũy kế} và người đọc thứ hai cùng chỉ ra (mục~\ref{sec:nguoidoc2}).
+Ở ảnh gốc, 2 ô sai là một lỗi duy nhất: BCTC quý 1/2026 của ACB chỉ in lãi trên cổ phiếu ở hai cột lũy kế, nhưng lần
+đọc đầu chép số lũy kế năm nay sang cột quý năm trước, nên một ô có số thừa và một ô bị trống. Lỗi này đã được phép
+kiểm \enquote{số quý bằng số lũy kế} và người đọc thứ hai cùng chỉ ra, và đã được sửa theo ảnh.
 
 Ở mức 72 dpi có 38 ô sai. 27 ô nằm trong 3 BCTC mà hệ thống đã báo (phép kiểm lệch, hoặc có dấu hiệu thiếu dòng), nên
 trong quy trình thật chúng sẽ được đọc lại hoặc vào hàng duyệt. 11 ô còn lại lọt qua, thuộc hai loại:
@@ -1606,35 +1470,27 @@ trong quy trình thật chúng sẽ được đọc lại hoặc vào hàng duy�
   \item \textbf{Vài dòng LCTT} của VPB quý 4/2025 mà đáp án dựng lại gộp chung với dòng tiêu đề; chưa tách được do hệ
         thống bỏ sót hay do cách dựng đáp án.
 \end{itemize}
-Phép đo này đã chỉ ra một điểm yếu, nay đã được bổ sung: ở bản 72 dpi của VPB quý 3/2026, hai dòng thu nhập và chi phí
-hoạt động khác bị bỏ sót, còn dòng LNST của cổ đông ngân hàng bị đọc sai 100 triệu đồng và ghi theo tên mà hệ thống chưa
-nhận ra. Phép cộng không báo, vì dòng tổng phía trên vẫn được đọc đúng và dòng LNST công ty mẹ không được gán mã; thẻ
-khi đó lấy LNST chung thay vào. Sau khi thêm phép kiểm đủ dòng (mục~\ref{sec:duydong}), BCTC này bị báo thiếu hai dòng
-khi so với BCTC quý 2, và phép kiểm \enquote{LNST của cổ đông ngân hàng mẹ bằng LNST trừ phần không kiểm soát} chỉ ra ô
-đọc sai. Con số 11 ô lọt ở trên đã tính theo bộ phép kiểm mới.
-Lần đọc thứ hai không chạy trong phép đo này; trong quy trình thật nó còn bắt thêm một phần các ô ở dòng không thuộc
-phép cộng nào.
+Phép đo này là nguồn gốc của phép kiểm đủ dòng (mục~\ref{sec:duydong}): ở bản 72 dpi của VPB quý 3/2026, hai dòng con
+bị bỏ sót mà phép cộng không báo; con số 11 ô lọt ở trên đã tính theo bộ phép kiểm mới. Lần đọc thứ hai không chạy
+trong phép đo này; trong quy trình thật nó còn bắt thêm một phần các ô ở dòng không thuộc phép cộng nào.
 
-Phép đo còn phát hiện một lỗi của quy trình: đôi khi mô hình ghi số trang in ở chân trang BCTC thay vì số trang của ảnh
-được gửi, làm bước đọc lại ô mở nhầm trang. Lỗi này đã xảy ra ở 4 BCTC thật (MSN quý 2/2026, STB quý 1 và quý 2/2026, TCB quý
-1/2026); hệ thống nay tự đổi lại số trang theo thứ tự các trang đã gửi.
+\textbf{Giới hạn:} bộ đáp án chỉ có 4 công ty (VPB chiếm 5/11 BCTC), chưa có công ty chứng khoán, và ảnh làm mờ chưa có
+con dấu đè lên số hay vết gấp như bản scan thật; vì vậy con số 99,94\% được dùng cùng với ước tính trên toàn bộ 119
+BCTC, không thay thế nó.
 
-\subsection{Giới hạn}
-\begin{itemize}
-  \item Bộ đáp án chỉ có 4 công ty và chưa có công ty chứng khoán; VPB chiếm 5/11 BCTC.
-  \item Ảnh làm mờ chưa giống hoàn toàn bản scan thật: không có con dấu đè lên số, không có vết gấp hay bóng mờ ở mép
-        trang. Các lỗi kiểu chữ số bị con dấu che (mục~\ref{sec:nguoidoc2}) vì vậy chưa được đo ở đây.
-  \item Vì vậy con số trực tiếp 99,94\% được dùng cùng với ước tính trên toàn bộ VN30, không thay thế nó.
-\end{itemize}
+\section{Độ đúng theo BCTC và theo từng ô}\label{sec:theoo}
+Hình~\ref{fig:trangthaiketqua} cho trạng thái các BCTC theo kỳ. Bốn BCTC quý 4/2025 \enquote{đã duyệt tay} (BSR, SSB,
+VPL, VHM) là trường hợp chính BCTC tự cộng lệch: lần đọc lại phóng to vẫn ra đúng số cũ, nên người duyệt ghi rõ lý do
+rồi duyệt. BCTC lỗi duy nhất (TCX quý 4/2025) là một công ty chứng khoán có cấu trúc trang khác thường.
 
-\section{Tỷ lệ BCTC đạt kiểm chứng}
-\begin{figure}[H]
+\begin{figure}[tbp]
 \centering
 \begin{tikzpicture}
 \begin{axis}[ybar stacked, bar width=14mm, width=0.86\linewidth, height=6.4cm,
   symbolic x coords={Q4/2025,Q1/2026,Q2/2026,H1/2026}, xtick=data,
   ylabel={Số BCTC}, ymin=0, ymax=36, enlarge x limits=0.18,
-  legend style={at={(0.5,-0.18)},anchor=north,legend columns=4,font=\small},
+  legend style={at={(0.5,-0.18)},anchor=north,legend columns=4,font=\small,
+    /tikz/every even column/.append style={column sep=4mm}},
   nodes near coords, nodes near coords style={font=\scriptsize},
   tick label style={font=\small}, label style={font=\small}]
 \addplot[fill=soigreen!75,draw=soigreen] coordinates {(Q4/2025,25) (Q1/2026,30) (Q2/2026,31) (H1/2026,29)};
@@ -1643,18 +1499,11 @@ Phép đo còn phát hiện một lỗi của quy trình: đôi khi mô hình gh
 \legend{Đã kiểm chứng, Đã duyệt tay, Lỗi}
 \end{axis}
 \end{tikzpicture}
-\caption{Trạng thái 120 BCTC đã đọc (VN30, cộng một mã ngoài VN30 do người dùng yêu cầu ở quý 2/2026): 119/120 đạt
-kiểm chứng hoặc được duyệt tay, không còn BCTC nào chờ duyệt. Không tính một BCTC bán niên trùng file với công bố
+\caption{Trạng thái 120 BCTC đã đọc tính đến 19/10/2026: 119 BCTC đạt kiểm chứng hoặc được duyệt tay (phạm vi đo của
+chương này), 1 BCTC lỗi, không còn BCTC nào chờ duyệt. Không tính một BCTC bán niên trùng file với công bố
 khác.}\label{fig:trangthaiketqua}
 \end{figure}
 
-Bốn BCTC quý 4/2025 \enquote{đã duyệt tay} (BSR, SSB, VPL, VHM) là trường hợp chính BCTC tự cộng lệch. Lần đọc lại phóng
-to vẫn ra đúng số cũ, nên người duyệt ghi rõ lý do rồi duyệt. Ví dụ ở cột quý 4/2024 của BCTC VHM, mã 30 in
-17.067.869, trong khi các dòng 20 đến 26 cộng ra 16.067.869 (cùng công thức này khớp ở ba cột còn lại của bảng) và mã
-50 cũng khớp với 16.067.869; nhiều khả năng doanh nghiệp in nhầm một chữ số ở mã 30. Bản lỗi duy nhất (TCX quý 4/2025) là một công ty chứng khoán
-có cấu trúc trang khác thường.
-
-\section{Độ đúng theo từng ô}\label{sec:theoo}
 Tỷ lệ BCTC đạt kiểm chứng chưa cho biết bao nhiêu ô số được xác nhận, vì một ô chỉ được kiểm khi nó nằm trong ít nhất
 một phép kiểm. Bảng~\ref{tab:theoo} chia toàn bộ 35.196 ô số của 119 BCTC đã kiểm chứng hoặc đã duyệt theo cách ô đó được
 xác nhận. \enquote{Được xác nhận} nghĩa là số khớp ít nhất một phép kiểm (phép cộng trong chính BCTC, hoặc đối chiếu với
@@ -1664,7 +1513,7 @@ thì ước lượng bằng một người đọc thứ hai độc lập (mục~
 
 \begin{table}[H]
 \centering\small
-\caption{Phân loại 35.196 ô số theo cách được xác nhận (VN30, quý 4/2025 đến bán niên 2026)}\label{tab:theoo}
+\caption{Phân loại 35.196 ô số của 119 BCTC theo cách được xác nhận}\label{tab:theoo}
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 \textbf{Loại} & \textbf{Số ô} & \textbf{Tỷ lệ} \\ \midrule
@@ -1680,61 +1529,28 @@ Chưa kiểm được: dòng có phép cộng nhưng hệ thống chưa khai bá
 \end{table}
 
 Như vậy 95,5\% số ô được phép kiểm xác nhận, hay 95,1\% nếu không tính 152 ô người sửa (con số dùng ở
-mục~\ref{sec:ketquachinh}). Nhóm chưa kiểm được tách làm hai. Phần thứ nhất là các dòng mà mẫu biểu không
-đặt vào phép cộng nào: mục ngoài bảng của ngân hàng (cam kết, bảo lãnh, nợ khó đòi đã xử lý), lãi trên cổ phiếu và các
-dòng \enquote{trong đó}. Mục ngoài bảng và dòng \enquote{trong đó} chỉ được xác nhận khi có BCTC kỳ khác để đối chiếu;
-lãi trên cổ phiếu không đối chiếu được như vậy (số quý không bằng lũy kế trừ lũy kế, số kỳ trước hay được tính lại theo
-số cổ phiếu mới), chỉ có phép kiểm số quý bằng số lũy kế ở BCTC quý 1. Phép tính đầy đủ của các dòng này nằm trong thuyết
-minh (hướng mở rộng ở chương~\ref{chap:ketluan}); trong lúc chờ, chúng được so với lần đọc thứ hai
-(mục~\ref{sec:nguoidoc2}). Phần thứ hai là các dòng có phép cộng mà hệ thống chưa khai báo, chủ yếu
-là dòng chi tiết của công ty chứng khoán. 33 ô vẫn lệch phép kiểm sau khi người duyệt đối chiếu ảnh và thấy chính BCTC
-in lệch (BSR, VHM, VPL, SSB quý 4/2025). Không còn ô nào bị phép kiểm chỉ ra nghi sai mà chưa xử lý: với các ô chỉ khác
-BCTC kỳ khác vài chữ số, hệ thống đọc lại ô ở cả hai BCTC; khi cả hai lần đọc lại đều ra đúng số cũ, chênh lệch được ghi
-nhận là số thật khác nhau. Các trường hợp đã đối chiếu ảnh đều là công ty điều chỉnh số khi soát xét (BID, SHB, VPL bán
-niên 2026 khác bản quý 2 ở nhiều dòng cùng lúc) hoặc trình bày khác (một bản tách khoản thu và khoản chi, bản kia gộp
-thành một dòng).
-
-LCTT của công ty chứng khoán có thêm phần lưu chuyển tiền của khách hàng đánh mã lại từ 01. Trước đây các dòng của phần
-này trùng mã với phần của công ty nên bị cộng dồn vào đó; nay chúng được tách riêng và kiểm bằng công thức của phần mình.
-23 công thức chi tiết cho công ty chứng khoán (12 cho BCĐKT và LCTT phần công ty, 11 cho khúc kinh doanh và phần khách
-hàng) khớp 100\% trên 7 BCTC sau khi sửa 3 chỗ đọc sai mà chính các công thức mới chỉ ra; cần xác nhận lại khi có thêm
-BCTC. Ngoài ra
-công thức nối hai báo cáo \enquote{lợi nhuận trước thuế trên LCTT (mã 01) bằng trên KQKD (mã 50)} khớp 91/92 cột và được
-dùng làm bằng chứng thêm; cột lệch duy nhất là do chính BCTC của GAS quý 2/2026 in lệch khoảng 11 tỷ đồng (đã đối chiếu
-ảnh), nên công thức này chưa đưa vào nhóm bắt buộc.
+mục~\ref{sec:ketquachinh}). Ô chưa kiểm được có hai loại: dòng mà mẫu biểu không đặt vào phép cộng nào (mục ngoài bảng
+của ngân hàng, lãi trên cổ phiếu, dòng \enquote{trong đó}), và dòng có phép cộng mà hệ thống chưa khai báo, chủ yếu là
+dòng chi tiết của công ty chứng khoán. Các ô này được so với lần đọc thứ hai (mục~\ref{sec:nguoidoc2}). 33 ô vẫn lệch
+phép kiểm sau khi người duyệt đối chiếu ảnh và thấy chính BCTC in lệch (BSR, VHM, VPL, SSB quý 4/2025). Không còn ô
+nào bị phép kiểm chỉ ra nghi sai mà chưa xử lý: khi một ô khác BCTC kỳ khác, hệ thống đọc lại ô ở cả hai BCTC, và nếu cả
+hai lần đọc lại đều ra đúng số cũ thì chênh lệch được ghi nhận là số thật khác nhau. Bộ công thức chi tiết cho công ty
+chứng khoán khớp 100\% trên 7 BCTC, cần xác nhận lại khi có thêm BCTC.
 
 \section{Kiểm đủ dòng}\label{sec:evalduydong}
-Lần đầu chạy phép kiểm đủ dòng (mục~\ref{sec:duydong}) trên 119 BCTC đã tìm ra lỗi ở 11 BCTC mà phép cộng để lọt:
-\begin{itemize}
-  \item \textbf{7 BCTC ngân hàng} (CTG, HDB, MBB, VPB) có dòng lợi ích cổ đông không kiểm soát nhưng không có dòng LNST
-        của cổ đông ngân hàng mẹ. Dòng này có được đọc, nhưng ghi theo tên mà hệ thống chưa nhận ra, nên thẻ lấy LNST chung
-        (mục~\ref{sec:ketquachinh}). Sau khi bổ sung các cách ghi tên, phép kiểm \enquote{LNST của cổ đông ngân hàng mẹ
-        bằng LNST trừ phần không kiểm soát} khớp 110/110 cột trên mọi BCTC ngân hàng và được đưa vào nhóm bắt buộc. Dấu
-        của phần không kiểm soát được khớp theo cả hai chiều, vì công ty con có thể lỗ.
-  \item \textbf{KQKD quý 2/2026 của TCX} thiếu cả phần từ lợi nhuận trước thuế trở xuống, vì bước định vị trang bỏ sót
-        trang cuối. Mọi phép cộng còn lại vẫn đúng nên BCTC này từng đạt kiểm chứng. Bước chép thêm trang lấy được 13 dòng
-        còn thiếu với chi phí 0,0015 USD, và mọi phép cộng mới đều khớp. Có các dòng này, phép đối chiếu quý 2 với quý 1
-        chỉ ra một chỗ lệch ở BCTC quý 1: dòng lãi từ đánh giá lại tài sản tài chính sẵn sàng để bán. Đọc lại ô và xem
-        ảnh gốc cho thấy chính BCTC quý 1 in nhầm vào dòng này số của dòng LNST; hệ thống đã đọc đúng như in.
-  \item \textbf{KQKD quý 4/2025 của SSI và bán niên 2026 của TCX} có đọc được dòng LNST, nhưng các dòng tổng đều không kèm
-        mã số nên mọi phép cộng KQKD bị bỏ qua. Sau khi các dòng tổng được gán mã theo tên dòng của mẫu công ty chứng
-        khoán, toàn bộ phép kiểm KQKD của hai BCTC này (48 và 24 phép) đều khớp.
-  \item \textbf{BCĐKT quý 2/2026 của SSI} không có phần ngoài bảng, trong khi bản quý 1 có 33 dòng ngoài bảng: lần chép
-        đầu dừng ở trang 6, bỏ qua ba trang cuối. Chép thêm ba trang này lấy được 39 dòng với chi phí 0,0053 USD; số phép
-        kiểm BCĐKT đạt tăng từ 26 lên 30, không phép nào lệch. Từ ca này, quy trình tự chép lại riêng mọi trang được
-        giao cho một báo cáo mà lần chép đầu không ra dòng nào. Trên 119 BCTC còn 12 trang như vậy (HDB, MCH); chép lại
-        đều không ra dòng nào vì đó là trang chữ ký, chi phí cả 12 trang là 0,0082 USD.
-\end{itemize}
-
-Sau khi sửa, phép kiểm còn báo 5/119 BCTC, đều là công ty tự đổi cách trình bày: MWG quý 1 và VIC quý 2/2026 có số đầu năm khác quý liền kề (trình bày lại), còn VHM, VJC và VNM quý 2/2026 đổi tên hoặc gộp một
-dòng LCTT. Vì có loại báo nhầm này, cảnh báo thiếu dòng chỉ để người xem lại chứ không chặn BCTC. Kết quả trên bản
-scan 72 dpi có đáp án ở mục~\ref{sec:dapan}.
+Chạy trên 119 BCTC, phép kiểm đủ dòng (mục~\ref{sec:duydong}) tìm ra lỗi ở 11 BCTC mà phép cộng để lọt: 7 BCTC ngân
+hàng ghi tên dòng LNST của cổ đông ngân hàng mẹ theo cách hệ thống chưa nhận ra, nên 18 số \enquote{LNST của cổ đông
+ngân hàng mẹ} trên thẻ thực ra là LNST chung, cao hơn số đúng từ 0,4\% đến 4,6\%; 3 BCTC công ty chứng khoán thiếu phần
+cuối KQKD hoặc in dòng tổng không kèm mã; 1 BCTC thiếu các trang ngoài bảng ($7 + 3 + 1 = 11$). Cả 11 BCTC đã được sửa;
+mỗi lần chép thêm trang thiếu tốn dưới 0,01 USD. Sau khi bổ sung các cách ghi tên, phép kiểm \enquote{LNST của cổ đông ngân hàng
+mẹ bằng LNST trừ phần không kiểm soát} khớp 110/110 cột trên mọi BCTC ngân hàng và được đưa vào nhóm bắt buộc. Sau khi
+sửa, phép kiểm còn báo 5/119 BCTC, đều do công ty tự đổi cách trình bày, nên cảnh báo thiếu dòng chỉ để người xem lại
+chứ không chặn BCTC.
 
 \section{Phép kiểm bắt được bao nhiêu lỗi}\label{sec:caloi}
 Để đo khả năng bắt lỗi của bộ phép kiểm, hệ thống cấy lỗi giả vào các ô đang được xác nhận của 114 BCTC đã kiểm chứng
-rồi chạy lại toàn bộ phép kiểm, không gọi mô hình. Lỗi nhầm chữ số được lấy theo đúng tần suất nhầm thật: từ các lỗi đã
-sửa, người đọc nhầm 6 thành 8, 1 thành 7, 6 thành 5, 8 thành 5 và 5 thành 3 nhiều hơn hẳn các cặp khác. Một nửa số lỗi
-thật dùng để học tần suất, nửa còn lại dùng để sinh lỗi cấy. Bảng~\ref{tab:caloi} cho kết quả theo từng kiểu lỗi.
+rồi chạy lại toàn bộ phép kiểm, không gọi mô hình. Lỗi nhầm chữ số được lấy theo đúng tần suất nhầm thật học từ các
+lỗi đã sửa: một nửa số lỗi thật dùng để học tần suất, nửa còn lại dùng để sinh lỗi cấy. Bảng~\ref{tab:caloi} cho kết quả theo từng kiểu lỗi.
 
 \begin{table}[H]
 \centering\small
@@ -1760,12 +1576,6 @@ Thiếu một chữ số & 500 & 91,0\% & 9,0\% & 100\% \\
         trước). Lỗi này chỉ lọt khi không có BCTC kỳ khác của cùng công ty.
 \end{itemize}
 
-Với các lỗi nhầm chữ số bị phép cộng bắt, bước định vị lỗi chỉ ra đúng một ô và đúng số ở 32\% trường hợp; ở 68\%
-trường hợp ô đúng nằm trong một nhóm trung bình 6 ô cùng làm khớp phép cộng, cần đọc lại để chọn; chỉ 1 trong 1.671 lần
-đề xuất nhầm ô. Khi xếp nhóm này theo tần suất nhầm thật thay vì theo số chữ số phải đổi, ô đúng đứng đầu 68\% so với
-42\%; trên các lỗi thật đã sửa (mỗi BCTC dùng tần suất học từ các BCTC khác) tỷ lệ này là 22/33. Xác suất này được dùng để chọn khi lần
-đọc lại xác nhận nhiều hơn một ô trong nhóm, và để gợi ý ô cần xem trước cho người duyệt.
-
 \section{Người đọc thứ hai}\label{sec:nguoidoc2}
 Phép kiểm chỉ nói một ô có khớp hay không; để ước lượng số ô sai thật sự mà không phải đối chiếu từng ô với ảnh, toàn bộ
 119 BCTC được một mô hình khác hãng với lần đọc đầu chép lại từ đầu (Claude Haiku 5.5 cho các BCTC trước đây do
@@ -1785,56 +1595,27 @@ số của người thứ hai vào; nếu làm lệch phép kiểm đang khớp 
         BCTC vẫn đạt kiểm chứng.
 \end{itemize}
 
-Tổng cộng 72 số và 6 mã số ở 11 BCTC được sửa theo ảnh nhờ người đọc thứ hai. Ca thứ 11 (ACB quý 1/2026) cũng bị phép kiểm lãi trên cổ phiếu quý 1 nói ở dưới chỉ ra: BCTC chỉ in lãi trên cổ phiếu ở
-hai cột lũy kế, lần đọc đầu chép số của năm nay sang cột quý năm trước. Sau khi sửa, ở nhóm chưa kiểm được không
-còn ô nào hai người đọc khác chữ số.
+Tổng cộng 72 số và 6 mã số ở 11 BCTC được sửa theo ảnh nhờ người đọc thứ hai; ca thứ 11 là lỗi lãi trên cổ phiếu của ACB
+đã tả ở mục~\ref{sec:dapan}. Sau khi sửa, ở nhóm chưa kiểm được không còn ô nào hai người đọc khác chữ số.
 
-\subsection{Ước lượng số lỗi chưa bên nào phát hiện}
-Có hai \enquote{lưới} bắt lỗi gần như độc lập: phép kiểm kế toán và người đọc thứ hai. Phương pháp bắt--thả--bắt lại
-(ước lượng Lincoln--Petersen, bản hiệu chỉnh của Chapman) dùng số lỗi mỗi lưới bắt được và số lỗi cả hai cùng bắt để
-ước lượng tổng số lỗi, kể cả số lỗi cả hai cùng bỏ sót. Với N là tổng số lỗi, n\textsubscript{1}, n\textsubscript{2}
-là số lỗi mỗi lưới bắt được và m là số lỗi cả hai cùng bắt, nếu với mỗi lỗi hai lưới bắt độc lập với nhau thì kỳ vọng
-của m bằng N nhân hai xác suất bắt, suy ra ước lượng N = n\textsubscript{1}n\textsubscript{2}/m.
-
-Trên 154 ô đã biết là đọc sai (người sửa sau khi xem ảnh, hoặc lần đọc lại đã sửa đúng; không tính các lần chỉ sửa dấu
-phân cách), mỗi ô được đặt lại số sai ban đầu rồi hỏi hai lưới: phép kiểm bắt 135 ô, người đọc thứ hai bắt 145 ô, cả hai
-cùng bắt 131 ô. Công thức cho tổng khoảng 149,4 lỗi, tức chỉ còn khoảng 0,4 lỗi chưa bên nào thấy. Nhưng chính bộ dữ liệu
-đã có 5 lỗi mà cả hai lưới cùng bỏ sót (người tìm ra bằng cách khác): một chữ số trên file 72 dpi của GVR mà cả hai đều không
-phát hiện, và bốn ô trong các khối dòng chép lệch của SSB và SSI. Nghĩa là giả định độc lập không đứng
-vững: lỗi khó thì khó với cả hai bên. Vì vậy phương pháp này không được dùng làm con số chính; nó chỉ cho thấy số lỗi
-còn sót không thể suy ra chỉ từ hai lưới, và cần đáp án thật như ở mục~\ref{sec:dapan}.
+Phép kiểm và người đọc thứ hai không phải hai lưới bắt lỗi độc lập: trong 154 ô đã biết là đọc sai có 5 ô cả hai cùng
+bỏ sót, vì lỗi khó thì khó với cả hai bên. Vì vậy số lỗi còn sót không suy ra được từ hai lưới này mà cần đáp án thật
+như ở mục~\ref{sec:dapan}.
 
 \subsection{Đọc lần hai trong quy trình xử lý BCTC mới}
-Từ mùa BCTC quý 3/2026, lần đọc thứ hai là bước cuối của quy trình, chạy sau khi đã báo tin cho người theo dõi để không
-làm chậm thông báo. Hệ thống chỉ cho nhà cung cấp còn lại chép lại những báo cáo còn ô chưa được phép kiểm nào xác nhận;
-trên 119 BCTC hiện có, các báo cáo đó chiếm 395 trong 837 trang báo cáo, nên chi phí của bước này chưa tới một nửa so
-với chép lại toàn bộ. Kết quả chỉ dùng cho ô chưa kiểm được, theo hai trạng thái mới trên giao diện:
-\begin{itemize}
-  \item \textbf{Hai lần đọc trùng nhau}: thêm một bằng chứng độc lập, nhưng không tính vào nhóm được phép kiểm xác nhận,
-        vì hai người đọc cùng sai thành một số tuy hiếm nhưng không bị loại trừ như với phép cộng. Trên 119 BCTC, 1.244
-        trong 1.550 ô chưa kiểm được (3,5\% tổng số ô) thuộc trạng thái này, gồm 264/279 ô lãi trên cổ phiếu (so theo
-        đồng, không theo đơn vị của bảng) và 342/368 ô ngoài bảng của ngân hàng. 306 ô còn lại (0,9\%) chủ yếu là ô
-        người đọc thứ hai không chép. Lãi trên cổ phiếu của BCTC quý 1 có thêm phép kiểm riêng: số quý và số lũy kế in ở
-        hai cột khác nhau nhưng phải bằng nhau.
-  \item \textbf{Hai lần đọc khác nhau}: ô được tô màu \enquote{cần xem lại} và đếm vào số ô cần xem của BCTC trong thư báo
-        quản trị, nhưng \textbf{không} làm BCTC mất trạng thái đạt kiểm chứng. Người đọc thứ hai không nhất thiết đọc tốt
-        hơn: với BCTC do Claude Haiku 5.5 đọc lần đầu, người đọc thứ hai là gpt-5.4-mini, mô hình hiện chỉ làm dự phòng.
-        Nếu chặn BCTC theo người đọc thứ hai, mỗi lỗi của chính người này sẽ giữ cả BCTC lại chờ duyệt.
-\end{itemize}
-Hai cột của BCTC bán niên và BCTC năm được so theo cả hai cách gán cột (cả kỳ hoặc lũy kế), và ô cùng dãy chữ số nhưng
-hai bên hiểu đơn vị tính khác nhau được coi là trùng, vì đơn vị do code xác định và đã có phép kiểm riêng.
+Từ mùa BCTC quý 3/2026, lần đọc thứ hai chạy tự động cho mọi BCTC mới (mục~\ref{sec:bangchung}). Trên 119 BCTC, các báo
+cáo còn ô chưa kiểm được chiếm 395 trong 837 trang báo cáo, nên bước này tốn chưa tới một nửa so với chép lại toàn bộ.
+Trong 1.550 ô chưa kiểm được, 1.244 ô có hai lần đọc trùng nhau, gồm 264/279 ô lãi trên cổ phiếu và 342/368 ô ngoài
+bảng của ngân hàng. Ô hai lần đọc khác nhau được tô màu \enquote{cần xem lại} và báo cho quản trị, nhưng \textbf{không}
+làm BCTC mất trạng thái đạt kiểm chứng: người đọc thứ hai không nhất thiết đọc tốt hơn, nên nếu chặn theo nó thì mỗi
+lỗi của chính nó sẽ giữ cả BCTC lại chờ duyệt.
 
 \section{Chi phí}
-\subsection{Cách tính}
-Mỗi BCTC có một bản ghi trích xuất, cộng dồn token của mọi lần gọi mô hình cho chính BCTC đó: định vị trang, chép bảng,
-chép lại trang, đọc lại ô. Vì vậy chi phí trong mục này là \textbf{chi phí đọc một BCTC} đúng như khi hệ thống chạy thật.
-Chi phí \textbf{phát triển} (các lần chạy thử rồi bị ghi đè khi sửa code, các thử nghiệm riêng) \textbf{không} nằm trong
-các con số dưới đây; tổng tiền thực trả cho nhà cung cấp mô hình trong giai đoạn phát triển cao hơn.
-
-Số liệu đáng tin nhất cho chi phí vận hành là \textbf{29 BCTC quý 4/2025} (bản lỗi của TCX không có bản ghi chi phí):
-đây là đợt đọc đầu tiên chạy trọn bằng quy trình hiện tại (có định vị ô sai, đọc phóng to) và có ghi chi phí theo từng
-bước. 90 BCTC các kỳ còn lại được đọc bằng quy trình cũ, sau đó được đọc lại một phần bằng quy trình hiện tại; chi phí
-của chúng (trung bình 0,108 USD) dùng để đối chiếu.
+Mỗi BCTC có một bản ghi cộng dồn token của mọi lần gọi mô hình cho chính BCTC đó, nên chi phí ở đây là \textbf{chi phí
+đọc một BCTC} đúng như khi hệ thống chạy thật; chi phí \textbf{phát triển} (các lần chạy thử, thử nghiệm riêng)
+\textbf{không} nằm trong đó. Số liệu đáng tin nhất là \textbf{29 BCTC quý 4/2025} (bản lỗi của TCX không có bản ghi chi
+phí), đợt đầu tiên chạy trọn bằng quy trình hiện tại và có ghi chi phí theo từng bước. 90 BCTC các kỳ còn lại được đọc
+bằng quy trình cũ rồi đọc lại một phần bằng quy trình hiện tại; chi phí của chúng dùng để đối chiếu.
 
 \begin{table}[H]
 \centering\small
@@ -1851,40 +1632,16 @@ Chép lại trang còn lệch & 2,7 & 10.110 & 5.658 & 0,033 \\
 \end{tabular}
 \end{table}
 
-\begin{table}[H]
-\centering\small
-\caption{Phân bố chi phí mỗi BCTC (USD)}\label{tab:phanbo}
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-& \textbf{Số BCTC} & \textbf{Trung bình} & \textbf{Trung vị} & \textbf{90\% dưới} \\ \midrule
-Quy trình hiện tại (quý 4/2025) & 29 & 0,117 & 0,084 & 0,173 \\
-\quad Ngân hàng & 13 & 0,096 & & \\
-\quad Doanh nghiệp thường & 15 & 0,136 & & \\
-\quad Công ty chứng khoán & 1 & 0,121 & & \\
-Các kỳ còn lại (Q1, Q2, bán niên 2026) & 90 & 0,108 & 0,083 & 0,136 \\
-\bottomrule
-\end{tabular}
-\end{table}
+Trên 29 BCTC này, trung vị là 0,084 USD và 90\% số BCTC tốn dưới 0,173 USD; trung bình ở ngân hàng 0,096 USD, ở doanh
+nghiệp thường 0,136 USD. 90 BCTC các kỳ còn lại tốn trung bình 0,108 USD, trung vị 0,083 USD. Trung vị thấp hơn trung
+bình vì một số BCTC khó tốn gấp 2--3 lần: phải chép lại nhiều trang, hoặc chính BCTC in lệch nên hệ thống đọc lại nhiều
+lần trước khi chuyển duyệt tay. So với hệ thống của khóa trước (272.054 token vào mỗi báo cáo, 0,04 USD), Soi dùng ít
+token vào hơn khoảng 4,7 lần nhưng tốn hơn, vì đọc ảnh đắt hơn đọc văn bản OCR và vì Soi đọc lại để kiểm chứng; đổi lại,
+Soi không cần GPU và mỗi số đều đã được kiểm chứng.
 
-Trung vị (0,084 USD) thấp hơn trung bình vì một số BCTC khó tốn gấp 2--3 lần: BCTC phải chép lại nhiều trang, hoặc BCTC tự
-in lệch nên hệ thống đọc lại nhiều lần trước khi chuyển duyệt tay. Bước \enquote{chép lại trang} chiếm khoảng 1/4 chi phí và
-sẽ giảm khi bộ quy tắc bắt được thêm các dạng BCTC đặc biệt (mỗi lỗi quy tắc đã sửa ở quý 4/2025 đều từng gây chép lại).
-
-\subsection{Ước tính chi phí vận hành}
-Với mỗi mã, mỗi kỳ Soi chỉ đọc một BCTC dùng cho thẻ (ưu tiên hợp nhất), không đọc mọi bản riêng lẻ. Một năm có 4 BCTC
-quý, 1 bán niên và 1 năm, tức khoảng 6 BCTC mỗi mã. Lấy 0,10--0,12 USD mỗi BCTC:
-
-\begin{table}[H]
-\centering\small
-\caption{Ước tính chi phí gọi mô hình khi vận hành (chưa gồm đọc theo yêu cầu người dùng, đã có trần riêng)}\label{tab:uoctinh}
-\begin{tabular}{@{}lrrr@{}}
-\toprule
-\textbf{Phạm vi} & \textbf{BCTC mỗi mùa quý} & \textbf{USD mỗi mùa quý} & \textbf{USD mỗi năm} \\ \midrule
-VN30 & khoảng 30 & 3--3,5 & 18--22 \\
-VN100 & khoảng 100 & 10--12 & 60--72 \\
-\bottomrule
-\end{tabular}
-\end{table}
+Mỗi mã, mỗi kỳ Soi chỉ đọc một BCTC dùng cho thẻ (ưu tiên hợp nhất). Với 0,10--0,12 USD mỗi BCTC, chi phí gọi mô hình
+khi vận hành vào khoảng 3--3,5 USD mỗi mùa quý cho VN30 và 10--12 USD cho VN100, chưa gồm đọc theo yêu cầu người dùng
+(đã có trần riêng).
 
 \section{Định vị ô đọc sai}\label{sec:evalrepair}
 \subsection{Bộ đề và cách thử}
@@ -1897,21 +1654,12 @@ Bộ đề này \textbf{nghiêng về các ca khó}: một ô chỉ vào bộ đ
 phải đọc lại. Các ô đọc sai mà quy trình đã tự sửa ngay thì không có trong đề.
 
 \subsection{Bốn loại kết quả}
-\begin{itemize}
-  \item \textbf{Ngoài tầm:} ô sai không nằm trong phép cộng bắt buộc nào bị lệch, và đối chiếu với BCTC kỳ khác cũng không
-        tự chỉ ra được. Đọc sai ô này thì mọi phép cộng vẫn khớp, nên không phương pháp nào dựa trên phép cộng nhận ra
-        được. Các ô này được loại khỏi phép đo.
-  \item \textbf{Đúng ngay:} chỉ bằng phép tính, bước định vị chỉ ra đúng một ô và đúng số, chưa cần nhìn lại ảnh. Thường là
-        ô nằm trong hai phép cộng cùng lệch.
-  \item \textbf{Cần đọc lại cả nhóm:} phép tính thu hẹp được về một nhóm vài ô, trong đó có phương án đúng, nhưng chưa
-        biết ô nào. Ví dụ: tài sản ngắn hạn (mã 100) bằng tổng các mã 110 đến 150 nhưng đang lệch đúng 1 tỷ đồng. Nếu
-        tiền (mã 110) đọc nhầm 6,231 tỷ thành 5,231 tỷ thì lệch 1 tỷ; nếu tồn kho (mã 140) đọc nhầm 13,4 tỷ thành
-        12,4 tỷ thì cũng lệch đúng 1 tỷ. Cả hai đều chỉ khác một chữ số. Khi đó hệ thống \textbf{tự gửi ảnh trang cho
-        mô hình đọc lại riêng các ô trong nhóm} (không cho biết số mong đợi) và nhận ô duy nhất đọc ra đúng số đề xuất
-        (mục~\ref{sec:loi}). Bước này hoàn toàn tự động, không có người chấm.
-  \item \textbf{Sót:} bước định vị không đưa ra đề xuất nào cho ô này. Ô đi tiếp sang các bậc sau: chép lại trang, rồi
-        duyệt tay.
-\end{itemize}
+Ô \textbf{ngoài tầm} không nằm trong phép cộng bắt buộc nào bị lệch, nên không phương pháp nào dựa trên phép cộng nhận
+ra được; các ô này được loại khỏi phép đo. Ô \textbf{đúng ngay} được chỉ ra đúng ô và đúng số chỉ bằng phép tính. Ô
+\textbf{cần đọc lại cả nhóm} nằm trong một nhóm vài ô cùng làm khớp phép cộng: ví dụ tài sản ngắn hạn đang lệch đúng 1
+tỷ đồng, có thể do tiền đọc nhầm 6,231 tỷ thành 5,231 tỷ, hoặc tồn kho đọc nhầm 13,4 tỷ thành 12,4 tỷ; hệ thống tự đọc
+lại các ô trong nhóm (không cho biết số mong đợi) và nhận ô duy nhất ra đúng số đề xuất. Ô \textbf{sót} không có đề
+xuất nào và đi tiếp sang chép lại trang, rồi duyệt tay.
 
 \begin{figure}[H]
 \centering
@@ -1933,34 +1681,19 @@ nhóm; đọc lại vài ô tốn khoảng 0,003 USD mỗi BCTC. Nếu bỏ BCTC
 \end{figure}
 
 \subsection{Phân tích các ca ngoài tầm, ca sót và đề xuất sai}
-\begin{itemize}
-  \item \textbf{75 ô ngoài tầm} là các dòng chi tiết không thuộc phép cộng bắt buộc nào, hoặc chỉ lệch so với BCTC kỳ khác.
-        Phần lớn do người đọc thứ hai tìm ra (mục~\ref{sec:nguoidoc2}); riêng hai khối lệch dòng ở phần ngoài bảng của
-        SSB bán niên 2026 và LCTT của MBB quý 1/2026 đã chiếm 42 ô. Số còn lại người duyệt tìm ra nhờ màu bằng chứng trên
-        trang tài liệu (\enquote{cần xem lại}, \enquote{chưa kiểm được}).
-        Các chỉ tiêu dùng trên thẻ KQKD đều nằm trong phép cộng bắt buộc, nên đọc sai thì phép cộng sẽ lệch và hệ thống
-        không công bố.
-  \item \textbf{44 ô sót} phần lớn rơi vào trường hợp \textbf{nhiều ô sai cùng lúc trong cùng một phép cộng}, trái với giả
-        thiết của bước định vị là mỗi phép cộng chỉ có một ô sai (hoặc hai ô lệch cùng một lượng):
-  \begin{itemize}
-    \item 17 ô của BCTC bán niên 2026 của GVR. File chỉ có độ phân giải 72 dpi, nên mô hình đọc sai nhiều chữ số trên cùng
-          một trang. Ví dụ ba dòng nợ ngắn hạn (mã 312, 316, 319) cùng sai trong phép cộng của mã 310; nguyên giá và hao
-          mòn tài sản cố định cùng sai trong phép cộng của mã 221. Khi đó không có cách thay một ô nào làm phép cộng khớp
-          lại. Người duyệt sửa các ô này sau khi đối chiếu ảnh phóng to.
-    \item 9 ô nằm trong \textbf{cùng một cột} (số liệu cùng kỳ năm trước) của BCTC quý 4/2025 của VHM: cả cột bị đọc sai
-          nhiều chỗ một lúc. Nguyên nhân sau này tìm ra là các trang KQKD của BCTC đó bị vẽ lộn ngược
-          (mục~\ref{sec:evalanh}).
-    \item 8 ô của BCTC quý 1 và quý 2/2026 của VHM, trong đó 2 ô mô hình chép số của một dòng khác (số khác hẳn, không
-          phải nhầm 1--2 chữ số).
-    \item 8 ô ở đoạn cuối khúc kinh doanh LCTT của SSI quý 2/2026: cả đoạn lệch một dòng nên nhiều ô của cùng một phép
-          cộng sai một lúc. 2 ô còn lại (SSI bán niên, TCX quý 1/2026) là số bị chép sang cột hoặc dòng khác.
-  \end{itemize}
-  \item \textbf{5 đề xuất sai} đều ở các BCTC của VHM có nhiều ô sai cùng lúc nói trên. Không đề xuất sai nào được nhận
-        trong các lần chạy thật, vì số đề xuất chỉ được nhận khi lần đọc lại ảnh ra đúng số đó.
-        Trong các lần chạy thật, mọi số được nhận qua bước \enquote{định vị $\rightarrow$ đọc lại xác nhận} đều đúng khi
-        đối chiếu với ảnh gốc. Ví dụ BCTC bán niên của HDB có một ô BCĐKT đọc sai được sửa đúng nhờ đề xuất của bước định
-        vị; bước đọc phóng to theo dải sửa được một ô của VHM mà lần đọc lại thường vẫn nhầm.
-\end{itemize}
+75 ô ngoài tầm là các dòng không thuộc phép cộng bắt buộc nào, phần lớn do người đọc thứ hai tìm ra
+(mục~\ref{sec:nguoidoc2}); các chỉ tiêu dùng trên thẻ KQKD đều nằm trong phép cộng bắt buộc. 44 ô sót phần lớn là
+trường hợp nhiều ô sai cùng lúc trong một phép cộng, trái với giả thiết mỗi phép cộng chỉ có một ô sai, và dồn ở ba
+BCTC khó: bán niên 2026 của GVR (file 72 dpi, 17 ô), VHM (trang lộn ngược và chép nhầm dòng, 17 ô), SSI quý 2/2026 (cả
+đoạn LCTT lệch một dòng, 8 ô); 2 ô còn lại là số bị chép sang cột hoặc dòng khác ($17 + 17 + 8 + 2 = 44$). 5 đề xuất sai
+đều ở các BCTC của VHM nói trên và không đề xuất nào được nhận trong các lần chạy thật, vì lần đọc lại ảnh không ra
+đúng số đó.
+
+Trên các lỗi cấy nhầm một chữ số mà phép cộng bắt được (mục~\ref{sec:caloi}), bước định vị chỉ ra đúng một ô và đúng số
+ở 32\% trường hợp; còn lại ô đúng nằm trong một nhóm trung bình 6 ô, và chỉ 1 trong 1.671 lần đề xuất nhầm ô. Khi xếp
+nhóm theo tần suất nhầm chữ số thật, ô đúng đứng đầu nhóm ở 68\% lỗi cấy (42\% nếu xếp theo số chữ số phải đổi) và ở
+22/33 lỗi thật; thứ tự này dùng để chọn khi lần đọc lại xác nhận nhiều hơn một ô và để gợi ý ô cần xem trước cho người
+duyệt.
 
 \section{Chép lại cả báo cáo}\label{sec:evalchep}
 Thống kê từ nhật ký lưu trong từng BCTC: mỗi lần chép lại ghi số ràng buộc đạt và lệch trước, sau, và bản mới có được giữ
@@ -1968,7 +1701,7 @@ hay không.
 
 \begin{table}[H]
 \centering\small
-\caption{Bậc chép lại cả báo cáo trên 120 BCTC (khoảng 360 báo cáo BCĐKT, KQKD, LCTT)}\label{tab:chep}
+\caption{Bậc chép lại cả báo cáo trên 119 BCTC (khoảng 360 báo cáo BCĐKT, KQKD, LCTT)}\label{tab:chep}
 \begin{tabularx}{\linewidth}{@{}Xr@{}}
 \toprule
 \textbf{Chỉ tiêu} & \textbf{Số báo cáo} \\ \midrule
@@ -1981,30 +1714,26 @@ Bản chép lại không tốt hơn, giữ bản cũ & 30 \\
 \end{tabularx}
 \end{table}
 
-Khi được giữ, bản chép lại sửa triệt để: cả 16 báo cáo đều hết lệch, gồm 1.456 ô số (4,2\% toàn bộ ô,
-Bảng~\ref{tab:theoo}). Bậc này sửa được những lỗi mà đọc lại từng ô không sửa được: BCĐKT quý 1/2026 của MBB có thêm 9
-dòng bị bỏ sót, LCTT bán niên của GVR thêm 7 dòng; KQKD bán niên của GVR, HDB, MCH trước đó không kiểm được ràng buộc
-nào; cả ba
-báo cáo của VHM quý 1/2026 và KQKD quý 4/2025 của HPG có trang lộn ngược. Mặt hạn chế là 30/46 lần chép lại không giúp
-gì; phần lớn các báo cáo đó về sau hết lệch nhờ đọc lại ô, sửa quy tắc hoặc sửa tay, còn 4 báo cáo là do chính BCTC in
-lệch. Bậc này chiếm khoảng 0,033 USD mỗi BCTC (Bảng~\ref{tab:chiphi}). Số ràng buộc \enquote{trước} được tính theo bộ
-quy tắc lúc chạy, còn trạng thái hiện tại đã gồm cả các lần sửa quy tắc về sau, nên không tách được 30 báo cáo kia hết
-lệch nhờ cách nào.
+Khi được giữ, bản chép lại sửa triệt để: cả 16 báo cáo đều hết lệch, và 1.491 ô số của chúng (4,2\% toàn bộ ô, đúng dòng
+tương ứng của Bảng~\ref{tab:theoo}) được phép kiểm xác nhận; con số này không tính các ô của cùng báo cáo về sau còn
+phải đọc lại riêng hoặc sửa tay. Các lỗi được sửa là loại mà đọc lại từng ô không sửa được: bỏ sót dòng, trang lộn
+ngược, cả báo cáo trước đó không kiểm được ràng buộc nào. Mặt hạn chế là 30/46 lần chép lại không giúp gì; phần lớn các
+báo cáo đó về sau hết lệch nhờ đọc lại ô, sửa quy tắc hoặc sửa tay, còn 4 báo cáo là do chính BCTC in lệch. Bậc này
+chiếm khoảng 0,033 USD mỗi BCTC (Bảng~\ref{tab:chiphi}).
 
 \section{Chuẩn bị ảnh cho bước đọc lại}\label{sec:evalanh}
 Thí nghiệm dùng lại các ô đã biết là đọc sai của mục~\ref{sec:evalrepair}, cộng thêm số ô đối chứng bằng nhau: các ô
 đúng lấy ngẫu nhiên trên cùng trang, để đo xem cách vẽ mới có làm hỏng ô đang đúng hay không. Mỗi trang được hỏi một lần
-cho mỗi cách vẽ. Ô sai và ô đối chứng được trộn lẫn, và mô hình không được biết số mong đợi. Ba trang bị loại vì bản ghi
-lưu sai góc xoay nên cả hai cách đều vẽ trang lộn ngược (mục dưới); còn lại 27 trang của 16 BCTC.
+cho mỗi cách vẽ. Ô sai và ô đối chứng được trộn lẫn, và mô hình không được biết số mong đợi.
 
 \begin{table}[H]
 \centering\small
-\caption{Đọc lại 71 ô sai và 71 ô đối chứng (27 trang của 16 BCTC, gpt-5.4-mini)}\label{tab:anhnet}
+\caption{Đọc lại 71 ô sai và 71 ô đối chứng (27 trang của 16 BCTC, gpt-5.4-mini; không tính 3 trang lưu sai góc xoay)}\label{tab:anhnet}
 \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrr@{}}
 \toprule
 \textbf{Cách vẽ ảnh} & \textbf{Ô sai đọc ra đúng} & \textbf{Ô đối chứng vẫn đúng} \\ \midrule
 Cũ: vẽ trang cạnh dài 3000 điểm ảnh, API tự thu nhỏ & 38/71 (54\%) & 64/71 (90\%) \\
-Mới: vẽ theo độ phân giải scan gốc, phóng Lanczos, mức \code{original} (mục~\ref{sec:anhnet}) & \textbf{57/71 (80\%)} & \textbf{67/71 (94\%)} \\
+Mới: vẽ theo độ phân giải scan gốc, phóng Lanczos, gửi ảnh không thu nhỏ (mục~\ref{sec:anhnet}) & \textbf{57/71 (80\%)} & \textbf{67/71 (94\%)} \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -2018,15 +1747,10 @@ tổng thể giữa hai cách thì đủ lớn để kết luận.
 
 Kiểm lại trong quy trình thật: trả các ô đã biết về số sai cũ trên 4 BCTC mờ (GVR bán niên, VHM quý 1/2026, HDB, LPB;
 51 ô), rồi chạy bước \enquote{định vị $\rightarrow$ đọc lại $\rightarrow$ chỉ nhận khi khớp}. Cách cũ tự sửa đúng 11 ô,
-cách mới 20 ô; cả hai cách đều không nhận nhầm ô nào, chi phí gần như nhau (0,11 và 0,12 USD cho cả 4 BCTC).
-
-\begin{ghichu}{Phát hiện phụ: trang lộn ngược}
-Khi xem ảnh của thí nghiệm, ba trang KQKD của BCTC quý 4/2025 của VHM hiện ra lộn ngược: bước định vị trang ghi góc xoay
-90 độ trong khi đúng phải là 270 độ. Cả KQKD của BCTC này vì vậy đã được chép trên ảnh lộn ngược, và đây là nguyên nhân
-của lỗi \enquote{cả cột hỏng} ở mục~\ref{sec:evalrepair}. Góc xoay của các trang này đã được sửa. Với BCTC
-đọc từ nay, trang lộn ngược làm ràng buộc lệch, nên ở bậc chép lại hệ thống sẽ thử xoay từng trang 180 độ
+cách mới 20 ô; cả hai cách đều không nhận nhầm ô nào, chi phí gần như nhau (0,11 và 0,12 USD cho cả 4 BCTC). Thí
+nghiệm này cũng cho thấy ba trang KQKD của VHM quý 4/2025 đã được chép trên ảnh lộn ngược do lưu sai góc xoay; đây là
+nguyên nhân của nhiều ô sót ở mục~\ref{sec:evalrepair}, và từ đó bậc chép lại tự thử xoay từng trang
 (mục~\ref{sec:leothang}).
-\end{ghichu}
 
 \section{Đối chiếu với nguồn dữ liệu công khai}\label{sec:doichieu}
 Sau mỗi mùa BCTC, một chương trình đối chiếu so các chỉ tiêu trên thẻ với bảng KQKD theo quý của một trang dữ liệu
@@ -2049,16 +1773,9 @@ tài chính công khai. Số của nguồn ngoài \textbf{chỉ dùng nội bộ
 200 triệu đồng) đều là trường hợp số của Soi thỏa ràng buộc của chính BCTC.}\label{fig:doichieu}
 \end{figure}
 
-\begin{ghichu}{Bài học: lỗi \enquote{đọc đúng số nhưng lấy nhầm dòng}}
-Lần đối chiếu đầu tìm ra một lỗi thật của Soi. BCTC quý 1/2026 của VIC không in mã cho hai dòng \enquote{LNST của cổ
-đông công ty mẹ} và \enquote{của cổ đông không kiểm soát}. Thẻ không tìm thấy dòng công ty mẹ nên lấy dòng LNST tổng.
-Kết quả thẻ hiện LNST công ty mẹ 5.611 tỷ, \textbf{tăng khoảng 150\%}, trong khi số đúng là 7.276 tỷ, \textbf{tăng
-4,3\%}. Mọi ô đều được đọc đúng, nên bộ kiểm chứng không bắt được lỗi này.
-
-Cách sửa: gán mã 61/62 theo tên dòng khi BCTC không in mã. Nhờ đó ràng buộc $61 + 62 = 60$ kiểm được hai dòng này.
-Rút ra: ràng buộc kế toán bắt được lỗi \emph{đọc sai số}, nhưng cần thêm đối chiếu nguồn ngoài để bắt lỗi \emph{lấy
-nhầm dòng}. Vì vậy đối chiếu nguồn ngoài đã trở thành bước cố định sau mỗi mùa BCTC.
-\end{ghichu}
+Lần đối chiếu đầu tìm ra một lỗi lấy nhầm dòng LNST của cổ đông công ty mẹ ở một BCTC không in mã cho dòng này: mọi ô
+đều đọc đúng nên phép kiểm không bắt được. Lỗi đã được sửa bằng cách gán mã theo tên dòng, và đối chiếu nguồn ngoài trở
+thành bước cố định sau mỗi mùa BCTC.
 
 \section{Agent tạo báo cáo: hiểu yêu cầu}\label{sec:evalagent}
 Bộ đo gồm 58 câu hỏi tiếng Việt, mỗi câu kèm kế hoạch đúng: 53 câu tự soạn và 5 câu do người dùng thử viết theo cách
@@ -2088,16 +1805,6 @@ một lần sau lần chạy đầu trên 53 câu tự soạn (thêm cách hiể
 sách), nên kết quả trên 53 câu đó có phần lạc quan. 5 câu do người dùng thử viết được thêm sau khi đã chỉnh, nên là phép
 kiểm khách quan; cả hai nhà đều hiểu đúng cả 5 câu.
 
-Phần viết lời và bộ kiểm tra số sẽ được đo trên cả bộ câu khi mùa BCTC quý 3 về đủ số (mục hướng phát triển).
-
-\section{Tốc độ và các thước đo khác}
-\chualam
-\begin{itemize}
-  \item Time-to-Insight: từ lúc BCTC xuất hiện tới lúc thẻ được công bố, p50/p95, đo trong mùa quý 3/2026.
-  \item Độ chính xác theo ô trên bộ dữ liệu vàng (50--100 BCTC duyệt tay).
-  \item So sánh Number F1 với baseline của khóa trước trên bộ vnpdf.
-\end{itemize}
-
 % ============================================================================
 % CHƯƠNG 6: KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
 % ============================================================================
@@ -2107,7 +1814,7 @@ Phần viết lời và bộ kiểm tra số sẽ được đo trên cả bộ c
 Đến giữa tháng 10/2026, Soi đã có đủ chuỗi xử lý: thu thập BCTC, đọc bằng mô hình thị giác, kiểm chứng bằng ràng buộc kế
 toán, tự định vị và sửa ô đọc sai, đọc lần hai bằng mô hình khác hãng, tính thẻ KQKD có cờ cảnh báo, và giao diện web.
 Trên 11 BCTC có sẵn đáp án, hệ thống đọc đúng 99,94\% ô mà không cần người (98,8\% khi ảnh xấu như bản scan 72 dpi).
-Trên 119 BCTC của VN30, hệ thống tự xử lý trọn 97 BCTC (81,5\%) mà không cần người, và ước tính khoảng 99,5\% ô số đúng
+Trên 119 BCTC, chủ yếu của nhóm VN30, hệ thống tự xử lý trọn 97 BCTC (81,5\%) mà không cần người, và ước tính khoảng 99,5\% ô số đúng
 mà không cần người sửa (95,1\% có phép kiểm tự động xác nhận). Người chỉ phải sửa 152 ô, trung bình 8 ô ở mỗi BCTC cần
 sửa thay vì nhập lại khoảng 300 ô. Chi phí đọc trung bình khoảng 0,12 USD mỗi BCTC (khoảng 3--3,5 USD cho
 cả nhóm VN30 mỗi mùa BCTC quý). Đối chiếu với nguồn ngoài cho thấy số liệu khớp ở 208/211 ô, và cả 3 ô
@@ -2122,16 +1829,16 @@ nhà cung cấp mô hình.
 \section{Hướng phát triển}
 Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện. Mỗi mục sẽ được viết đầy đủ khi hoàn thành.
 
-\subsection{Chạy thật mùa BCTC quý 3/2026 cho VN30}\chualam
+\subsection{Đo độ đúng trên cả mùa BCTC quý 3/2026}\chualam
+\subsection{Đo thời gian từ lúc công bố tới lúc có thẻ trong mùa quý 3/2026}\chualam
 \subsection{Chỉ số tài chính: biên lợi nhuận gộp, ROE, tăng trưởng lũy kế}\chualam
 \subsection{Đo phần viết của agent và bộ kiểm tra số trên cả bộ câu, so hai nhà cung cấp}\chualam
-\subsection{Bộ dữ liệu vàng và benchmark vnpdf}\chualam
 \subsection{Phép thử so với trợ lý AI đa năng}\chualam
 \subsection{Mở rộng lên VN100}\chualam
-\subsection{Tìm nguyên nhân biến động trong thuyết minh và công văn giải trình}\chualam
+\subsection{Đưa nguyên nhân biến động từ công văn giải trình lên thẻ}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam
 \subsection{Xác suất đúng cho từng ô và bước kiểm chứng tự chọn công cụ theo lợi ích trên chi phí}\chualam
-\subsection{Mở rộng bộ đáp án: công ty chứng khoán, bản scan thật có con dấu}\chualam
+\subsection{Mở rộng bộ đáp án và so với khóa trước trên bộ vnpdf}\chualam
 \subsection{Sàng lọc doanh nghiệp tăng trưởng và kiểm định lịch sử (backtest)}\chualam
 \subsection{Radar sự kiện công bố thông tin và bản tin sáng theo danh mục}\chualam
 \subsection{Kênh phân phối: Facebook, Zalo, MCP}\chualam

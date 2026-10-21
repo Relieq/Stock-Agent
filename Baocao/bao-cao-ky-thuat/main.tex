@@ -188,8 +188,14 @@ xử lý trọn mà không cần người}, và ước tính \textbf{khoảng 99
 phép kiểm kế toán tự động xác nhận, 3,5\% có hai lần đọc độc lập của hai mô hình khác hãng trùng nhau. Người chỉ phải
 sửa 152 ô (0,4\%), trung bình 8 ô ở mỗi BCTC cần sửa. Chi phí gọi mô hình để đọc một BCTC trung bình
 khoảng 0,12 USD (trung vị 0,08 USD), chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
-trong chính BCTC. Các phần agent phân tích, chỉ số tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho
-người dùng thật được liệt kê ở Chương~\ref{chap:ketluan} dưới dạng đề mục, sẽ hoàn thiện ở các giai đoạn sau.
+trong chính BCTC.
+
+Trên lớp số liệu đã kiểm chứng này, một \textbf{agent} nhận câu hỏi tự do của người dùng (ví dụ \enquote{so sánh KQKD quý
+3/2026 của TCB, LPB và VPB}), tự lập kế hoạch, lấy số, viết báo cáo kèm bảng và biểu đồ; mọi con số và từ tăng/giảm,
+cao hơn/thấp hơn trong lời văn được code kiểm lại với bảng số trước khi người đọc thấy. Trên bộ 53 câu hỏi mẫu, agent
+\textbf{hiểu đúng yêu cầu ở cả 53 câu} với cả hai nhà cung cấp mô hình. Phần đo chất lượng lời văn trên cả bộ câu, chỉ số
+tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho người dùng thật được liệt kê ở
+Chương~\ref{chap:ketluan} dưới dạng đề mục.
 \end{abstract}
 
 \chapter*{Danh mục thuật ngữ và viết tắt}
@@ -248,6 +254,8 @@ Bài toán cụ thể gồm ba phần:
   \item Xây dựng bộ \textbf{ràng buộc kế toán khai báo theo từng mẫu} BCTC để tự kiểm chứng số đọc được.
   \item Phát triển bộ máy \textbf{tự định vị và tự sửa ô đọc sai} dựa trên ràng buộc, giảm tối đa duyệt tay.
   \item Xây dựng \textbf{sản phẩm web} trình bày số liệu đã kiểm chứng, có nguồn cho từng số.
+  \item Xây dựng \textbf{agent tạo báo cáo theo câu hỏi} của người dùng, trong đó mọi con số trong lời văn được kiểm lại
+        bằng code.
 \end{itemize}
 
 \section{Phạm vi và đóng góp}
@@ -273,6 +281,8 @@ Bài toán cụ thể gồm ba phần:
         toán sửa giữa hai bản BCTC.
   \item \textbf{Sản phẩm web chạy được:} thẻ KQKD có cờ cảnh báo, bảng xếp hạng mùa BCTC, lịch công bố, ảnh thẻ để chia
         sẻ.
+  \item \textbf{Agent tạo báo cáo có bộ kiểm tra số} (mục~\ref{sec:agent}): lời văn do mô hình viết, nhưng từng con số,
+        từ tăng/giảm, so sánh và thứ hạng được code đối chiếu với bảng số trước khi đến người đọc.
 \end{enumerate}
 
 \section{Cấu trúc báo cáo}
@@ -528,25 +538,26 @@ từng câu. Đây là hình mẫu gần nhất của \enquote{lớp số liệu
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[font=\small\sffamily]
-  \draw[thick,rounded corners=3pt] (-3.3,1.0) rectangle (3.3,-12.9);
+  \draw[thick,rounded corners=3pt] (-3.3,1.0) rectangle (3.3,-13.9);
   \node[font=\sffamily\bfseries] at (0,0.6) {Hệ thống Soi};
   \foreach \i/\t in {1/Xem trang chia sẻ thẻ,2/Đăng nhập bằng link email,3/Xem bảng xếp hạng mùa BCTC,
                      4/Xem lịch công bố,5/Xem thẻ KQKD,6/Mở trang BCTC gốc của một số,7/Theo dõi mã,
-                     8/Yêu cầu đọc mã ngoài danh sách,9/Tải BCTC lên,10/Duyệt tay BCTC,11/Quản lý người dùng,
-                     12/Xem chi phí gọi mô hình}
+                     8/Yêu cầu đọc mã ngoài danh sách,9/Tải BCTC lên,10/Tạo báo cáo theo yêu cầu,11/Duyệt tay BCTC,
+                     12/Quản lý người dùng,13/Xem chi phí gọi mô hình}
     \node[uc] (u\i) at (0,-\i+0.8) {\t};
-  \node[uc] (u13) at (0,-12.25) {Phát hiện, đọc, kiểm chứng\\BCTC mới và gửi email};
+  \node[uc] (u14) at (0,-13.25) {Phát hiện, đọc, kiểm chứng\\BCTC mới và gửi email};
   \pic at (-6,-0.3) {actor};  \node (kh) at (-6,-0.3) {}; \node[below] at (-6,-0.8) {Khách};
-  \pic at (-6,-5.0) {actor};  \node (nd) at (-6,-5.0) {}; \node[below,align=center] at (-6,-5.5) {Người dùng\\được mời};
-  \pic at (-6,-10.0) {actor}; \node (qt) at (-6,-10.0) {}; \node[below] at (-6,-10.5) {Quản trị viên};
-  \pic at (6,-12.25) {actor};  \node (bc) at (6,-12.25) {}; \node[below,align=center] at (6,-12.75) {Bộ canh\\(hệ thống)};
+  \pic at (-6,-5.5) {actor};  \node (nd) at (-6,-5.5) {}; \node[below,align=center] at (-6,-6.0) {Người dùng\\được mời};
+  \pic at (-6,-11.0) {actor}; \node (qt) at (-6,-11.0) {}; \node[below] at (-6,-11.5) {Quản trị viên};
+  \pic at (6,-13.25) {actor};  \node (bc) at (6,-13.25) {}; \node[below,align=center] at (6,-13.75) {Bộ canh\\(hệ thống)};
   \draw (kh) -- (u1.west);
-  \foreach \u in {2,...,9} \draw (nd) -- (u\u.west);
-  \foreach \u in {10,11,12} \draw (qt) -- (u\u.west);
-  \draw (bc) -- (u13.east);
+  \foreach \u in {2,...,10} \draw (nd) -- (u\u.west);
+  \foreach \u in {11,12,13} \draw (qt) -- (u\u.west);
+  \draw (bc) -- (u14.east);
+  \draw (bc) -- (u10.east);
   % khái quát hóa: tác nhân con kế thừa mọi use case của tác nhân cha (mũi tên tam giác rỗng chỉ vào tác nhân cha)
-  \draw[-{Triangle[open,length=3mm,width=3mm]},thick] (-6,-4.42) -- (-6,-1.35);
-  \draw[-{Triangle[open,length=3mm,width=3mm]},thick] (-6,-9.42) -- (-6,-6.35);
+  \draw[-{Triangle[open,length=3mm,width=3mm]},thick] (-6,-4.92) -- (-6,-1.35);
+  \draw[-{Triangle[open,length=3mm,width=3mm]},thick] (-6,-10.42) -- (-6,-6.85);
 \end{tikzpicture}
 \caption{Biểu đồ use case tổng quát. Đường nối là quan hệ giữa tác nhân và use case; mũi tên tam giác rỗng là quan hệ
 khái quát hóa: người dùng được mời làm được mọi việc của khách, quản trị viên làm được mọi việc của người dùng.}\label{fig:usecase}
@@ -595,6 +606,28 @@ Hậu điều kiện & Yêu cầu có trạng thái \code{done} hoặc \code{rej
 
 \begin{table}[H]
 \centering\small
+\caption{Đặc tả use case \enquote{Tạo báo cáo theo yêu cầu}}\label{tab:uc-baocao}
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}p{3.2cm}X@{}}
+\toprule
+Tác nhân & Người dùng được mời; bộ canh (chạy tiếp báo cáo đang chờ) \\
+Tiền điều kiện & Đã đăng nhập, còn hạn mức báo cáo trong ngày, chưa chạm trần chi phí tháng \\
+Luồng chính & 1. Người dùng gõ câu hỏi tự do.\newline
+2. Agent hiểu câu hỏi thành kế hoạch (loại so sánh, mã, kỳ); code kiểm kế hoạch.\newline
+3. Code lấy số đã kiểm chứng, dựng bảng số và biểu đồ.\newline
+4. Mô hình viết lời; code kiểm từng câu, câu sai được viết lại.\newline
+5. Hệ thống hiện trang báo cáo; người dùng tải PDF nếu cần. \\
+Luồng thay thế & 2a. Không có mã hoặc mã không tồn tại: hỏi lại người dùng.\newline
+3a. Kho thiếu BCTC: hỏi người dùng có cho đọc thêm không (báo chi phí, hạn mức); đồng ý thì chờ bộ canh đọc xong rồi
+chạy tiếp và gửi email.\newline
+4a. Câu vẫn sai sau 2 lần viết lại: bỏ câu đó; không còn câu nào thì báo lỗi.\newline
+5a. Cùng câu hỏi, số liệu chưa đổi: dùng lại báo cáo cũ, không tốn tiền. \\
+Hậu điều kiện & Báo cáo có trạng thái xong hoặc lỗi kèm lý do; chi phí ghi vào trần tháng \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering\small
 \caption{Đặc tả use case \enquote{Duyệt tay BCTC}}\label{tab:uc-duyet}
 \begin{tabularx}{\linewidth}{@{}>{\bfseries}p{3.2cm}X@{}}
 \toprule
@@ -627,8 +660,8 @@ F5 & Bảng xếp hạng mùa BCTC, lịch công bố, ảnh thẻ để chia s�
 F6 & Theo dõi mã và nhận email khi có BCTC mới & Đã làm \\
 F7 & Yêu cầu đọc mã ngoài danh sách, tải BCTC lên (có hạn mức) & Đã làm \\
 F8 & Quản trị: duyệt tay, sửa ô, mời và phân quyền người dùng, xem chi phí gọi mô hình & Đã làm \\
-F9 & Chỉ số tài chính (biên lợi nhuận, ROE\ldots) & Dự kiến \\
-F10 & Agent báo cáo so sánh theo câu hỏi của người dùng & Dự kiến \\
+F9 & Chỉ số tài chính (biên lợi nhuận, ROE\ldots) & Một phần \\
+F10 & Agent tạo báo cáo theo câu hỏi của người dùng, kiểm từng con số trong lời văn & Đã làm \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -701,11 +734,12 @@ có chiều ngược lại. Phụ thuộc chi tiết (Bảng~\ref{tab:phuthuoc})
 \centering
 \begin{tikzpicture}[scale=0.82, transform shape, font=\footnotesize\sffamily]
   \node[pkg] (api) at (3.2,0) {api\\(web FastAPI)};
-  \node[pkg] (watcher) at (9.6,0) {watcher\\(bộ canh)};
-  \node[pkg] (users) at (0,-2.8) {users\\(tài khoản)};
-  \node[pkg] (ondemand) at (4.2,-2.8) {ondemand\\(yêu cầu đọc)};
-  \node[pkg] (alerts) at (8.4,-2.8) {alerts\\(email theo dõi)};
-  \node[pkg] (metrics) at (12.6,-2.8) {metrics\\(thẻ, lịch, xếp hạng)};
+  \node[pkg] (watcher) at (11.2,0) {watcher\\(bộ canh)};
+  \node[pkg] (users) at (-0.6,-2.8) {users\\(tài khoản)};
+  \node[pkg] (ondemand) at (2.8,-2.8) {ondemand\\(yêu cầu đọc)};
+  \node[pkg] (alerts) at (6.2,-2.8) {alerts\\(email theo dõi)};
+  \node[pkg] (metrics) at (9.6,-2.8) {metrics\\(thẻ, lịch, xếp hạng)};
+  \node[pkg] (analyst) at (13.4,-2.8) {analyst\\(agent báo cáo)};
   \node[pkg] (costs) at (8.0,-5.6) {costs\\(chi phí)};
   \node[pkg] (ingestion) at (4.8,-5.6) {ingestion\\(thu thập)};
   \node[pkg] (extraction) at (11.2,-5.6) {extraction\\(đọc, kiểm chứng)};
@@ -713,7 +747,7 @@ có chiều ngược lại. Phụ thuộc chi tiết (Bảng~\ref{tab:phuthuoc})
   \node[pkg] (llm) at (7.2,-8.4) {llm\\(gọi mô hình)};
   \node[pkg] (notify) at (12.8,-8.4) {notify\\(gửi email)};
   \begin{scope}[on background layer]
-    \foreach \r/\a/\b/\t in {0/api/watcher/Tầng giao diện, 1/users/metrics/Tầng nghiệp vụ,
+    \foreach \r/\a/\b/\t in {0/api/watcher/Tầng giao diện, 1/users/analyst/Tầng nghiệp vụ,
                              2/ingestion/extraction/Tầng xử lý dữ liệu, 3/db/notify/Tầng hạ tầng}{
       \node[draw=black,fill=white,fit=(\a)(\b),inner xsep=6mm,inner ysep=5mm] (L\r) {};
       \draw[fill=white] (L\r.north west) rectangle ++(34mm,4.2mm)
@@ -736,8 +770,9 @@ Bảng~\ref{tab:phuthuoc}.}\label{fig:goi}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
 \textbf{Gói} & \textbf{Dùng các gói} \\ \midrule
-api & users, ondemand, metrics, costs, alerts, extraction, ingestion \\
-watcher & ondemand, alerts, extraction, ingestion, llm, notify \\
+api & users, ondemand, metrics, analyst, costs, alerts, extraction, ingestion \\
+watcher & ondemand, alerts, analyst, extraction, ingestion, llm, notify \\
+analyst & metrics, ondemand, users, extraction, ingestion, costs, llm, notify \\
 ondemand & extraction, ingestion, metrics, alerts, users, costs, llm, notify \\
 alerts & metrics, users, notify \\
 users & notify \\
@@ -762,7 +797,7 @@ máy chủ ảo (VPS) (Hình~\ref{fig:trienkhai}).
   \node[udnode,text width=26mm] (db) at (2.1,-2.7) {«container»\\\textbf{db}\\PostgreSQL 16 + pgvector};
   \begin{scope}[on background layer]
     \node[udnode,fill=white,fit=(web)(watch)(db),inner xsep=6mm,inner ysep=6mm,yshift=4mm,
-          label={[font=\footnotesize\sffamily,anchor=north]north:«device» \textbf{Máy chủ} (Docker Compose)}] (srv) {};
+          label={[font=\footnotesize\sffamily,anchor=north]south:«device» \textbf{Máy chủ} (Docker Compose)}] (srv) {};
   \end{scope}
   \node[udnode,text width=24mm] (browser) at (-5.4,-1.3) {«device»\\\textbf{Trình duyệt}\\của người dùng};
   \node[udnode,text width=26mm] (vs) at (9.8,1.2) {«external»\\\textbf{Vietstock, HOSE}};
@@ -773,6 +808,7 @@ máy chủ ảo (VPS) (Hình~\ref{fig:trienkhai}).
   \draw[thick] (watch) -- node[right,guard]{SQL} (db);
   \draw[thick] (watch.east) -- node[above,guard,sloped]{HTTPS} (vs);
   \draw[thick] (watch.east) -- node[above,guard,sloped]{HTTPS} (llm);
+  \draw[thick] (web.north) to[out=40,in=150] node[above,guard,pos=0.3]{HTTPS (agent)} (llm.north west);
   \draw[thick] (watch.south east) -- node[below,guard,sloped]{SMTP} (smtp);
 \end{tikzpicture}
 \caption{Biểu đồ triển khai. Hộp ba chiều là nút (thiết bị hoặc môi trường chạy); đường nối là kênh giao tiếp, ghi giao
@@ -1344,6 +1380,85 @@ Giai đoạn thử nghiệm chỉ dành cho người được mời, đăng nh�
 email khi có BCTC mới, gửi yêu cầu đọc mã ngoài danh sách (có hạn mức mỗi ngày), hoặc tải lên BCTC riêng. Tài liệu tải
 lên chỉ chủ sở hữu thấy. Trước khi đọc, hệ thống xem hai trang đầu để kiểm tra file đúng là BCTC của mã và kỳ người dùng
 khai; file khác loại (ví dụ công văn giải trình kết quả kinh doanh) bị từ chối kèm lý do và không tính vào hạn mức.
+
+\section{Agent tạo báo cáo theo yêu cầu}\label{sec:agent}
+Người dùng gõ một câu hỏi tự do, ví dụ \enquote{so sánh KQKD quý 3/2026 của TCB, LPB và VPB}, và nhận về một báo cáo
+ngắn có lời văn, bảng số, biểu đồ. Nguyên tắc vẫn như phần đọc BCTC: \textbf{mô hình chỉ hiểu câu hỏi và viết câu, mọi
+con số do code tính và code kiểm lại}.
+
+\subsection{Luồng xử lý}
+Agent là một đồ thị trạng thái (LangGraph) gồm các bước ở Hình~\ref{fig:agent}. Trạng thái được lưu vào CSDL sau mỗi
+bước, nên báo cáo dừng chờ được (chờ người dùng xác nhận, chờ bộ canh đọc thêm BCTC, có khi vài giờ) rồi chạy tiếp đúng
+chỗ, kể cả khi dịch vụ khởi động lại.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=5mm]
+  \node[start] (s) {};
+  \node[act=60mm, below=of s] (a) {Hiểu câu hỏi thành kế hoạch: loại, mã, kỳ (mô hình)};
+  \node[act=60mm, below=of a] (b) {Kiểm kế hoạch, điền kỳ gần nhất (code)};
+  \node[dnode, below=6mm of b] (d1) {};
+  \node[act=60mm, below=10mm of d1] (c) {Kiểm kho: mỗi mã đã có BCTC kiểm chứng chưa (code)};
+  \node[dnode, below=6mm of c] (d2) {};
+  \node[act=60mm, below=10mm of d2] (e) {Tính bảng số và biểu đồ từ số đã kiểm chứng (code)};
+  \node[act=60mm, below=of e] (f) {Viết lời, mỗi câu ghi các dòng số đã dùng (mô hình)};
+  \node[act=60mm, below=of f] (g) {Kiểm từng câu với bảng số (code)};
+  \node[dnode, below=6mm of g] (d3) {};
+  \node[act=60mm, below=10mm of d3] (h) {Bỏ câu còn sai; dựng trang web và PDF};
+  \node[stop, below=of h] (x1) {};
+  \node[act=34mm] (ask) at ($(d1)+(6.3,0)$) {Hỏi lại người dùng};
+  \node[stop, below=of ask] (x2) {};
+  \node[act=34mm] (cf) at ($(d2)+(6.3,0)$) {Xin xác nhận đọc thêm, báo chi phí};
+  \node[dnode, below=6mm of cf] (d4) {};
+  \node[act=34mm, below=10mm of d4] (w) {Chờ bộ canh đọc xong};
+  \draw[flow] (s)--(a); \draw[flow] (a)--(b); \draw[flow] (b)--(d1);
+  \draw[flow] (d1) -- node[above,guard]{[thiếu mã, mã lạ]} (ask); \draw[flow] (ask)--(x2);
+  \draw[flow] (d1) -- node[right,guard]{[hợp lệ]} (c);
+  \draw[flow] (c)--(d2);
+  \draw[flow] (d2) -- node[above,guard]{[thiếu BCTC]} (cf);
+  \draw[flow] (d2) -- node[right,guard]{[đủ]} (e);
+  \draw[flow] (cf)--(d4);
+  \draw[flow] (d4) -- node[right,guard]{[đồng ý]} (w);
+  \draw[flow] (w.east) -- ++(0.5,0) |- (c.east);
+  \draw[flow] (d4.west) -- node[above,guard]{[không]} ($(d4.west -| e.east)+(0.5,0)$) |- (e.east);
+  \draw[flow] (e)--(f); \draw[flow] (f)--(g); \draw[flow] (g)--(d3);
+  \draw[flow] ($(f.west)+(0,-0.15)$) -- ++(-0.6,0) |- node[pos=0.25,left,guard,align=center]{[xin thêm số,\\tối đa 3 lần]}
+    ($(f.west)+(0,0.15)$);
+  \draw[flow] (d3.east) -- ++(3.6,0) |- node[pos=0.25,right,guard,align=left]{[còn câu sai,\\chưa quá 2 lần]} (f.east);
+  \draw[flow] (d3) -- node[right,guard]{[đạt, hoặc đã viết lại 2 lần]} (h);
+  \draw[flow] (h)--(x1);
+\end{tikzpicture}
+\caption{Biểu đồ hoạt động của agent tạo báo cáo. Hình thoi là nút rẽ nhánh, điều kiện ghi trong ngoặc vuông.}\label{fig:agent}
+\end{figure}
+
+\subsection{Bảng số và bộ kiểm tra số}
+Code dựng bảng số từ BCTC đã kiểm chứng; ô \enquote{cần xem lại} và số tính từ những ô đó không được đưa vào. Mỗi dòng
+(S1, S2,\ldots) ghi sẵn mọi con số được phép nói, kèm trang BCTC gốc: kỳ này, cùng kỳ, \% thay đổi, mức thay đổi; dòng
+so sánh ghi thứ tự các mã và chênh lệch; dòng xếp hạng ghi thứ hạng, trung vị nhóm. Mô hình không phải tự tính gì.
+Nguyên nhân lấy từ công văn giải trình chỉ giữ số khi số đó đã khớp BCTC.
+
+Bộ kiểm tra số là code, không gọi mô hình. Với mỗi câu, nó kiểm:
+\begin{itemize}
+  \item mỗi con số khớp một số trong các dòng câu đó ghi, sai số theo chữ số cuối như in (\enquote{7,9 nghìn tỷ} khớp
+        7.943 tỷ); \enquote{khoảng}, \enquote{hơn}, \enquote{dưới} được hiểu đúng nghĩa;
+  \item từ tăng/giảm, lãi/lỗ, cao hơn/thấp hơn, cao nhất/thấp nhất và thứ hạng khớp dấu, thứ tự trong bảng số;
+  \item không có ngôn ngữ khuyến nghị (\enquote{nên mua}, \enquote{giá mục tiêu}\ldots), không nhắc mã ngoài bảng số.
+\end{itemize}
+Câu sai được gửi lại mô hình kèm lý do để viết lại, tối đa 2 lần; vẫn sai thì bỏ, chỉ quản trị viên thấy câu bị bỏ.
+
+\subsection{Trang báo cáo}
+Mỗi con số trong lời văn là một liên kết tới dòng bảng số, và dòng bảng số dẫn tới trang BCTC gốc
+(Hình~\ref{fig:agent-ui}). Báo cáo tải được dạng PDF, có nhãn \enquote{nội dung do AI viết, không phải khuyến nghị đầu
+tư}, chỉ người tạo và quản trị viên xem được. Mỗi người tạo tối đa 20 báo cáo một ngày; chi phí tính chung vào trần
+tháng của phần đọc theo yêu cầu, chạm trần thì không tạo báo cáo mới. Câu hỏi trùng mà số liệu chưa đổi thì dùng lại
+báo cáo cũ.
+
+\begin{figure}[H]
+\centering
+\fbox{\includegraphics[width=0.9\linewidth]{bao-cao-agent.png}}
+\caption{Trang báo cáo agent tạo cho câu hỏi \enquote{So sánh kết quả kinh doanh quý 3/2026 của TCB, LPB và VPB}
+(phần đầu; bảng số đầy đủ có 30 dòng).}\label{fig:agent-ui}
+\end{figure}
 
 % ============================================================================
 % CHƯƠNG 5: KẾT QUẢ THỰC NGHIỆM VÀ ĐÁNH GIÁ
@@ -1945,6 +2060,33 @@ Rút ra: ràng buộc kế toán bắt được lỗi \emph{đọc sai số}, nh
 nhầm dòng}. Vì vậy đối chiếu nguồn ngoài đã trở thành bước cố định sau mỗi mùa BCTC.
 \end{ghichu}
 
+\section{Agent tạo báo cáo: hiểu yêu cầu}\label{sec:evalagent}
+Bộ đo gồm 53 câu hỏi tiếng Việt, mỗi câu kèm kế hoạch đúng. Các câu phủ ba loại yêu cầu và nhiều cách nói: trang trọng,
+nói tắt, không dấu, sai chính tả nhẹ, gọi bằng tên công ty, nói kỳ bằng chữ (\enquote{9 tháng}, \enquote{quý vừa
+rồi}). Có cả các câu khó: thiếu mã, mã không tồn tại, mã ngoài danh sách theo dõi, kỳ chưa có trong kho, câu xin khuyến
+nghị mua bán. Hai nhà cung cấp chạy cùng bộ câu, cùng lời dặn, cùng ngày cố định (21/10/2026).
+
+\begin{table}[H]
+\centering\small
+\caption{Agent hiểu yêu cầu trên 53 câu hỏi (đếm theo câu)}\label{tab:agent-plan}
+\begin{tabularx}{\linewidth}{@{}Xrr@{}}
+\toprule
+& \textbf{Claude Haiku 5.5} & \textbf{gpt-5.4-mini} \\ \midrule
+Hệ thống làm đúng yêu cầu (sau khi code kiểm kế hoạch) & 53/53 & 53/53 \\
+Kế hoạch mô hình trả về đúng mọi trường & 52/53 & 52/53 \\
+Chi phí mỗi câu (USD) & 0,0003 & 0,0016 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\enquote{Làm đúng yêu cầu} nghĩa là sau bước code kiểm kế hoạch, hệ thống làm đúng việc người hỏi muốn: đúng mã, đúng
+kỳ, đúng loại so sánh, hoặc hỏi lại khi thiếu mã. Câu duy nhất có kế hoạch thô lệch ở mỗi nhà là câu nói cả năm mà mô hình
+ghi cách tính \enquote{riêng quý}; code luôn tính cả năm theo lũy kế nên kết quả vẫn đúng. Lời dặn của bước này được chỉnh
+một lần sau lần chạy đầu trên chính bộ câu (thêm cách hiểu \enquote{9 tháng}, \enquote{năm 2025} và mã ngoài danh sách),
+nên kết quả trên có phần lạc quan; các câu hỏi do người dùng thật góp thêm sẽ dùng để kiểm lại.
+
+Phần viết lời và bộ kiểm tra số sẽ được đo trên cả bộ câu khi mùa BCTC quý 3 về đủ số (mục hướng phát triển).
+
 \section{Tốc độ và các thước đo khác}
 \chualam
 \begin{itemize}
@@ -1969,16 +2111,17 @@ cả nhóm VN30 mỗi mùa BCTC quý). Đối chiếu với nguồn ngoài cho t
 lệch đều có lời giải thích từ chính BCTC.
 
 Điểm khác biệt của hệ thống không nằm ở mô hình ngôn ngữ, vì ai cũng dùng được mô hình như nhau. Điểm khác biệt là
-\textbf{lớp kiểm chứng}: mỗi con số đều có nguồn, đều đã qua kiểm tra, và có lịch sử sửa lỗi tích lũy qua từng mùa. Các
-giai đoạn tiếp theo sẽ đặt agent phân tích lên trên lớp số liệu này.
+\textbf{lớp kiểm chứng}: mỗi con số đều có nguồn, đều đã qua kiểm tra, và có lịch sử sửa lỗi tích lũy qua từng mùa.
+Agent tạo báo cáo được đặt lên trên lớp này theo cùng nguyên tắc: mô hình hiểu câu hỏi và viết câu, code tính số và kiểm
+lại từng con số, từng từ tăng/giảm trong lời văn. Trên 53 câu hỏi mẫu, agent hiểu đúng yêu cầu ở cả 53 câu với cả hai
+nhà cung cấp mô hình.
 
 \section{Hướng phát triển}
 Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện. Mỗi mục sẽ được viết đầy đủ khi hoàn thành.
 
 \subsection{Chạy thật mùa BCTC quý 3/2026 cho VN30}\chualam
 \subsection{Chỉ số tài chính: biên lợi nhuận gộp, ROE, tăng trưởng lũy kế}\chualam
-\subsection{Agent báo cáo so sánh (lập kế hoạch, gọi công cụ, kiểm tra số khi viết)}\chualam
-\subsection{Bộ kiểm tra số và từ chỉ hướng trong văn bản sinh ra}\chualam
+\subsection{Đo phần viết của agent và bộ kiểm tra số trên cả bộ câu, so hai nhà cung cấp}\chualam
 \subsection{Bộ dữ liệu vàng và benchmark vnpdf}\chualam
 \subsection{Phép thử so với trợ lý AI đa năng}\chualam
 \subsection{Mở rộng lên VN100}\chualam

@@ -1308,6 +1308,18 @@ chỗ, kể cả khi dịch vụ khởi động lại.
 \caption{Biểu đồ hoạt động của agent tạo báo cáo. Hình thoi là nút rẽ nhánh, điều kiện ghi trong ngoặc vuông.}\label{fig:agent}
 \end{figure}
 
+Hình~\ref{fig:agent-graph} là chính đồ thị LangGraph mà agent chạy, sinh tự động từ code nên luôn khớp với code. Mỗi khối
+là một bước của đồ thị (tên bước giữ như trong code); các hoạt động ở Hình~\ref{fig:agent} được gom vào bảy bước này.
+Hai bước \enquote{dừng chờ} là nơi đồ thị tạm dừng và lưu trạng thái: chờ người dùng xác nhận, và chờ bộ canh đọc xong
+BCTC.
+
+\begin{figure}[tbp]
+\centering
+\resizebox{\linewidth}{!}{\input{so-do/agent-graph.tex}}
+\caption{Đồ thị LangGraph của agent, sinh từ đồ thị trong code. Mũi tên liền là chuyển cố định, mũi tên đứt là chuyển
+có điều kiện (điều kiện trong ngoặc vuông); chấm đen là điểm bắt đầu, vòng tròn có chấm là điểm kết thúc.}\label{fig:agent-graph}
+\end{figure}
+
 \subsection{Bảng số và bộ kiểm tra số}
 Code dựng bảng số từ BCTC đã kiểm chứng; ô \enquote{cần xem lại} và số tính từ những ô đó không được đưa vào. Mỗi dòng
 (S1, S2,\ldots) ghi sẵn mọi con số được phép nói, kèm trang BCTC gốc: kỳ này, cùng kỳ, \% thay đổi, mức thay đổi; dòng

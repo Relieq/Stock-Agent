@@ -1,0 +1,28 @@
+% Sinh tự động bởi tools/agent_graph.py từ đồ thị LangGraph trong code; đừng sửa tay.
+\begin{tikzpicture}[font=\footnotesize\sffamily]
+  \node[start] (s) at (0,0) {};
+  \node[state,minimum width=30mm] (understand) at (0,-1.5) {\texttt{understand}\\hiểu yêu cầu};
+  \node[state,minimum width=30mm] (inventory) at (0,-3.6) {\texttt{inventory}\\kiểm kho BCTC};
+  \node[state,minimum width=30mm] (confirm) at (5.4,-3.6) {\texttt{confirm}\\xin đọc thêm BCTC\\{\scriptsize «dừng chờ»}};
+  \node[state,minimum width=30mm] (wait) at (10.2,-3.6) {\texttt{wait}\\chờ bộ canh đọc\\{\scriptsize «dừng chờ»}};
+  \node[state,minimum width=30mm] (compute) at (0,-5.6) {\texttt{compute}\\tính bảng số};
+  \node[state,minimum width=30mm] (write) at (0,-7.6) {\texttt{write}\\viết lời (mô hình)};
+  \node[state,minimum width=30mm] (check) at (0,-9.6) {\texttt{check}\\kiểm từng câu};
+  \node[stop] (eu) at (-4.4,-1.5) {};
+  \node[stop] (ec) at (-4.4,-5.6) {};
+  \node[stop] (ek) at (-4.4,-9.6) {};
+  \draw[flow] (s) -- (understand);
+  \draw[flow,dashed] (understand) -- node[left,guard]{[hợp lệ]} (inventory);
+  \draw[flow,dashed] (understand.west) -- node[above,guard]{[thiếu mã, mã lạ]} (eu);
+  \draw[flow,dashed] (inventory) -- node[above,guard]{[thiếu BCTC]} (confirm);
+  \draw[flow,dashed] (inventory) -- node[left,guard]{[đủ, hoặc đã hỏi]} (compute);
+  \draw[flow,dashed] (confirm) -- node[above,guard]{[đồng ý]} (wait);
+  \draw[flow,dashed] (confirm.south) |- node[pos=0.25,right,guard]{[không]} (compute.east);
+  \draw[flow] (wait.north) -- ++(0,0.9) -| ($(inventory.north)+(1.0,0)$);
+  \draw[flow,dashed] (compute) -- node[left,guard]{[có số]} (write);
+  \draw[flow,dashed] (compute.west) -- node[above,guard,align=center]{[dùng lại,\\kho rỗng]} (ec);
+  \draw[flow,dashed] (write.east) -- ++(0.8,0) |- node[pos=0.25,right,guard,align=left]{[xin thêm số,\\tối đa 3 lần]} ($(write.north)+(1.0,0)$);
+  \draw[flow,dashed] (write) -- node[left,guard]{[viết xong]} (check);
+  \draw[flow,dashed] (check.east) -- ++(3.4,0) |- node[pos=0.25,right,guard,align=left]{[còn câu sai,\\chưa quá 2 lần]} ($(write.east)+(0,-0.2)$);
+  \draw[flow,dashed] (check.west) -- node[above,guard,align=center]{[xong, hoặc\\hết lượt sửa]} (ek);
+\end{tikzpicture}

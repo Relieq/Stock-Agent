@@ -40,7 +40,7 @@
 
 <h2>Tháng {{ rep.month[5:] }}/{{ rep.month[:4] }}</h2>
 <p><b>{{ "%.2f" | format(rep.this_month.usd) }} USD</b> tổng · {{ rep.this_month.calls }} lần gọi mô hình</p>
-<p>Đọc theo yêu cầu người dùng (tính vào trần): <b>{{ "%.2f" | format(capped) }} USD</b> trên trần {{ "%.0f" | format(budget) }} USD
+<p>Đọc theo yêu cầu người dùng và báo cáo của agent (tính vào trần): <b>{{ "%.2f" | format(capped) }} USD</b> trên trần {{ "%.0f" | format(budget) }} USD
   ({{ "%.0f" | format(share) }}%)</p>
 <div style="background:#e8ebef;border-radius:4px;height:12px;max-width:520px">
   <div style="width:{{ share }}%;height:12px;border-radius:4px;background:{{ '#be3232' if share >= 90 else ('#d68c14' if share >= 70 else '#2e8c57') }}"></div>

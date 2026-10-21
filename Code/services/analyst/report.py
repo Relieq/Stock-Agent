@@ -102,18 +102,26 @@ class RealDeps:
         return check_plan(plan, known, exists, lambda ts: store.latest(self.conn, ts))
 
     def missing(self, plan: Plan) -> list[dict]:
+        out = store.missing(self.conn, plan)
+        if not out:
+            return []
         est = estimate_read_usd()
-        out = [m | {"usd": est} for m in store.missing(self.conn, plan)]
-        ids = (get(self.conn, self.report_id) or {}).get("request_ids") or []
-        if ids and out:
-            # yêu cầu đọc của báo cáo này đã thất bại hoặc bị từ chối thì không hẹn đọc lại, ghi lý do vào báo cáo
-            bad = {(t, y, p): n for t, y, p, n in self.conn.execute(
+        out = [m | {"usd": est} for m in out]
+        row = get(self.conn, self.report_id) or {}
+        ids = row.get("request_ids") or []
+        # lý do không đọc được: yêu cầu đọc của báo cáo này thất bại/bị từ chối, hoặc không gửi được yêu cầu (hết hạn mức...)
+        bad = {}
+        if ids:
+            bad = {(t, y, p): n or "yêu cầu đọc không thành công" for t, y, p, n in self.conn.execute(
                 """SELECT ticker, fiscal_year, fiscal_period, note FROM processing_requests
                    WHERE id = ANY(%s) AND status IN ('failed', 'rejected')""", (ids,)).fetchall()}
-            for m in out:
-                key = (m["ticker"], m["year"], m["period"])
-                if key in bad:
-                    m["can_read"], m["note"] = False, bad[key] or "yêu cầu đọc không thành công"
+        for m in row.get("missing") or []:
+            if isinstance(m, dict) and m.get("error"):
+                bad.setdefault((m.get("ticker"), m.get("year"), m.get("period")), m["error"])
+        for m in out:
+            key = (m["ticker"], m["year"], m["period"])
+            if key in bad:
+                m["can_read"], m["note"] = False, bad[key]
         return out
 
     def request_reading(self, report_id: int, items: list[dict]) -> list[int]:
@@ -121,14 +129,20 @@ class RealDeps:
         if row.get("request_ids"):      # nút này có thể chạy lại sau sự cố: không tạo yêu cầu thứ hai
             return list(row["request_ids"])
         from services.ondemand import request_ticker
-        ids = []
+        ids, errors = [], {}
         for m in items:
             try:
                 rid, _ = request_ticker(self.conn, self.user, m["ticker"], m["year"], m["period"])
                 ids.append(rid)
             except (ValueError, PermissionError) as e:
-                notes = (get(self.conn, report_id) or {}).get("notes") or []
-                save(self.conn, report_id, notes=notes + [f"Không gửi được yêu cầu đọc {m['ticker']}: {e}"])
+                errors[(m["ticker"], m["year"], m["period"])] = f"không gửi được yêu cầu đọc: {e}"
+        if errors:      # giữ lý do trong cột missing để báo cáo nói rõ vì sao không đọc thêm được
+            saved = row.get("missing") or [dict(m) for m in items]
+            for m in saved:
+                err = errors.get((m.get("ticker"), m.get("year"), m.get("period")))
+                if err:
+                    m["error"] = err
+            save(self.conn, report_id, missing=saved)
         save(self.conn, report_id, request_ids=ids)
         return ids
 
@@ -136,7 +150,10 @@ class RealDeps:
         return store.sheet_for_plan(self.conn, plan)
 
     def reuse(self, report_id: int, plan: Plan, sources: list[dict]) -> bool:
-        key = json.dumps({k: v for k, v in plan.to_json().items() if k != "unclear"}, sort_keys=True)
+        pj = {k: v for k, v in plan.to_json().items() if k != "unclear"}
+        if isinstance(pj.get("tickers"), list):
+            pj["tickers"] = sorted(pj["tickers"])
+        key = json.dumps(pj, sort_keys=True)
         skey = json.dumps(sources, sort_keys=True)
         save(self.conn, report_id, plan_key=key, sources_key=skey)
         row = self.conn.execute(
@@ -203,57 +220,146 @@ def setup_checkpoints() -> None:
         saver.setup()
 
 
-def is_waiting(state) -> bool:
-    """Luồng đang dừng đúng ở chỗ chờ đọc BCTC (không phải chờ xác nhận hay đã xong)."""
+def pending_interrupt(state) -> dict | None:
+    """Giá trị của điểm dừng (interrupt) mà luồng đang chờ: {"missing": ...} khi chờ xác nhận, {"waiting": ...} khi chờ
+    đọc BCTC; None nếu luồng không dừng ở đâu cả (chưa chạy, đã xong)."""
     for task in getattr(state, "tasks", ()) or ():
         for it in getattr(task, "interrupts", ()) or ():
             value = getattr(it, "value", None)
-            if isinstance(value, dict) and "waiting" in value:
-                return True
-    return False
+            if isinstance(value, dict):
+                return value
+    return None
 
 
-def run(report_id: int, resume=None, client=None) -> str:
+def is_waiting(state) -> bool:
+    """Luồng đang dừng đúng ở chỗ chờ đọc BCTC (không phải chờ xác nhận hay đã xong)."""
+    value = pending_interrupt(state)
+    return value is not None and "waiting" in value
+
+
+LOCK_CLASS = 4242       # khóa tư vấn (advisory lock) theo từng báo cáo: (LOCK_CLASS, report_id)
+STALE_ERROR = "Bị gián đoạn (dịch vụ khởi động lại giữa chừng)"
+
+
+def _try_lock(conn, report_id: int) -> bool:
+    return bool(conn.execute("SELECT pg_try_advisory_lock(%s, %s)", (LOCK_CLASS, report_id)).fetchone()[0])
+
+
+def _unlock(conn, report_id: int) -> None:
+    conn.execute("SELECT pg_advisory_unlock(%s, %s)", (LOCK_CLASS, report_id))
+
+
+def _safely(what: str, fn, *args) -> None:
+    """Gửi thư (hoặc việc phụ khác) không được làm hỏng lượt chạy: lỗi chỉ in ra."""
+    try:
+        fn(*args)
+    except Exception as e:      # noqa: BLE001
+        print(f"[báo cáo] {what}: {e}")
+
+
+def run(report_id: int, resume=None, client=None, expect: str | None = None) -> str:
     """Chạy (resume=None) hoặc chạy tiếp (resume=True/False: trả lời xác nhận, hoặc True khi BCTC đã đọc xong) một
-    báo cáo. Trả về trạng thái sau khi chạy."""
+    báo cáo. Trả về trạng thái sau khi chạy.
+
+    Mỗi báo cáo chỉ một lượt chạy cùng lúc (khóa tư vấn): có lượt khác đang chạy thì trả trạng thái hiện tại, không làm
+    gì. `expect`: chỉ chạy tiếp khi luồng đang dừng đúng ở điểm dừng đó ("missing" = chờ xác nhận, nút Đọc thêm;
+    "waiting" = chờ đọc BCTC, bộ canh); khác thì không làm gì, nên bấm lặp hay chạy lại không đánh thức nhầm."""
     from langgraph.types import Command
-    with _conn() as conn, _checkpointer() as saver:
-        deps = RealDeps(conn, report_id, client)
-        app = build(deps, saver)
-        cfg = {"configurable": {"thread_id": str(report_id)}, "recursion_limit": 60}
-        before = get(conn, report_id)
+    with _conn() as conn:
+        if not _try_lock(conn, report_id):
+            return (get(conn, report_id) or {}).get("status", "")
         try:
-            if resume is None:
-                app.invoke({"report_id": report_id, "question": before["question"]}, cfg)
-            else:
-                app.invoke(Command(resume=resume), cfg)
-        except Exception as e:
-            err = traceback.format_exc()
-            save(conn, report_id, status="failed", error=str(e)[:2000])
-            notify_admin(f"[Soi] Báo cáo {report_id} lỗi", err)
+            with _checkpointer() as saver:
+                deps = RealDeps(conn, report_id, client)
+                app = build(deps, saver)
+                cfg = {"configurable": {"thread_id": str(report_id)}, "recursion_limit": 60}
+                before = get(conn, report_id)
+                resumed_waiting = False
+                if resume is not None:
+                    pending = pending_interrupt(app.get_state(cfg))
+                    if expect is not None and (pending is None or expect not in pending):
+                        return before["status"]
+                    resumed_waiting = pending is not None and "waiting" in pending
+                try:
+                    if resume is None:
+                        app.invoke({"report_id": report_id, "question": before["question"]}, cfg)
+                    else:
+                        app.invoke(Command(resume=resume), cfg)
+                except Exception as e:      # noqa: BLE001
+                    err = traceback.format_exc()
+                    try:
+                        save(conn, report_id, status="failed", error=str(e)[:2000])
+                    except Exception as e2:      # noqa: BLE001
+                        print(f"[báo cáo] không ghi được trạng thái lỗi của báo cáo {report_id}: {e2}")
+                    _safely("gửi thư báo lỗi cho quản trị", notify_admin, f"[Soi] Báo cáo {report_id} lỗi", err)
+                finally:
+                    _safely("ghi chi phí", deps.flush_usage)
+                after = get(conn, report_id)
+                if resumed_waiting and after["status"] == "done":
+                    _safely("gửi thư cho người dùng", send_email, after["email"], "[Soi] Báo cáo của bạn đã xong",
+                            f"Báo cáo cho câu hỏi \"{after['question']}\" đã xong sau khi hệ thống đọc thêm BCTC:\n"
+                            f"{site_url()}/bao-cao/{report_id}")
+                elif resumed_waiting and after["status"] == "failed":
+                    _safely("gửi thư cho người dùng", send_email, after["email"], "[Soi] Báo cáo của bạn gặp lỗi",
+                            f"Báo cáo cho câu hỏi \"{after['question']}\" gặp lỗi, quản trị viên đã được báo:\n"
+                            f"{site_url()}/bao-cao/{report_id}")
+                return after["status"]
         finally:
-            deps.flush_usage()
-        after = get(conn, report_id)
-        if after["status"] == "done" and before.get("request_ids"):
-            send_email(after["email"], "[Soi] Báo cáo của bạn đã xong",
-                       f"Báo cáo cho câu hỏi \"{after['question']}\" đã xong sau khi hệ thống đọc thêm BCTC:\n"
-                       f"{site_url()}/bao-cao/{report_id}")
-        return after["status"]
+            _safely("nhả khóa", _unlock, conn, report_id)
+
+
+def fail_stale(conn, minutes: int = 30) -> list[str]:
+    """Báo cáo ở trạng thái đang chạy quá lâu mà không còn lượt chạy nào giữ khóa (dịch vụ khởi động lại giữa chừng)
+    thì đánh dấu lỗi và báo quản trị."""
+    rows = conn.execute(
+        """SELECT id FROM reports WHERE status IN ('planning', 'writing')
+             AND created_at < now() - make_interval(mins => %s) ORDER BY id""", (minutes,)).fetchall()
+    out = []
+    for (rid,) in rows:
+        if not _try_lock(conn, rid):        # vẫn có lượt chạy sống
+            continue
+        try:
+            cur = conn.execute("SELECT status FROM reports WHERE id = %s", (rid,)).fetchone()
+            if cur is None or cur[0] not in RUNNING:
+                continue
+            save(conn, rid, status="failed", error=STALE_ERROR)
+            _safely("gửi thư báo lỗi cho quản trị", notify_admin, f"[Soi] Báo cáo {rid} bị gián đoạn", STALE_ERROR)
+            out.append(f"báo cáo {rid}: bị gián đoạn -> failed")
+        finally:
+            _safely("nhả khóa", _unlock, conn, rid)
+    return out
 
 
 def resume_waiting(conn) -> list[str]:
     """Bộ canh gọi mỗi lượt: báo cáo đang chờ mà mọi yêu cầu đọc đã xong (đọc được hay không) thì chạy tiếp. Chỉ chạy
-    tiếp luồng thật sự dừng ở chỗ chờ (đọc trạng thái đồ thị), tránh đánh thức nhầm luồng đã chạy tiếp hoặc hỏng."""
+    tiếp luồng thật sự dừng ở chỗ chờ (đọc trạng thái đồ thị), tránh đánh thức nhầm luồng đã chạy tiếp hoặc hỏng. Một
+    báo cáo lỗi không làm dừng các báo cáo còn lại. Đầu lượt đánh dấu lỗi các báo cáo bị gián đoạn."""
+    out = []
+    try:
+        out += fail_stale(conn)
+    except Exception as e:      # noqa: BLE001
+        out.append(f"không dọn được báo cáo bị gián đoạn: {e}")
     rows = conn.execute(
         """SELECT r.id FROM reports r WHERE r.status = 'waiting_data' AND NOT EXISTS (
              SELECT 1 FROM processing_requests p WHERE p.id = ANY(r.request_ids) AND p.status IN ('queued', 'processing'))
            ORDER BY r.id""").fetchall()
     if not rows:
-        return []
+        return out
     ready = []
-    with _checkpointer() as saver:
-        app = build(None, saver)         # chỉ để đọc trạng thái, không chạy nút nào
-        for (rid,) in rows:
-            if is_waiting(app.get_state({"configurable": {"thread_id": str(rid)}})):
-                ready.append(rid)
-    return [f"báo cáo {rid}: chạy tiếp sau khi đọc BCTC -> {run(rid, resume=True)}" for rid in ready]
+    try:
+        with _checkpointer() as saver:
+            app = build(None, saver)         # chỉ để đọc trạng thái, không chạy nút nào
+            for (rid,) in rows:
+                try:
+                    if is_waiting(app.get_state({"configurable": {"thread_id": str(rid)}})):
+                        ready.append(rid)
+                except Exception as e:      # noqa: BLE001
+                    out.append(f"báo cáo {rid}: không đọc được trạng thái đồ thị: {e}")
+    except Exception as e:      # noqa: BLE001
+        out.append(f"không mở được kho trạng thái đồ thị: {e}")
+    for rid in ready:
+        try:
+            out.append(f"báo cáo {rid}: chạy tiếp sau khi đọc BCTC -> {run(rid, resume=True, expect='waiting')}")
+        except Exception as e:      # noqa: BLE001
+            out.append(f"báo cáo {rid}: lỗi khi chạy tiếp: {e}")
+    return out

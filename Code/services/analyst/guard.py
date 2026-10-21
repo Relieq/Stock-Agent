@@ -16,15 +16,22 @@ from services.analyst.sheet import Fact, FactSheet
 MONEY = (("nghìn tỷ", Decimal(10) ** 12), ("ngàn tỷ", Decimal(10) ** 12), ("tỷ", Decimal(10) ** 9),
          ("triệu", Decimal(10) ** 6), ("đồng", Decimal(1)))
 _UNIT = r"(nghìn tỷ|ngàn tỷ|tỷ|triệu|đồng|điểm phần trăm|điểm %|%|phần trăm|lần)"
-NUMBER = re.compile(r"(?<![\w.,])([-−+]?)(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?)(?!\w)(?:\s*" + _UNIT + r")?")
+# Sau đơn vị phải hết từ: "tỷ lệ", "đồng thời" là từ khác, không phải đơn vị tiền
+_UNIT_END = r"(?!\w)(?!\s+(?:lệ|thời|ý)(?!\w))"
+NUMBER = re.compile(r"(?<![\w.,])([-−+]?)(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?)(?!\w)(?:\s*" + _UNIT
+                    + _UNIT_END + r")?")
 WORD_TIMES = {"gấp đôi": 2, "gấp ba": 3}
 # Kỳ, năm, ngày tháng, tên chỉ số: không phải số liệu
-IGNORE = re.compile(r"(?i)\b(?:quý|Q)\s*[1-4]\b(?:\s*[/-]\s*\d{4})?|\b(?:năm|nam)\s+\d{4}|\b(?:19|20)\d{2}\b"
-                    r"|\b\d{1,2}\s*tháng|\bVN\d+\b|\b\d{1,2}/\d{1,2}(?:/\d{2,4})?|\bH[12]\b")
+# Năm đứng một mình được bỏ qua, trừ khi theo sau là đơn vị ("đạt 2000 tỷ" là số liệu, không phải năm)
+IGNORE = re.compile(r"(?i)\b(?:quý|Q)\s*[1-4]\b(?:\s*[/-]\s*\d{4})?|\b(?:năm|nam)\s+\d{4}|\b\d{1,2}/(?:19|20)\d{2}\b"
+                    r"|\b(?:19|20)\d{2}\b(?!\s*(?:tỷ|triệu|đồng|%|lần|điểm|nghìn|ngàn)" + _UNIT_END + r")"
+                    r"|\b\d{1,2}\s*tháng|\bVN\d+\b|\b\d{1,2}/\d{1,2}(?:/\d{2,4})?(?!\d)|\bH[12]\b")
 APPROX = re.compile(r"(khoảng|gần|xấp xỉ|ước|chừng)\s*$")
 MORE = re.compile(r"(hơn|trên|vượt)\s*$")
 LESS = re.compile(r"(dưới|chưa đến|chưa tới|không tới)\s*$")
-ADVICE = re.compile(r"(?i)(nên|khuyên)\s+(mua|bán|nắm giữ|giữ|tích lũy|chốt lời|cắt lỗ|đầu tư)|giá mục tiêu"
+# Dạng động từ ("nên mua", "có thể cân nhắc bán") luôn bị bắt; "khuyến nghị" (danh từ) có thể được phủ định
+ADVICE = re.compile(r"(?i)(nên|khuyên|có thể)\s+(?:\S+\s+){0,2}?(mua|bán|nắm giữ|giữ|tích lũy|chốt lời|cắt lỗ|đầu tư)\b"
+                    r"|giá mục tiêu"
                     r"|cơ hội (đầu tư|mua)|định giá (hấp dẫn|rẻ)|thời điểm (tốt để )?(mua|bán)|khuyến nghị")
 NEGATED = re.compile(r"(?i)không\s+(?:\S+\s+){0,2}$")
 TICKER = re.compile(r"\b[A-Z]{3}\b")
@@ -154,14 +161,21 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
             else:
                 out.links.append(Link(n.start, n.end, hit.id))
     for m in ADVICE.finditer(text):
-        if not NEGATED.search(text[max(0, m.start() - 25):m.start()]):
-            bad("advice", m.group(0))
+        if m.group(0).lower() == "khuyến nghị" and _negated(text, m.start()):
+            continue
+        bad("advice", m.group(0))
     fact_text = " ".join(f.text for f in facts)
     for t in sorted(set(TICKER.findall(text)) & known):
         if t not in allowed and t not in fact_text:
             bad("foreign_ticker", t)
     _check_directions(text, facts, out, bad)
     return out
+
+
+def _negated(text: str, start: int) -> bool:
+    """Phủ định đứng ngay trước cụm (không phải/không đưa/không có) và cùng mệnh đề (không có dấu phẩy, chấm phẩy)."""
+    m = NEGATED.search(text[max(0, start - 25):start])
+    return bool(m) and not re.search(r"[,;.]", m.group(0))
 
 
 def _check_directions(text, facts, out, bad) -> None:

@@ -68,3 +68,31 @@ def test_check_draft_indexes_sentences():
     violations, links, _ = check_draft(draft, sheet(), {"TCB"}, KNOWN)
     assert [(v.section, v.sentence, v.kind) for v in violations] == [(0, 1, "unsourced_number")]
     assert [l.fact_id for l in links["0.0"]] == ["S1"]
+
+
+def test_month_year_is_not_a_quantity():
+    assert [n.kind for n in numbers("LNST quý 3 trong tháng 9/2026 đạt 7.943 tỷ")] == ["money"]
+
+
+def test_year_used_as_quantity_is_checked():
+    assert numbers("đạt 2000 tỷ")[0].kind == "money"
+    assert numbers("năm 2026 và 2025") == []
+
+
+def test_unit_must_be_a_whole_word():
+    assert numbers("tỷ lệ 5 tỷ lệ")[0].kind == "plain"
+    assert numbers("3 đồng thời")[0].kind == "plain"
+
+
+def test_advice_in_verb_form_is_not_excused_by_negation_words():
+    s = sheet()
+
+    def kinds(t, uses=("S1",)):
+        return [v.kind for v in check_sentence(t, list(uses), s, {"TCB", "MWG"}, KNOWN).violations]
+
+    assert "advice" in kinds("Nhà đầu tư không phải lo, nên mua TCB.")
+    assert "advice" in kinds("Nên cân nhắc mua TCB.")
+    assert "advice" in kinds("Có thể cân nhắc bán MWG.")
+    assert kinds("Soi không đưa khuyến nghị đầu tư.") == []
+    assert kinds("Đây không phải là khuyến nghị mua bán.") == []
+    assert kinds("Chi phí tăng có thể do lạm phát.") == []

@@ -44,7 +44,12 @@ Bảng số (mọi con số đã được tính sẵn từ BCTC đã kiểm ch�
 
 Cách viết:
 - Viết 2 đến 4 mục, mỗi mục có tiêu đề ngắn và 2 đến 6 câu. Mục đầu trả lời thẳng câu hỏi.
-- Mỗi câu ghi trong "uses" mã các dòng bảng số mà câu dùng. Câu không có số vẫn ghi dòng nó dựa vào.
+- Mỗi câu ghi trong "uses" mã các dòng bảng số mà câu dùng, đúng mã như trong bảng số, ví dụ "uses": ["S12", "S31"].
+  Câu không có số vẫn ghi dòng nó dựa vào.
+- Câu so sánh giữa hai mã (cao hơn, thấp hơn, nhanh hơn, chậm hơn) hay câu nói cao nhất/thấp nhất phải ghi cả
+  dòng so sánh hoặc xếp hạng tương ứng trong bảng số, ngoài các dòng chỉ tiêu.
+- Mỗi câu phải tự đứng được vì câu trước có thể bị bỏ: không mở câu bằng "Tỷ lệ này", "Con số này", "Mức này"; nhắc lại tên
+  chỉ tiêu và mã.
 - Chỉ dùng con số có trong các dòng đã ghi, chép đúng như bảng (được làm tròn bớt, ví dụ 7.943 tỷ thành 7,9 nghìn tỷ). Không
   tự tính số mới (không cộng, trừ, chia, không tự tính %), không ước đoán, không dùng số ngoài bảng.
 - Từ tăng/giảm, cao hơn/thấp hơn, nhanh hơn/chậm hơn, cao nhất/thấp nhất phải đúng như bảng.

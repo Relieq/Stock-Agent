@@ -29,6 +29,17 @@ def test_prompt_carries_question_sheet_rules_and_feedback():
     assert "\"A\": lỗi" in prompt and "need phải rỗng" in prompt and "không đưa khuyến nghị" in prompt
 
 
+def test_prompt_explains_uses_comparison_rows_and_standalone_sentences():
+    sheet = FactSheet()
+    sheet.add("metric", "LNST, TCB, quý 3/2026: 7.943 tỷ")
+    c = FakeClient()
+    write(c, "TCB?", Plan("yoy", ["TCB"], 2026, "Q3", "quarter"), sheet, [], allow_need=True)
+    prompt = c.prompts[0][0]
+    assert '"uses": ["S12", "S31"]' in prompt
+    assert "dòng so sánh hoặc xếp hạng" in prompt
+    assert "không mở câu bằng" in prompt and "Tỷ lệ này" in prompt
+
+
 def test_feedback_and_dropping_sentences():
     v = [Violation(0, 1, "unsourced_number", "5%")]
     assert feedback_lines(DRAFT, v) == ['"B giảm 5%.": số không có trong các dòng câu đã ghi (5%)']

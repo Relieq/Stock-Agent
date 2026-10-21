@@ -143,6 +143,22 @@ def test_comparisons_follow_the_order_in_the_sheet():
     assert kinds("LNST của TCB tăng nhanh hơn VCB.", ["S1"]) == ["comparison"]   # không ghi dòng so sánh
 
 
+def test_missing_comparison_row_suggests_which_row_to_add():
+    s = compare_sheet()
+    v = check_sentence("LNST của TCB tăng nhanh hơn VCB.", ["S1"], s, {"TCB", "VCB"}, KNOWN).violations
+    assert [x.kind for x in v] == ["comparison"]
+    assert "ghi thêm dòng S3" in v[0].detail and "S4" not in v[0].detail      # ưu tiên dòng cùng loại (tốc độ thay đổi)
+    # quy mô: gợi ý dòng quy mô
+    v = check_sentence("Về quy mô, LNST của VCB cao hơn TCB.", ["S1"], s, {"TCB", "VCB"}, KNOWN).violations
+    assert "ghi thêm dòng S4" in v[0].detail
+    # xếp hạng: gợi ý dòng có mã đó trong thứ tự
+    v = check_sentence("VPB tăng mạnh nhất nhóm.", ["S1"], s, {"TCB", "VPB"}, KNOWN).violations
+    assert [x.kind for x in v] == ["comparison"] and "S5" in v[0].detail
+    # không có dòng nào chứa đủ mã thì không gợi ý
+    v = check_sentence("LNST của TCB tăng nhanh hơn FPT.", ["S1"], s, {"TCB", "FPT"}, KNOWN).violations
+    assert [x.kind for x in v] == ["comparison"] and "ghi thêm" not in v[0].detail
+
+
 def test_superlatives_use_the_rank_order():
     s = compare_sheet()
     assert [v.kind for v in check_sentence("VPB tăng mạnh nhất nhóm.", ["S5"], s, {"TCB"}, KNOWN).violations] == []

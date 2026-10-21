@@ -170,7 +170,7 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
     for t in sorted(set(TICKER.findall(text)) & known):
         if t not in allowed and t not in fact_text:
             bad("foreign_ticker", t)
-    _check_directions(text, facts, out, bad)
+    _check_directions(text, facts, out, bad, sheet)
     return out
 
 
@@ -216,7 +216,17 @@ def _cue(low: str) -> str | None:
     return "growth" if GROWTH_WORDS.search(low) else None
 
 
-def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad) -> None:
+def _hint(sheet: FactSheet | None, codes: list[str], c: str | None, low: str) -> str:
+    """Gợi ý dòng bảng số câu cần ghi thêm: dòng có thứ tự chứa đủ các mã; ưu tiên cùng loại số liệu, rồi dòng có tên
+    chỉ tiêu xuất hiện trong vế câu. Tối đa 2 dòng; không có dòng nào thì không gợi ý."""
+    if sheet is None:
+        return ""
+    cands = [f for f in sheet.facts if f.order and all(t in f.order for t in codes)]
+    cands.sort(key=lambda f: (not (c is not None and f.measure == c), not any(n in low for n in f.names)))
+    return " — ghi thêm dòng " + ", ".join(f.id for f in cands[:2]) + " vào uses" if cands else ""
+
+
+def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, sheet: FactSheet | None = None) -> None:
     """Từ tăng/giảm khớp chiều của dòng được ghi; so sánh hai mã và cao nhất/thấp nhất khớp thứ tự trong bảng số.
     Xét từng vế câu; loại số liệu (quy mô hay tốc độ thay đổi) cũng đọc theo từng vế."""
     subject: str | None = None          # mã làm chủ ngữ ở vế trước ("TCB tăng 23,7%, cao hơn VCB")
@@ -257,7 +267,8 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad) -> 
                 cands = _named([f for f in facts if f.order and a_t in f.order and b_t in f.order
                                 and (c is None or f.measure == c)], low)
                 if not cands:
-                    bad("comparison", f"không có dòng so sánh {a_t} với {b_t}: {clause.strip()}")
+                    bad("comparison", f"không có dòng so sánh {a_t} với {b_t}: {clause.strip()}"
+                                      + _hint(sheet, [a_t, b_t], c, low))
                 elif not any((f.order.index(a_t) < f.order.index(b_t)) == first for f in cands):
                     bad("comparison", clause.strip())
                 subject = a_t if len(tickers) >= 2 or a_t == tickers[0] else subject
@@ -279,7 +290,8 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad) -> 
                         continue
                 cands = _named([f for f in facts if f.order and who in f.order and (c is None or f.measure == c)], low)
                 if not cands:
-                    bad("comparison", f"không có dòng xếp hạng cho {who}: {clause.strip()}")
+                    bad("comparison", f"không có dòng xếp hạng cho {who}: {clause.strip()}"
+                                      + _hint(sheet, [who], c, low))
                 elif not any((f.order[0] if first else f.order[-1]) == who for f in cands):
                     bad("comparison", clause.strip())
             continue

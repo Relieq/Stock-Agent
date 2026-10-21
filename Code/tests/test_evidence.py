@@ -143,6 +143,14 @@ def test_row_missing_from_a_report_is_found_by_the_same_number_on_another_report
     assert [m.key for m in missing_rows(q2, q1, "earlier")] == ["b.oi"]
     q2.printed = {("IS", "b.oi")}             # dòng có in nhưng để trống ("-"): không coi là thiếu
     assert missing_rows(q2, q1, "earlier") == []
+    # LPB: quý 2 in "Tăng/(Giảm) khác về nợ hoạt động" không mã, quý 3 in "Giảm khác về nợ hoạt động" mã 21: cùng dòng
+    from services.extraction.evidence import row_name
+    q2 = _cells(2, "Q2", {("CF", "~tang/giam khac ve no hoat dong"): {"ytd_cur": 33_809}})
+    q2.sum_evidence = {("CF", "~tang/giam khac ve no hoat dong", "ytd_cur"): ["x"]}
+    q2.labels = {("CF", "~tang/giam khac ve no hoat dong"): "Tăng/(Giảm) khác về nợ hoạt động"}
+    q3 = _cells(3, "Q3", {("CF", "21"): {"ytd_cur": -1_848}})
+    q3.printed = {("CF", "21"), ("CF", row_name("Giảm khác về nợ hoạt động"))}
+    assert missing_rows(q3, q2, "earlier") == []
 
 
 def test_reviewer_confirms_first_reading_from_the_image():

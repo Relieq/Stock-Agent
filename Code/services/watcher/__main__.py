@@ -78,11 +78,12 @@ def _stuck_path():
 
 def stuck_downloads(conn, now: datetime, hours: int = STUCK_HOURS) -> list[tuple]:
     """BCTC đầy đủ (hợp nhất hoặc báo cáo duy nhất) của mã đang theo dõi mà nguồn đã đăng quá `hours` giờ vẫn chưa tải
-    được file (TCX quý 3/2026: Vietstock đăng tiêu đề nhưng link file trả 404)."""
+    được file (TCX quý 3/2026: Vietstock đăng tiêu đề nhưng link file trả 404). Bỏ bản trùng: TCB quý 3/2026 đã đọc từ
+    file HOSE, bản Vietstock đánh dấu trùng không có file vẫn bị báo nhầm."""
     return conn.execute(
         """SELECT d.id, d.ticker, d.title_raw, d.source_listed_at, d.source_url FROM documents d
            WHERE d.content_kind = 'full' AND d.doc_type LIKE 'fs_%%' AND d.scope IN ('consolidated', 'standalone')
-             AND d.owner_user_id IS NULL AND d.source_listed_at < %s
+             AND d.owner_user_id IS NULL AND d.duplicate_of IS NULL AND d.source_listed_at < %s
              AND d.source_listed_at > %s - interval '30 days'
              AND NOT EXISTS (SELECT 1 FROM document_files f WHERE f.document_id = d.id)
              AND EXISTS (SELECT 1 FROM companies c WHERE c.ticker = d.ticker AND c.tracked)

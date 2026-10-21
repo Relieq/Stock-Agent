@@ -82,6 +82,7 @@ def cells_of(document_id: int, period: str, record: dict) -> Cells:
             keys.append(None)
             code = normalize_code(it.code)
             printed.add((st, fold(clean_label(it.label))))
+            printed.add((st, row_name(it.label)))
             if code:
                 printed.add((st, code))
             if EPS.search(fold(clean_label(it.label))):
@@ -444,6 +445,15 @@ PEER_CONTAINED = {"earlier": {"IS": ("ytd_cur", "q_cur", "ytd_prev_year", "q_pre
                               "CF": ("ytd_cur", "q_cur", "ytd_prev_year", "q_prev_year")}}
 
 
+_DIRECTION = re.compile(r"^(?:(?:tang|giam)\s*/?\s*)+")
+
+
+def row_name(label: str) -> str:
+    """Tên dòng bỏ dấu, bỏ chữ chỉ chiều ở đầu: ngân hàng đổi "Tăng/(Giảm) khác về nợ hoạt động" thành "Giảm khác về
+    nợ hoạt động" theo dấu của số kỳ đó (LPB quý 2 và quý 3/2026), vẫn là một dòng."""
+    return _DIRECTION.sub("", fold(clean_label(label)))
+
+
 def missing_rows(cells: Cells, peer: Cells, relation: str) -> list[MissingRow]:
     """Dòng của BCTC đối chiếu (đã khớp cộng tổng, số khác 0 ở cột liên quan) mà tài liệu này không có.
 
@@ -464,7 +474,7 @@ def missing_rows(cells: Cells, peer: Cells, relation: str) -> list[MissingRow]:
                 continue
         else:
             col = next((c for c in PEER_CONTAINED.get(relation, {}).get(st, ()) if c in evidenced), None)
-            if col is None or (st, fold(clean_label(peer.labels.get((st, key), "")))) in cells.printed:
+            if col is None or (st, row_name(peer.labels.get((st, key), ""))) in cells.printed:
                 continue
         out.append(MissingRow(st, key, peer.labels.get((st, key), key), "peer", peer.document_id, peer.period, col, pv[col],
                               by_value))

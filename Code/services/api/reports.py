@@ -10,7 +10,7 @@ from services.analyst import render, report
 from services.analyst.plan import label as period_label
 from services.api.accounts import _back, templates, user_of
 from services.db import connect
-from services.ondemand import used_today
+from services.ondemand import month_spend, monthly_budget, used_today
 from services.users import site_url
 
 router = APIRouter()
@@ -23,9 +23,23 @@ def can_view(row: dict, user) -> bool:
     return user is not None and (user.is_admin or row["user_id"] == user.id)
 
 
-def confirm_view(items: list[dict], used: int, quota: int) -> dict:
+def budget_block(user, spend: float, budget: float) -> str | None:
+    """Lý do không cho tạo báo cáo mới: tiền gọi mô hình tháng này đã chạm trần chung của phần đọc theo yêu cầu (đặc tả
+    mục 10). Quản trị viên vẫn tạo được."""
+    if user.is_admin or spend < budget:
+        return None
+    return (f"Tháng này đã chạm trần chi phí tháng ({vn_usd(budget)} USD) của phần đọc và báo cáo theo yêu cầu; "
+            "tháng sau mới tạo được báo cáo mới.")
+
+
+def vn_usd(x: float) -> str:
+    return f"{x:.2f}".replace(".", ",")
+
+
+def confirm_view(items: list[dict], used: int, quota: int, over_budget: bool = False) -> dict:
     """Danh sách BCTC thiếu cho màn xác nhận: số tiền và kỳ kiểu Việt, và BCTC nào sẽ không đọc được vì hết hạn mức
-    (yêu cầu đọc gửi lần lượt theo thứ tự, mỗi BCTC đọc được tính một lượt)."""
+    (yêu cầu đọc gửi lần lượt theo thứ tự, mỗi BCTC đọc được tính một lượt). `over_budget`: đã chạm trần chi phí tháng,
+    yêu cầu đọc sẽ nằm chờ sang tháng sau."""
     remaining = max(quota - used, 0)
     out, left, skipped = [], remaining, 0
     for m in items:
@@ -40,8 +54,8 @@ def confirm_view(items: list[dict], used: int, quota: int) -> dict:
         else:
             state, skipped = "quota", skipped + 1
         out.append({"ticker": m.get("ticker"), "label": label, "state": state, "note": m.get("note") or m.get("error"),
-                    "usd": f"{(m.get('usd') or 0):.2f}".replace(".", ",")})
-    return {"rows": out, "remaining": remaining, "quota": quota, "skipped": skipped}
+                    "usd": vn_usd(m.get("usd") or 0)})
+    return {"rows": out, "remaining": remaining, "quota": quota, "skipped": skipped, "over_budget": over_budget}
 
 
 def _row(rid: int, request: Request) -> dict:
@@ -78,6 +92,9 @@ def reports_submit(request: Request, background: BackgroundTasks, question: str 
         return _back("/bao-cao", "Bạn gõ câu hỏi trước đã.")
     try:
         with connect() as conn:
+            blocked = budget_block(user, month_spend(conn), monthly_budget())
+            if blocked:
+                return _back("/bao-cao", blocked)
             rid = report.create(conn, user, question)
             conn.commit()
     except PermissionError as e:
@@ -95,7 +112,8 @@ def report_page(request: Request, rid: int):
     if row["status"] == "awaiting_confirmation":
         with connect() as conn:        # hạn mức đọc BCTC của người tạo báo cáo (quản trị xem hộ thì vẫn là của người tạo)
             cur = conn.execute("SELECT daily_quota FROM users WHERE id = %s", (row["user_id"],)).fetchone()
-            confirm = confirm_view(r["missing"], used_today(conn, row["user_id"]), cur[0] if cur else 0)
+            confirm = confirm_view(r["missing"], used_today(conn, row["user_id"]), cur[0] if cur else 0,
+                                   month_spend(conn) >= monthly_budget())
     return templates().TemplateResponse(request, "report.html", {"r": r, "confirm": confirm,
                                                                   "refresh": row["status"] in report.RUNNING})
 

@@ -4,14 +4,32 @@ nguyên nhân công ty nêu trong công văn giải trình kèm kết quả đ�
 from __future__ import annotations
 
 from services.analyst import store
-from services.analyst.explanations import check_section, facts_for, load_letter
+from services.analyst.explanations import Check, check_section, facts_for, load_letter
 from services.analyst.facts import metric_fact
+from services.analyst.guard import numbers
 from services.analyst.plan import Plan
 from services.analyst.sheet import Fact, FactSheet
 
 REASON_LABELS = {"khớp": "đã đối chiếu, khớp BCTC", "khớp chiều": "đã đối chiếu, khớp chiều tăng/giảm",
                  "không kiểm được": "theo công ty, chưa kiểm được bằng số"}
 PERIOD_KINDS = {"quarter": ("quarter",), "ytd": ("ytd", "half_year", "year")}
+WORDS_ONLY = {"khớp chiều", "không kiểm được"}     # số trong các nguyên nhân này chưa đối chiếu được với BCTC
+
+
+def words_only(text: str) -> str:
+    """Thay mọi con số (đọc như bộ kiểm tra số) bằng "…", để số chưa kiểm không thành số có nguồn trong bảng số."""
+    for n in reversed(numbers(text)):
+        text = text[:n.start] + "…" + text[n.end:]
+    return text
+
+
+def reason_line(ticker: str, c: Check) -> str | None:
+    """Dòng bảng số cho một nguyên nhân; nguyên nhân lệch với BCTC thì None. Chỉ nguyên nhân khớp số giữ số."""
+    lab = REASON_LABELS.get(c.verdict)
+    if lab is None:
+        return None
+    what = words_only(c.what) if c.verdict in WORDS_ONLY else c.what
+    return f"Nguyên nhân {ticker} nêu trong công văn giải trình ({lab}): {what}"
 
 
 def more_metric(conn, plan: Plan, sheet: FactSheet, ticker: str, key: str) -> list[Fact]:
@@ -45,9 +63,8 @@ def reasons(conn, client, plan: Plan, sheet: FactSheet, ticker: str, cache_dir=N
         for c in res.checks:
             if c.what == "cả phần" or c.what.startswith(("lợi nhuận", "doanh thu", "% thay đổi")):
                 continue
-            lab = REASON_LABELS.get(c.verdict)
-            if lab:
-                out.append(sheet.add("reason", f"Nguyên nhân {ticker} nêu trong công văn giải trình ({lab}): {c.what}",
-                                     ticker=ticker, sources=src))
+            line = reason_line(ticker, c)
+            if line:
+                out.append(sheet.add("reason", line, ticker=ticker, sources=src))
     return out or [sheet.add("reason", f"Công văn giải trình của {ticker} không có nguyên nhân dùng được cho "
                                        f"{plan.label()}.", ticker=ticker)]

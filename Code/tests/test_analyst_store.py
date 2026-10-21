@@ -71,3 +71,28 @@ def test_first_keeps_derived_value_for_other_metrics():
 def test_first_falls_through_to_next_column_when_first_is_empty():
     f = FakeFacts({("npat", "q_cur"): Value(Decimal(9), src("60", "q_cur"))})
     assert store._first(f, "npat", ("ytd_cur", "q_cur"), set()).value == Decimal(9)
+
+
+def test_flags_on_computed_parent_profit_drop_when_an_input_is_hidden():
+    from services.metrics.card import Flag
+    f = FakeFacts({("npat_parent", "q_cur"): Value(Decimal(-5), None, "NPAT trừ lợi ích không kiểm soát"),
+                   ("npat_parent", "q_prev_year"): Value(Decimal(3), None, "NPAT trừ lợi ích không kiểm soát")},
+                  {"npat": "60", "minority": "62"})
+    flags = [Flag("sign_change", "Lỗ hoặc đổi dấu lợi nhuận", "chuyển từ lãi sang lỗ"),
+             Flag("low_base", "Tăng trưởng do nền so sánh thấp", "nền thấp"),
+             Flag("cash", "Có lãi nhưng dòng tiền kinh doanh âm", "dòng tiền", [src("20", "ytd_cur")])]
+    assert [t for t, _ in store.visible_flags(flags, f, set())] == [x.title for x in flags]
+    # ô LNST cùng kỳ "cần xem lại": hai cờ dựa trên LNST mẹ tính ra bị bỏ, cờ khác giữ
+    assert [t for t, _ in store.visible_flags(flags, f, {("IS", "60", "q_prev_year")})] == \
+        ["Có lãi nhưng dòng tiền kinh doanh âm"]
+    assert [t for t, _ in store.visible_flags(flags, f, {("IS", "62", "q_cur")})] == \
+        ["Có lãi nhưng dòng tiền kinh doanh âm"]
+    # ô ẩn ở cột lũy kế không ảnh hưởng cờ tính trên số quý; ô nguồn của cờ bị ẩn thì bỏ cờ đó
+    assert len(store.visible_flags(flags, f, {("IS", "60", "ytd_cur")})) == 3
+    assert [t for t, _ in store.visible_flags(flags, f, {("IS", "20", "ytd_cur")})] == \
+        ["Lỗ hoặc đổi dấu lợi nhuận", "Tăng trưởng do nền so sánh thấp"]
+    # LNST mẹ có nguồn riêng (không phải số tính): ô NPAT bị ẩn không ảnh hưởng
+    g = FakeFacts({("npat_parent", "q_cur"): Value(Decimal(-5), src("61", "q_cur")),
+                   ("npat_parent", "q_prev_year"): Value(Decimal(3), src("61", "q_prev_year"))},
+                  {"npat": "60", "minority": "62"})
+    assert len(store.visible_flags(flags[:2], g, {("IS", "60", "q_cur")})) == 2

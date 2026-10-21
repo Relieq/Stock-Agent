@@ -95,6 +95,21 @@ def _derived_inputs(f: Facts, key: str) -> list[str]:
     return []
 
 
+PARENT_PROFIT_FLAGS = {"sign_change", "low_base"}    # cờ thẻ tính trên LNST mẹ riêng quý (kỳ này, cùng kỳ)
+
+
+def visible_flags(flags, f: Facts, hidden: set[tuple[str, str, str]]) -> list[tuple[str, str]]:
+    """(tên cờ, chi tiết) của các cờ thẻ KQKD không dựa trên ô "cần xem lại": bỏ cờ có ô nguồn bị ẩn, và bỏ cờ tính trên
+    LNST mẹ khi số đó là số tính (NPAT − cổ đông không kiểm soát, không có nguồn riêng) từ một ô bị ẩn."""
+    derived_hidden = any(
+        (v := f.metric("IS", "npat_parent", col)).value is not None and v.source is None
+        and any(("IS", c, col) in hidden for c in _derived_inputs(f, "npat_parent"))
+        for col in ("q_cur", "q_prev_year"))
+    return [(fl.title, fl.detail) for fl in flags
+            if not any((s.statement, s.code, s.column) in hidden for s in fl.sources)
+            and not (derived_hidden and fl.key in PARENT_PROFIT_FLAGS)]
+
+
 def _first(f: Facts, key: str, cols: tuple[str, ...], hidden: set[tuple[str, str, str]]) -> Value:
     for col in cols:
         v = f.metric("IS", key, col)
@@ -135,8 +150,7 @@ def _load(conn, ticker: str, year: int, period: str, basis: str, with_flags: boo
         from services.metrics.service import card_for
         got = card_for(conn, doc_id)
         if got is not None:
-            flags = [(fl.title, fl.detail) for fl in got[0].flags
-                     if not any((s.statement, s.code, s.column) in hidden for s in fl.sources)]
+            flags = visible_flags(got[0].flags, f, hidden)
     return TickerData(ticker, kind, label(year, period, basis), values, flags, doc_id), None
 
 

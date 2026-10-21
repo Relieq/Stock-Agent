@@ -22,6 +22,8 @@ from services.analyst.writer import drop_sentences, feedback_lines
 
 MAX_NEED_ROUNDS = 3
 MAX_REWRITES = 2
+EMPTY_ERROR = "Kho chưa có số của các mã/kỳ này"
+NO_SENTENCE_ERROR = "Không còn câu nào qua bộ kiểm tra số"
 
 
 class State(TypedDict, total=False):
@@ -90,12 +92,15 @@ def build(deps: Deps, checkpointer=None):
         plan = Plan.from_json(s["plan"])
         deps.save(s["report_id"], status="writing")
         sheet, sources, notes, charts = deps.build_sheet(plan)
-        if deps.reuse(s["report_id"], plan, sources):
-            return {"route": "end"}
         basis = plan.basis
         notes = s.get("notes", []) + notes + [
             f"Không đọc được thêm BCTC {m['ticker']} {label(m['year'], m['period'], basis)}"
             + (f": {m['note']}" if m.get("note") else "") for m in s.get("missing", []) if not m.get("can_read")]
+        if not sheet.facts:         # không có số nào: không gọi mô hình viết
+            deps.save(s["report_id"], status="failed", error=EMPTY_ERROR, notes=notes, sources=sources, charts=charts)
+            return {"notes": notes, "route": "end"}
+        if deps.reuse(s["report_id"], plan, sources):
+            return {"route": "end"}
         deps.save(s["report_id"], notes=notes, sources=sources, charts=charts)
         return {"sheet": sheet.to_json(), "notes": notes, "need_rounds": 0, "rewrites": 0, "feedback": [], "log": [],
                 "route": "write"}
@@ -125,7 +130,7 @@ def build(deps: Deps, checkpointer=None):
         _, links, _ = check_draft(final, sheet, allowed, known)
         guard_log = {"attempts": log, "dropped": dropped}
         if not any(sec["sentences"] for sec in final.get("sections", [])):
-            deps.save(s["report_id"], status="failed", error="Không còn câu nào qua bộ kiểm tra số", sheet=s["sheet"],
+            deps.save(s["report_id"], status="failed", error=NO_SENTENCE_ERROR, sheet=s["sheet"],
                       guard_log=guard_log)
             return {"log": log, "draft": final, "route": "end"}
         deps.save(s["report_id"], status="done", sheet=s["sheet"], result={"draft": final, "links": _links_json(links)},

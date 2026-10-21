@@ -157,6 +157,18 @@ def test_unreadable_note_uses_period_label():
     assert "Không đọc được thêm BCTC VCB quý 2/2026" in notes
 
 
+def test_empty_sheet_fails_without_calling_the_writer():
+    class EmptyStore(FakeDeps):
+        def build_sheet(self, plan):
+            return FactSheet(), [], ["Chưa có BCTC đã kiểm chứng của TCB cho quý 3/2026: báo cáo không có số của mã này."], []
+
+    deps = EmptyStore()
+    run(deps)
+    assert deps.writes == []
+    assert deps.last("status") == "failed" and deps.last("error") == "Kho chưa có số của các mã/kỳ này"
+    assert "ghi chú" in deps.last("notes") and any("Chưa có BCTC" in n for n in deps.last("notes"))
+
+
 def test_resume_after_restart_with_new_app():
     saver = InMemorySaver()
     cfg = {"configurable": {"thread_id": "1"}}

@@ -12,6 +12,7 @@
   <p>Kho chưa có các BCTC sau. Hệ thống có thể tìm và đọc (mỗi BCTC tính một lượt vào hạn mức yêu cầu đọc trong ngày của bạn):</p>
   <ul>{% for m in confirm.rows %}<li>{{ m.ticker }} {{ m.label }}{% if m.state == "read" %} · khoảng {{ m.usd }} USD{% elif m.state == "quota" %} · <b>sẽ không đọc được</b>: hết hạn mức hôm nay{% else %} · không đọc được{% if m.note %}: {{ m.note }}{% endif %}{% endif %}</li>{% endfor %}</ul>
   <p class="small muted">Hạn mức đọc BCTC hôm nay còn {{ confirm.remaining }}/{{ confirm.quota }} lượt.{% if confirm.skipped %} Còn thiếu {{ confirm.skipped }} lượt nên báo cáo sẽ viết với số đã có cho phần BCTC không đọc được.{% endif %}</p>
+  {% if confirm.over_budget %}<p class="note">Tháng này hệ thống đã chạm trần chi phí đọc BCTC: yêu cầu đọc sẽ nằm chờ sang tháng sau, báo cáo chỉ xong khi các BCTC đó được đọc. Chọn "Không, viết với số đã có" nếu cần báo cáo ngay.</p>{% endif %}
   <form method="post" action="/bao-cao/{{ r.id }}/xac-nhan" class="inline"><input type="hidden" name="yes" value="1"><button>Đọc thêm rồi viết báo cáo</button></form>
   <form method="post" action="/bao-cao/{{ r.id }}/xac-nhan" class="inline"><input type="hidden" name="yes" value="0"><button class="link">Không, viết với số đã có</button></form>
 {% elif r.status == "waiting_data" %}

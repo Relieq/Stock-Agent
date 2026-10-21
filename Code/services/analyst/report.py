@@ -279,7 +279,7 @@ def run(report_id: int, resume=None, client=None, expect: str | None = None) -> 
                 app = build(deps, saver)
                 cfg = {"configurable": {"thread_id": str(report_id)}, "recursion_limit": 60}
                 before = get(conn, report_id)
-                resumed_waiting = False
+                resumed_waiting, raised = False, False
                 if resume is not None:
                     pending = pending_interrupt(app.get_state(cfg))
                     if expect is not None and (pending is None or expect not in pending):
@@ -291,6 +291,7 @@ def run(report_id: int, resume=None, client=None, expect: str | None = None) -> 
                     else:
                         app.invoke(Command(resume=resume), cfg)
                 except Exception as e:      # noqa: BLE001
+                    raised = True
                     err = traceback.format_exc()
                     try:
                         save(conn, report_id, status="failed", error=str(e)[:2000])
@@ -300,6 +301,10 @@ def run(report_id: int, resume=None, client=None, expect: str | None = None) -> 
                 finally:
                     _safely("ghi chi phí", deps.flush_usage)
                 after = get(conn, report_id)
+                if not raised and after["status"] == "failed" and before["status"] != "failed":
+                    # đồ thị tự kết thúc bằng lỗi (không còn câu nào qua kiểm số, kho không có số): báo quản trị
+                    _safely("gửi thư báo lỗi cho quản trị", notify_admin, f"[Soi] Báo cáo {report_id} lỗi",
+                            f"Câu hỏi: {after['question']}\nLỗi: {after.get('error') or ''}\n{site_url()}/bao-cao/{report_id}")
                 if resumed_waiting and after["status"] == "done":
                     _safely("gửi thư cho người dùng", send_email, after["email"], "[Soi] Báo cáo của bạn đã xong",
                             f"Báo cáo cho câu hỏi \"{after['question']}\" đã xong sau khi hệ thống đọc thêm BCTC:\n"
@@ -354,10 +359,12 @@ def resume_waiting(conn) -> list[str]:
         out += fail_stale(conn)
     except Exception as e:      # noqa: BLE001
         out.append(f"không dọn được báo cáo bị gián đoạn: {e}")
+    _safely("kết thúc giao dịch", conn.commit)      # không giữ giao dịch mở suốt lượt chạy tiếp
     rows = conn.execute(
         """SELECT r.id FROM reports r WHERE r.status = 'waiting_data' AND NOT EXISTS (
              SELECT 1 FROM processing_requests p WHERE p.id = ANY(r.request_ids) AND p.status IN ('queued', 'processing'))
            ORDER BY r.id""").fetchall()
+    _safely("kết thúc giao dịch", conn.commit)
     if not rows:
         return out
     ready = []

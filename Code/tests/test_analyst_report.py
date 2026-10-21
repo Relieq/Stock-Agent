@@ -209,6 +209,67 @@ def test_run_loi_van_nha_khoa_va_thu_loi_khong_lam_hong(monkeypatch):
     assert any("pg_advisory_unlock" in s for s in conn.sql)
 
 
+def test_run_bao_quan_tri_khi_do_thi_ket_thuc_bang_loi(monkeypatch):
+    invoked, mails, admin = [], [], []
+    _fake_run_env(monkeypatch, "failed", None, invoked=invoked, mails=mails)
+    rows = iter([{"status": "planning", "question": "q", "email": "a@b"},
+                 {"status": "failed", "question": "q", "email": "a@b", "error": "Không còn câu nào qua bộ kiểm tra số"}])
+    monkeypatch.setattr(report, "get", lambda c, rid: next(rows))
+    monkeypatch.setattr(report, "notify_admin", lambda *a: admin.append(a))
+    assert report.run(5) == "failed"
+    assert len(admin) == 1 and "Không còn câu nào qua bộ kiểm tra số" in admin[0][1]
+    # báo cáo xong thì không báo
+    admin.clear()
+    rows = iter([{"status": "planning", "question": "q", "email": "a@b"},
+                 {"status": "done", "question": "q", "email": "a@b"}])
+    assert report.run(5) == "done" and admin == []
+
+
+def test_run_loi_ngoai_le_chi_bao_quan_tri_mot_lan(monkeypatch):
+    invoked, mails, admin = [], [], []
+    _fake_run_env(monkeypatch, "failed", None, invoked=invoked, mails=mails)
+    rows = iter([{"status": "planning", "question": "q", "email": "a@b"},
+                 {"status": "failed", "question": "q", "email": "a@b", "error": "mô hình lỗi"}])
+    monkeypatch.setattr(report, "get", lambda c, rid: next(rows))
+
+    def boom(*a, **k):
+        raise RuntimeError("mô hình lỗi")
+
+    monkeypatch.setattr(report, "build", lambda deps, saver: SimpleNamespace(get_state=lambda cfg: None, invoke=boom))
+    monkeypatch.setattr(report, "save", lambda *a, **k: None)
+    monkeypatch.setattr(report, "notify_admin", lambda *a: admin.append(a))
+    assert report.run(5) == "failed" and len(admin) == 1
+
+
+def test_resume_waiting_khong_giu_giao_dich_mo(monkeypatch):
+    """Sau khi dọn báo cáo kẹt và sau câu chọn báo cáo phải commit, để không giữ giao dịch suốt lượt chạy tiếp."""
+    events = []
+
+    class Conn:
+        def execute(self, sql, params=None):
+            events.append("select")
+            return SimpleNamespace(fetchall=lambda: [(9,)])
+
+        def commit(self):
+            events.append("commit")
+
+    monkeypatch.setattr(report, "fail_stale", lambda conn: events.append("fail_stale") or [])
+
+    class Saver:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(report, "_checkpointer", lambda: Saver())
+    monkeypatch.setattr(report, "build", lambda deps, saver: SimpleNamespace(get_state=lambda cfg: None))
+    monkeypatch.setattr(report, "is_waiting", lambda state: True)
+    monkeypatch.setattr(report, "run", lambda rid, resume=None, expect=None: events.append("run") or "done")
+    report.resume_waiting(Conn())
+    assert events == ["fail_stale", "commit", "select", "commit", "run"]
+
+
 def test_fail_stale_danh_dau_loi_bao_cao_ket(monkeypatch):
     saved, admin = [], []
 

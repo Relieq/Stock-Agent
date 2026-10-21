@@ -125,3 +125,46 @@ def test_reuse_ends_without_writing():
     deps = FakeDeps(reuse=True)
     run(deps)
     assert deps.writes == []
+
+
+def test_empty_draft_fails_instead_of_done():
+    deps = FakeDeps(drafts=[{"sections": [], "need": []}])
+    run(deps)
+    assert deps.last("status") == "failed" and deps.last("error") == "Không còn câu nào qua bộ kiểm tra số"
+    assert deps.last("guard_log")["attempts"] and deps.last("sheet")
+
+
+def test_all_sentences_dropped_fails():
+    only_bad = {"sections": [{"heading": "Lợi nhuận", "sentences": [{"text": "LNST của TCB đạt 9.999 tỷ.", "uses": ["S1"]}]}],
+                "need": []}
+    deps = FakeDeps(drafts=[only_bad])
+    run(deps)
+    assert deps.last("status") == "failed" and deps.last("guard_log")["dropped"] == ["LNST của TCB đạt 9.999 tỷ."]
+
+
+def test_only_explicit_true_counts_as_consent():
+    deps = FakeDeps(missing=[{"ticker": "TCB", "year": 2025, "period": "Q3", "can_read": True, "note": ""}])
+    run(deps, {"done": True})
+    assert not deps.requested and deps.last("status") == "done"
+
+
+def test_unreadable_note_uses_period_label():
+    deps = FakeDeps(missing=[{"ticker": "TCB", "year": 2026, "period": "Q3", "can_read": False, "note": "chờ duyệt"},
+                             {"ticker": "VCB", "year": 2026, "period": "Q2", "can_read": False, "note": ""}])
+    run(deps)
+    notes = deps.last("notes")
+    assert "Không đọc được thêm BCTC TCB quý 3/2026: chờ duyệt" in notes
+    assert "Không đọc được thêm BCTC VCB quý 2/2026" in notes
+
+
+def test_resume_after_restart_with_new_app():
+    saver = InMemorySaver()
+    cfg = {"configurable": {"thread_id": "1"}}
+    deps = FakeDeps(missing=[{"ticker": "TCB", "year": 2025, "period": "Q3", "can_read": True, "note": ""}])
+    app = build(deps, saver)
+    app.invoke({"report_id": 1, "question": "TCB quý 3?"}, cfg)
+    app.invoke(Command(resume=True), cfg)
+    assert deps.last("status") == "waiting_data"
+    new_deps = FakeDeps()                                   # tiến trình mới: BCTC đã đọc xong
+    build(new_deps, saver).invoke(Command(resume=True), cfg)
+    assert new_deps.last("status") == "done" and not new_deps.requested

@@ -16,7 +16,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from services.analyst.guard import check_draft
-from services.analyst.plan import Checked, Plan
+from services.analyst.plan import Checked, Plan, label
 from services.analyst.sheet import FactSheet
 from services.analyst.writer import drop_sentences, feedback_lines
 
@@ -76,7 +76,7 @@ def build(deps: Deps, checkpointer=None):
     def confirm(s: State) -> dict:
         readable = [m for m in s["missing"] if m.get("can_read")]
         deps.save(s["report_id"], status="awaiting_confirmation", missing=readable)
-        if not interrupt({"missing": readable}):
+        if interrupt({"missing": readable}) is not True:     # chỉ đồng ý khi xác nhận rõ ràng
             return {"confirmed": False, "route": "compute"}
         ids = deps.request_reading(s["report_id"], readable)
         deps.save(s["report_id"], status="waiting_data", request_ids=ids)
@@ -92,8 +92,10 @@ def build(deps: Deps, checkpointer=None):
         sheet, sources, notes, charts = deps.build_sheet(plan)
         if deps.reuse(s["report_id"], plan, sources):
             return {"route": "end"}
-        notes = s.get("notes", []) + notes + [f"Không đọc được thêm BCTC {m['ticker']} {m['period']}/{m['year']}: "
-                                              f"{m['note']}" for m in s.get("missing", []) if not m.get("can_read")]
+        basis = plan.basis
+        notes = s.get("notes", []) + notes + [
+            f"Không đọc được thêm BCTC {m['ticker']} {label(m['year'], m['period'], basis)}"
+            + (f": {m['note']}" if m.get("note") else "") for m in s.get("missing", []) if not m.get("can_read")]
         deps.save(s["report_id"], notes=notes, sources=sources, charts=charts)
         return {"sheet": sheet.to_json(), "notes": notes, "need_rounds": 0, "rewrites": 0, "feedback": [], "log": [],
                 "route": "write"}
@@ -121,8 +123,13 @@ def build(deps: Deps, checkpointer=None):
                     "route": "write"}
         final, dropped = drop_sentences(s["draft"], {(v.section, v.sentence) for v in violations})
         _, links, _ = check_draft(final, sheet, allowed, known)
+        guard_log = {"attempts": log, "dropped": dropped}
+        if not any(sec["sentences"] for sec in final.get("sections", [])):
+            deps.save(s["report_id"], status="failed", error="Không còn câu nào qua bộ kiểm tra số", sheet=s["sheet"],
+                      guard_log=guard_log)
+            return {"log": log, "draft": final, "route": "end"}
         deps.save(s["report_id"], status="done", sheet=s["sheet"], result={"draft": final, "links": _links_json(links)},
-                  guard_log={"attempts": log, "dropped": dropped})
+                  guard_log=guard_log)
         return {"log": log, "draft": final, "route": "end"}
 
     g = StateGraph(State)

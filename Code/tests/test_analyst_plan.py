@@ -1,0 +1,75 @@
+from datetime import date
+
+from services.analyst import catalog
+from services.analyst.plan import PLAN_SCHEMA, Plan, check_plan, label, parse_request
+
+KNOWN = {"TCB", "VCB", "FPT"}
+
+
+class FakeClient:
+    def __init__(self, answer):
+        self.answer, self.calls = answer, []
+
+    def json_from_images(self, prompt, images, schema, schema_name, **kw):
+        self.calls.append((prompt, schema_name))
+        return self.answer
+
+
+def plan(**kw):
+    base = dict(kind="compare", tickers=["vcb", "TCB"], year=2026, period="Q3", basis="quarter", metrics=[],
+                unclear=[], advice_request=False)
+    return Plan(**(base | kw))
+
+
+def check(p, latest=(2026, "Q3")):
+    return check_plan(p, KNOWN, exists=lambda t: t == "ABC", latest=lambda ts: latest)
+
+
+def test_schema_has_no_nullable_enum():
+    for prop in PLAN_SCHEMA["properties"].values():
+        assert "null" not in str(prop.get("type"))
+    assert set(PLAN_SCHEMA["required"]) == set(PLAN_SCHEMA["properties"])
+
+
+def test_parse_request_sends_question_and_reads_plan():
+    client = FakeClient(plan().to_json())
+    p = parse_request(client, "so sánh VCB và TCB quý 3", date(2026, 10, 21), [("TCB", "Techcombank")])
+    assert p.tickers == ["vcb", "TCB"] and client.calls[0][1] == "plan_request"
+    assert "so sánh VCB và TCB quý 3" in client.calls[0][0] and "21/10/2026" in client.calls[0][0]
+
+
+def test_tickers_are_normalised_and_unknown_ones_asked_back():
+    c = check(plan())
+    assert c.ask is None and c.plan.tickers == ["VCB", "TCB"]
+    assert check(plan(tickers=[])).ask.startswith("Bạn muốn xem mã")
+    assert "XYZ" in check(plan(tickers=["XYZ"])).ask
+    assert check(plan(tickers=["ABC", "VCB"])).ask is None          # mã ngoài danh sách nhưng có trên Vietstock
+
+
+def test_kind_follows_number_of_tickers_and_latest_is_filled():
+    c = check(plan(tickers=["FPT"]))
+    assert c.plan.kind == "yoy" and c.notes
+    c = check(plan(kind="yoy"))
+    assert c.plan.kind == "compare"
+    c = check(plan(period="latest", year=0), latest=(2026, "Q2"))
+    assert (c.plan.year, c.plan.period) == (2026, "Q2") and "quý 2/2026" in c.notes[-1]
+    assert check(plan(period="latest", year=0), latest=None).ask
+    assert check(plan(period="H1")).plan.basis == "ytd"
+    assert check(plan(period="Q1", basis="ytd")).plan.basis == "quarter"
+    assert check(plan(advice_request=True)).notes[-1].startswith("Soi chỉ cung cấp thông tin")
+    assert check(plan(metrics=["npat_parent", "khong_co"])).plan.metrics == ["npat_parent"]
+
+
+def test_labels():
+    assert label(2026, "Q3", "quarter") == "quý 3/2026"
+    assert label(2026, "Q3", "ytd") == "lũy kế 9 tháng năm 2026"
+    assert label(2026, "H1", "ytd") == "6 tháng đầu năm 2026"
+    assert label(2025, "FY", "ytd") == "năm 2025"
+
+
+def test_catalog_keys():
+    assert catalog.keys_for("TCTD", []) == ["nii", "toi", "provision", "pbt", "npat_parent", "cir"]
+    assert catalog.keys_for("corporate", ["provision", "revenue"]) == ["revenue"]
+    assert catalog.common_keys({"TCTD", "corporate"}, []) == ["pbt", "npat_parent"]
+    assert catalog.common_keys({"TCTD"}, ["nii"]) == ["nii"]
+    assert "lnst" in catalog.names("TCTD", "npat_parent")

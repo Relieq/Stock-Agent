@@ -156,6 +156,8 @@ OUTPUT_LIMITS = (
     ("page_classification", 6_000),
     ("identify_upload", 3_000),
     ("explanation_read", 12_000),  # đọc công văn giải trình (services/analyst/explanations.py)
+    ("plan_request", 3_000),       # hiểu yêu cầu của agent báo cáo (services/analyst/plan.py)
+    ("write_report", 12_000),      # viết lời báo cáo (services/analyst/writer.py)
     ("verify_cells", 6_000), ("reread_cells", 6_000), ("repair_", 6_000),
 )
 

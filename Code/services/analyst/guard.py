@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from services.analyst import catalog
 from services.analyst.sheet import Fact, FactSheet
 
 MONEY = (("nghìn tỷ", Decimal(10) ** 12), ("ngàn tỷ", Decimal(10) ** 12), ("tỷ", Decimal(10) ** 9),
@@ -25,7 +26,10 @@ WORD_TIMES = {"gấp đôi": 2, "gấp ba": 3}
 # Năm đứng một mình được bỏ qua, trừ khi theo sau là đơn vị ("đạt 2000 tỷ" là số liệu, không phải năm)
 IGNORE = re.compile(r"(?i)\b(?:quý|Q)\s*[1-4]\b(?:\s*[/-]\s*\d{4})?|\b(?:năm|nam)\s+\d{4}|\b\d{1,2}/(?:19|20)\d{2}\b"
                     r"|\b(?:19|20)\d{2}\b(?!\s*(?:tỷ|triệu|đồng|%|lần|điểm|nghìn|ngàn)" + _UNIT_END + r")"
-                    r"|\b\d{1,2}\s*tháng|\bVN\d+\b|\b\d{1,2}/\d{1,2}(?:/\d{2,4})?(?!\d)|\bH[12]\b")
+                    r"|\b\d{1,2}\s*tháng|\bVN\d+\b|(?<!thứ\s)\b\d{1,2}/\d{1,2}(?:/\d{2,4})?(?!\d)|\bH[12]\b")
+# Thứ hạng: "thứ 2/3", "thứ 2 trong (số) 3", "đứng/xếp thứ 2"; kiểm riêng theo thứ tự của dòng xếp hạng, không như số liệu
+RANK = re.compile(r"(?i)(?<!\w)(?P<verb>(?:đứng|xếp)\s+(?:hạng\s+)?)?thứ\s+(?P<n>\d{1,3})"
+                  r"(?:\s*(?:/|trên|trong(?:\s+số)?)\s*(?P<m>\d{1,3})(?!\d))?(?![\w/])")
 APPROX = re.compile(r"(khoảng|gần|xấp xỉ|ước|chừng)\s*$")
 MORE = re.compile(r"(hơn|trên|vượt)\s*$")
 LESS = re.compile(r"(dưới|chưa đến|chưa tới|không tới)\s*$")
@@ -33,6 +37,9 @@ LESS = re.compile(r"(dưới|chưa đến|chưa tới|không tới)\s*$")
 # để câu phân tích như "có thể giữ được đà tăng" không bị coi là khuyến nghị; "khuyến nghị" (danh từ) có thể được phủ định
 ADVICE = re.compile(r"(?i)(nên|khuyên|có thể\s+(?:cân nhắc|nên))\s+(?:\S+\s+){0,2}?"
                     r"(mua|bán|nắm giữ|giữ|tích lũy|chốt lời|cắt lỗ|đầu tư)\b"
+                    # "nhà đầu tư/cổ đông/bạn có thể mua...": có chủ thể là người đầu tư thì "có thể" cũng là khuyên
+                    r"|(?<!\w)(?:nhà đầu tư|cổ đông|bạn)\s+(?:(?:vẫn|cũng|hoàn toàn)\s+)?có thể\s+(?:\S+\s+){0,2}?"
+                    r"(?:mua|bán|nắm giữ|giữ|tích lũy|chốt lời|cắt lỗ|đầu tư|gom)\b"
                     r"|giá mục tiêu"
                     r"|cơ hội (đầu tư|mua)|định giá (hấp dẫn|rẻ)|thời điểm (tốt để )?(mua|bán)|khuyến nghị")
 NEGATED = re.compile(r"(?i)không\s+(?:\S+\s+){0,2}$")
@@ -40,7 +47,7 @@ TICKER = re.compile(r"\b[A-Z]{3}\b")
 
 KINDS = {
     "unsourced_number": "số không có trong các dòng câu đã ghi",
-    "no_source": "câu có số nhưng không ghi dòng số nào",
+    "no_source": "câu có số hoặc từ chỉ chiều nhưng không ghi dòng số nào",
     "unknown_fact": "câu ghi mã dòng không có trong bảng số",
     "advice": "ngôn ngữ khuyến nghị đầu tư",
     "foreign_ticker": "nhắc mã ngoài kế hoạch và ngoài các dòng câu ghi",
@@ -96,8 +103,15 @@ def _kind(unit: str | None) -> tuple[str, Decimal]:
     return "times", Decimal(1)
 
 
+def ranks(text: str) -> list[re.Match]:
+    """Các cụm thứ hạng: phải có "đứng/xếp" đứng trước hoặc có tổng số ("thứ 2/3"); "quý thứ 3 liên tiếp" không phải."""
+    return [m for m in RANK.finditer(text) if m.group("verb") or m.group("m")]
+
+
 def _masked(text: str) -> str:
-    """Thay kỳ, năm, ngày tháng bằng khoảng trắng cùng độ dài để vị trí các số còn lại không đổi."""
+    """Thay kỳ, năm, ngày tháng, thứ hạng bằng khoảng trắng cùng độ dài để vị trí các số còn lại không đổi."""
+    for m in ranks(text):
+        text = text[:m.start()] + " " * (m.end() - m.start()) + text[m.end():]
     return IGNORE.sub(lambda m: " " * len(m.group(0)), text)
 
 
@@ -151,15 +165,19 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
             bad("unknown_fact", fid)
         else:
             facts.append(f)
-    allowed_nums = [(f, n) for f in facts for n in numbers(f.text)]
+    allowed_nums = [(f, n, loss) for f in facts for n, loss in _fact_numbers(f)]
     found = numbers(text)
-    if found and not facts:
+    if not facts and (found or (not uses and _direction_claim(text))):
         bad("no_source", text.strip())
-    else:
+    elif facts:
         for n in found:
-            hit = next((f for f, fn in allowed_nums if matches(n, fn)), None)
+            side = _profit_side(text, n)
+            pool = [(f, fn) for f, fn, loss in allowed_nums if side is None or loss == (side == "loss")]
+            hit = next((f for f, fn in pool if matches(n, fn)), None)
             if hit is None:
-                bad("unsourced_number", text[n.start:n.end].strip())
+                flipped = side is not None and any(matches(n, fn) for _, fn, _ in allowed_nums)
+                bad("unsourced_number", text[n.start:n.end].strip()
+                    + (" (số đứng sau “lãi/lỗ” ngược dấu với bảng số)" if flipped else ""))
             else:
                 out.links.append(Link(n.start, n.end, hit.id))
     for m in ADVICE.finditer(text):
@@ -171,7 +189,87 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
         if t not in allowed and t not in fact_text:
             bad("foreign_ticker", t)
     _check_directions(text, facts, out, bad, sheet)
+    _check_ranks(text, facts, bad, sheet)
     return out
+
+
+# "lãi"/"lỗ" đứng riêng (không phải "Lãi/lỗ tỷ giá", không phải "lỗi")
+PROFIT_WORD = re.compile(r"(?i)(?<![/\w])(lãi|lỗ)(?![/\w])")
+
+
+def _profit_side(text: str, n: Num) -> str | None:
+    """Số tiền đứng ngay sau "lãi" hay "lỗ" (cách tối đa 3 từ, cùng vế): "profit", "loss" hoặc None."""
+    if n.kind != "money":
+        return None
+    word = None
+    for m in PROFIT_WORD.finditer(text, 0, n.start):
+        word = m
+    if word is None:
+        return None
+    between = text[word.end():n.start]
+    if re.search(r"[,;:.](?!\d)", between) or len(between.split()) > 3:
+        return None
+    return "loss" if word.group(1).lower() == "lỗ" else "profit"
+
+
+def _fact_numbers(f: Fact) -> list[tuple[Num, bool]]:
+    """Số của dòng kèm cờ "là khoản lỗ": số âm, hoặc đứng sau chữ "lỗ" gần nhất trong cùng phần ("lỗ thu hẹp từ 100 tỷ
+    còn 50 tỷ", "chuyển từ lãi 20 tỷ sang lỗ 30 tỷ")."""
+    out = []
+    for n in numbers(f.text):
+        seg_start = max((m.end() for m in re.finditer(r"[;:]|\.\s", f.text[:n.start])), default=0)
+        word = None
+        for m in PROFIT_WORD.finditer(f.text, seg_start, n.start):
+            word = m
+        out.append((n, n.value < 0 or (word is not None and word.group(1).lower() == "lỗ")))
+    return out
+
+
+def _direction_claim(text: str) -> bool:
+    """Câu có nói chiều (tăng/giảm, cao/thấp hơn cùng kỳ, lãi/lỗ): là nhận định về số liệu, phải ghi dòng số."""
+    for a, b in _clauses(text):
+        low = text[a:b].lower().replace("tăng trưởng âm", "giảm")
+        if bool(UP.search(low)) != bool(DOWN.search(low)):
+            return True
+        if LAST_YEAR.search(low) and COMP_AS_DIR.search(low):
+            return True
+        if re.search(r"(?<![/\w])lỗ(?![/\w])|\b(?:có|báo) lãi\b", low):
+            return True
+    return False
+
+
+def _check_ranks(text: str, facts: list[Fact], bad, sheet: FactSheet | None) -> None:
+    """Thứ hạng "thứ N/M", "thứ N trong M", "đứng thứ N": N là vị trí của mã trong thứ tự của dòng xếp hạng câu ghi, M
+    là số mã của dòng đó."""
+    subject: str | None = None
+    for a, b in _clauses(text):
+        clause = text[a:b]
+        low = clause.lower()
+        tickers = [(m.start(), m.group(0)) for m in TICKER.finditer(clause)]
+        for r in ranks(clause):
+            n, m = int(r.group("n")), int(r.group("m")) if r.group("m") else None
+            before = [t for p, t in tickers if p < r.start()]
+            who = before[-1] if before else tickers[0][1] if tickers else subject
+            c = _cue(low)
+            rows = [f for f in facts if f.order and (who is None and f.ticker in f.order or who in f.order)
+                    and (c is None or f.measure == c)]
+            rows = _named(rows, low)
+            if not rows:
+                bad("comparison", f"không có dòng xếp hạng cho {who or 'mã được nói'}: {clause.strip()}"
+                                  + (_hint(sheet, [who], c, low, rank=True) if who else ""))
+                continue
+
+            def ok(f: Fact) -> bool:
+                t = who or f.ticker
+                return f.order.index(t) + 1 == n and (m is None or m == len(f.order))
+
+            if not any(ok(f) for f in rows):
+                f = rows[0]
+                t = who or f.ticker
+                bad("comparison", f"{clause.strip()} — dòng {f.id}: {t} xếp thứ {f.order.index(t) + 1} "
+                                  f"trong {len(f.order)}")
+        if tickers:
+            subject = tickers[0][1]
 
 
 def _negated(text: str, start: int) -> bool:
@@ -206,10 +304,36 @@ def _clauses(text: str) -> list[tuple[int, int]]:
     return [(a, b) for a, b in spans if text[a:b].strip()]
 
 
+VOCAB = frozenset(n for kind in catalog.METRICS for key in list(catalog.METRICS[kind]) + list(catalog.RATIOS[kind])
+                  for n in catalog.names(kind, key))
+
+
+def _mentioned(low: str, facts: list[Fact]) -> set[str]:
+    """Tên chỉ tiêu vế câu nhắc, khớp tên dài nhất: "lợi nhuận" nằm trong "lợi nhuận trước thuế" thì không tính là nhắc
+    LNST; "doanh thu" trong "doanh thu tài chính", "chi phí hoạt động" trong "chi phí hoạt động trên tổng thu nhập..."
+    cũng vậy. Xét cả tên trong danh mục, để tên của chỉ tiêu câu không ghi dòng vẫn che được tên ngắn hơn."""
+    vocab = VOCAB | {n for f in facts for n in f.names}
+    occ = sorted(((m.start(), m.end(), n) for n in vocab if n for m in re.finditer(re.escape(n), low)),
+                 key=lambda x: x[0] - x[1])
+    taken, out = [], set()
+    for s, e, n in occ:
+        if not any(s < te and ts < e for ts, te in taken):
+            taken.append((s, e))
+            out.add(n)
+    return out
+
+
+def _named_ids(facts: list[Fact], low: str) -> tuple[set[str], bool]:
+    """(mã các dòng có tên được nhắc theo khớp dài nhất, vế có nhắc tên chỉ tiêu nào không)."""
+    names = _mentioned(low, facts)
+    return {f.id for f in facts if names & set(f.names)}, bool(names)
+
+
 def _named(facts: list[Fact], low: str) -> list[Fact]:
-    """Các dòng mà vế câu nhắc tên chỉ tiêu; không nhắc tên nào thì giữ cả."""
-    hit = [f for f in facts if any(n in low for n in f.names)]
-    return hit or facts
+    """Các dòng mà vế câu nhắc tên chỉ tiêu (khớp tên dài nhất); không nhắc tên nào thì giữ cả. Nhắc tên một chỉ tiêu
+    không có trong các dòng này thì không dòng nào hợp."""
+    ids, any_name = _named_ids(facts, low)
+    return [f for f in facts if f.id in ids] if any_name else facts
 
 
 def _cue(low: str) -> str | None:
@@ -219,13 +343,15 @@ def _cue(low: str) -> str | None:
     return "growth" if GROWTH_WORDS.search(low) else None
 
 
-def _hint(sheet: FactSheet | None, codes: list[str], c: str | None, low: str) -> str:
-    """Gợi ý dòng bảng số câu cần ghi thêm: dòng có thứ tự chứa đủ các mã; ưu tiên cùng loại số liệu, rồi dòng có tên
-    chỉ tiêu xuất hiện trong vế câu. Tối đa 2 dòng; không có dòng nào thì không gợi ý."""
+def _hint(sheet: FactSheet | None, codes: list[str], c: str | None, low: str, rank: bool = False) -> str:
+    """Gợi ý dòng bảng số câu cần ghi thêm: dòng có thứ tự chứa đủ các mã; với thứ hạng, cao nhất/thấp nhất thì ưu tiên
+    dòng xếp hạng; rồi cùng loại số liệu, rồi dòng có tên chỉ tiêu xuất hiện trong vế câu. Tối đa 2 dòng; không có dòng
+    nào thì không gợi ý."""
     if sheet is None:
         return ""
     cands = [f for f in sheet.facts if f.order and all(t in f.order for t in codes)]
-    cands.sort(key=lambda f: (not (c is not None and f.measure == c), not any(n in low for n in f.names)))
+    named, _ = _named_ids(cands, low)
+    cands.sort(key=lambda f: (rank and f.kind != "rank", not (c is not None and f.measure == c), f.id not in named))
     return " — ghi thêm dòng " + ", ".join(f.id for f in cands[:2]) + " vào uses" if cands else ""
 
 
@@ -332,7 +458,7 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                 cands = _named([f for f in facts if f.order and who in f.order and (c is None or f.measure == c)], low)
                 if not cands:
                     bad("comparison", f"không có dòng xếp hạng cho {who}: {clause.strip()}"
-                                      + _hint(sheet, [who], c, low))
+                                      + _hint(sheet, [who], c, low, rank=True))
                 elif not any((f.order[0] if first else f.order[-1]) == who for f in cands):
                     bad("comparison", clause.strip())
             continue
@@ -354,20 +480,32 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
         # mọi dòng câu ghi có số khớp với số trong vế (không chỉ dòng con số được gắn liên kết)
         by_num = _directions_by_number(clause, facts, tickers)
         dirs = {d for _, d in by_num}
+        named, any_name = _named_ids(facts, low)
         if len(dirs) > 1:       # số khớp nhiều dòng trái chiều: thu hẹp theo tên chỉ tiêu vế câu nhắc
-            named = {f.id for f in facts if any(n in low for n in f.names)}
             dirs = {d for fid, d in by_num if fid in named} or dirs
         if not by_num:          # không có số khớp: theo tên chỉ tiêu
-            cands = [f for f in facts if f.direction and any(n in low for n in f.names)
-                     and (not tickers or f.ticker in tickers)]
+            cands = [f for f in facts if f.direction and f.id in named and (not tickers or f.ticker in tickers)]
             if not cands:
-                # chỉ một dòng có chiều: dùng khi vế nhắc đúng mã của dòng đó (hoặc không mã nào và nhắc tên chỉ tiêu)
+                # chỉ một dòng có chiều: dùng khi vế nhắc đúng mã của dòng đó mà không nhắc tên chỉ tiêu khác (hoặc
+                # không mã nào và nhắc tên chỉ tiêu của dòng)
                 with_dir = [f for f in facts if f.direction]
                 if len(with_dir) == 1:
                     f = with_dir[0]
-                    if (f.ticker and f.ticker in tickers) or (not tickers and any(n in low for n in f.names)):
+                    if (f.ticker and f.ticker in tickers and (not any_name or f.id in named)) \
+                            or (not tickers and f.id in named):
                         cands = with_dir
             dirs = {f.direction for f in cands}
+        if not dirs and sheet is not None:
+            # các dòng câu ghi không cho biết chiều: dò cả bảng số theo mã và tên chỉ tiêu; đúng một dòng thì kiểm theo nó
+            who = tickers or ([subject] if subject else [])
+            ids, _ = _named_ids(sheet.facts, low)
+            found = [f for f in sheet.facts if f.direction and f.ticker in who and f.id in ids]
+            if len(found) == 1:
+                f = found[0]
+                if (up and f.direction == "down") or (down and f.direction == "up"):
+                    bad("direction", f"{clause.strip()} — bảng số ghi chiều ngược ở dòng {f.id}; ghi dòng {f.id} "
+                                     f"vào uses")
+                continue
         if len(dirs) != 1:
             out.warnings.append(f"không rõ chiều: {clause.strip()}")
             continue

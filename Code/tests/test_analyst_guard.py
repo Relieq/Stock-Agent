@@ -242,8 +242,10 @@ def test_loss_inversion_only_for_loss_right_before_the_verb():
     assert kinds("LNST của XYZ giảm do khoản lỗ mở rộng.", ["S2"], s, allowed) == []
     assert kinds("LNST của ABC tăng so với khoản lỗ 100 tỷ cùng kỳ.", ["S1"], s, allowed) == []
     assert kinds("Lãi/lỗ tỷ giá tăng.", ["S3"], s, allowed) == []
-    assert kinds("ABC lỗ giảm còn 50 tỷ.", ["S1"], s, allowed) == []
+    assert kinds("LNST của ABC lỗ giảm.", ["S1"], s, allowed) == []
     assert kinds("ABC lỗ tăng.", ["S1"], s, allowed) == ["direction"]
+    # ABC đã lãi 50 tỷ: "lỗ ... còn 50 tỷ" là sai dấu (trước lượt sửa lãi/lỗ, câu này từng được coi là đúng)
+    assert kinds("ABC lỗ giảm còn 50 tỷ.", ["S1"], s, allowed) == ["unsourced_number"]
 
 
 def test_negation_and_compound_words_are_not_direction():
@@ -340,3 +342,128 @@ def test_comparison_without_growth_cue_prefers_the_level_row():
     # không có dòng quy mô chứa cả hai mã: mới xét dòng tăng trưởng
     assert kinds("LNST của TCB cao hơn VCB.", ["S3"]) == []
     assert kinds("LNST của VCB cao hơn TCB.", ["S3"]) == ["comparison"]
+
+
+# --- Lượt sửa sau soát toàn nhánh ---
+
+def test_direction_word_without_cited_rows_is_unsourced():
+    s = sheet()
+    v = check_sentence("LNST của TCB giảm mạnh so với cùng kỳ.", [], s, {"TCB"}, KNOWN).violations
+    assert [x.kind for x in v] == ["no_source", "direction"]
+    assert "S1" in v[1].detail                       # dò được dòng ngược chiều trong bảng số: gợi ý mã dòng
+    assert [x.kind for x in check_sentence("LNST của TCB tăng mạnh so với cùng kỳ.", [], s, {"TCB"},
+                                           KNOWN).violations] == ["no_source"]
+    # câu không có số, không có từ chỉ chiều thì không cần ghi dòng
+    assert check_sentence("Soi không đưa khuyến nghị đầu tư.", [], s, {"TCB"}, KNOWN).violations == []
+
+
+def test_unresolved_clause_looks_up_the_whole_sheet():
+    s = sheet()
+    # câu chỉ ghi dòng dự phòng nhưng nói về LNST: dò bảng số theo mã và tên chỉ tiêu, ra S1 (tăng)
+    v = check_sentence("LNST của TCB giảm mạnh.", ["S2"], s, {"TCB"}, KNOWN).violations
+    assert [x.kind for x in v] == ["direction"] and "S1" in v[0].detail
+    assert check_sentence("LNST của TCB tăng mạnh.", ["S2"], s, {"TCB"}, KNOWN).violations == []
+    assert check_sentence("Chi phí dự phòng của TCB giảm.", ["S1"], s, {"TCB"}, KNOWN).violations == []
+
+
+def profit_loss_sheet():
+    s = FactSheet()
+    s.add("metric", "LNST, TCB, quý 3/2026: 50,0 tỷ; cùng kỳ 40,0 tỷ; thay đổi +25,0% (tăng 10,0 tỷ)", ticker="TCB",
+          metric="npat_parent", direction="up", names=["lnst"])
+    s.add("metric", "LNST, VCB, quý 3/2026: −30,0 tỷ; cùng kỳ 20,0 tỷ; chuyển từ lãi 20,0 tỷ sang lỗ 30,0 tỷ",
+          ticker="VCB", metric="npat_parent", direction="down", names=["lnst"])
+    s.add("metric", "LNST, ABC, quý 3/2026: −50,0 tỷ; cùng kỳ −100,0 tỷ; lỗ thu hẹp từ 100,0 tỷ còn 50,0 tỷ",
+          ticker="ABC", metric="npat_parent", direction="up", names=["lnst"])
+    return s
+
+
+def test_profit_and_loss_amounts_keep_their_sign():
+    s, allowed = profit_loss_sheet(), ("TCB", "VCB", "ABC")
+    assert kinds("TCB lãi 50,0 tỷ.", ["S1"], s, allowed) == []
+    assert kinds("TCB lỗ 50,0 tỷ.", ["S1"], s, allowed) == ["unsourced_number"]
+    assert kinds("VCB lỗ 30,0 tỷ.", ["S2"], s, allowed) == []
+    assert kinds("VCB lãi 30,0 tỷ.", ["S2"], s, allowed) == ["unsourced_number"]
+    assert kinds("VCB chuyển từ lãi 20,0 tỷ sang lỗ 30,0 tỷ.", ["S2"], s, allowed) == []
+    assert kinds("VCB chuyển từ lỗ 20,0 tỷ sang lãi 30,0 tỷ.", ["S2"], s, allowed) == ["unsourced_number"] * 2
+    assert kinds("ABC lỗ giảm còn 50,0 tỷ.", ["S3"], s, allowed) == []
+    assert kinds("ABC lãi 50,0 tỷ.", ["S3"], s, allowed) == ["unsourced_number"]
+    # "lãi/lỗ" là tên khoản mục, không phải dấu; số xa hơn 3 từ không bị ràng buộc
+    assert kinds("Lãi/lỗ của TCB là 50,0 tỷ.", ["S1"], s, allowed) == []
+    assert kinds("TCB thoát lỗ, LNST đạt 50,0 tỷ.", ["S1"], s, allowed) == []
+
+
+def rank4_sheet():
+    s = FactSheet()
+    s.add("rank", "LNST, thay đổi so với cùng kỳ, quý 3/2026, các ngân hàng (4 mã có số): TCB xếp thứ 3 trong 4; "
+                  "trung vị nhóm +16,0%; thứ tự: VPB +60,1%, VCB +20,0%, TCB +12,0%, ACB +5,0%", ticker="TCB",
+          metric="npat_parent", measure="growth", order=["VPB", "VCB", "TCB", "ACB"], names=["lnst"])
+    return s
+
+
+def test_rank_numbers_are_checked_against_the_order():
+    allowed = ("TCB",)
+    assert kinds("TCB xếp thứ 2/3 về tăng trưởng LNST.", ["S5"]) == []
+    assert kinds("TCB xếp thứ 1/3 về tăng trưởng LNST.", ["S5"]) == ["comparison"]
+    assert kinds("TCB đứng thứ 2 trong 3 ngân hàng.", ["S5"]) == []
+    assert kinds("TCB đứng thứ 3 trong 3 ngân hàng.", ["S5"]) == ["comparison"]
+    assert kinds("TCB xếp thứ 2 trong 4 ngân hàng.", ["S5"]) == ["comparison"]
+    assert kinds("TCB đứng thứ 2 về tăng trưởng LNST.", ["S5"]) == []
+    assert kinds("TCB đứng thứ 1 về tăng trưởng LNST.", ["S5"]) == ["comparison"]
+    r = rank4_sheet()
+    assert kinds("TCB xếp thứ 3/4 trong nhóm.", ["S1"], r, allowed) == []
+    assert kinds("TCB xếp thứ 1/4 trong nhóm.", ["S1"], r, allowed) == ["comparison"]
+    assert kinds("TCB xếp thứ 4 trong 4 ngân hàng.", ["S1"], r, allowed) == ["comparison"]
+    # không ghi dòng xếp hạng: báo lỗi kèm gợi ý
+    v = check_sentence("TCB đứng thứ 2 trong 3 ngân hàng.", ["S1"], compare_sheet(), {"TCB"}, KNOWN).violations
+    assert [x.kind for x in v] == ["comparison"] and "S5" in v[0].detail
+    # "thứ N/M" không còn bị che như ngày tháng; ngày tháng vẫn bị che
+    assert numbers("ngày 30/6 LNST đạt 7.943 tỷ")[0].kind == "money" and len(numbers("ngày 30/6")) == 0
+
+
+def overlap_sheet():
+    s = FactSheet()
+    s.add("compare", "Lợi nhuận trước thuế, xếp theo quy mô, quý 3/2026: VCB 12.000 tỷ, TCB 9.000 tỷ", metric="pbt",
+          measure="level", order=["VCB", "TCB"], names=["lợi nhuận trước thuế", "lntt"])
+    s.add("compare", "LNST của cổ đông ngân hàng mẹ, xếp theo quy mô, quý 3/2026: TCB 8.000 tỷ, VCB 7.000 tỷ",
+          metric="npat_parent", measure="level", order=["TCB", "VCB"],
+          names=["lnst của cổ đông ngân hàng mẹ", "lnst", "lợi nhuận sau thuế", "lãi ròng", "lợi nhuận ròng",
+                 "lợi nhuận"])
+    s.add("metric", "Doanh thu thuần, FPT, quý 3/2026: 15.000 tỷ; cùng kỳ 14.000 tỷ", ticker="FPT", metric="revenue",
+          direction="up", names=["doanh thu thuần", "doanh thu"])
+    s.add("metric", "Doanh thu hoạt động tài chính, FPT, quý 3/2026: 500 tỷ; cùng kỳ 700 tỷ", ticker="FPT",
+          metric="fin_income", direction="down", names=["doanh thu hoạt động tài chính", "doanh thu tài chính"])
+    s.add("ratio", "Chi phí hoạt động trên tổng thu nhập hoạt động, TCB, quý 3/2026: 30,0%; cùng kỳ 33,0%", ticker="TCB",
+          metric="cir", direction="down", names=["chi phí hoạt động trên tổng thu nhập hoạt động", "cir",
+                                                 "chi phí hoạt động trên"])
+    s.add("metric", "Chi phí hoạt động, TCB, quý 3/2026: 3.000 tỷ; cùng kỳ 2.800 tỷ", ticker="TCB", metric="opex",
+          direction="up", names=["chi phí hoạt động"])
+    return s
+
+
+def test_longest_metric_name_wins():
+    s, allowed = overlap_sheet(), ("TCB", "VCB", "FPT")
+    assert kinds("Lợi nhuận trước thuế của TCB cao hơn VCB.", ["S1", "S2"], s, allowed) == ["comparison"]
+    assert kinds("Lợi nhuận trước thuế của VCB cao hơn TCB.", ["S1", "S2"], s, allowed) == []
+    assert kinds("Lợi nhuận của TCB cao hơn VCB.", ["S1", "S2"], s, allowed) == []
+    # chỉ ghi dòng LNST mà câu nói LNTT: không có dòng so sánh LNTT, gợi ý S1
+    v = check_sentence("Lợi nhuận trước thuế của TCB cao hơn VCB.", ["S2"], s, set(allowed), KNOWN).violations
+    assert [x.kind for x in v] == ["comparison"] and "S1" in v[0].detail
+    assert kinds("Doanh thu tài chính của FPT tăng.", ["S3", "S4"], s, allowed) == ["direction"]
+    assert kinds("Doanh thu của FPT tăng.", ["S3", "S4"], s, allowed) == []
+    assert kinds("Chi phí hoạt động trên tổng thu nhập hoạt động của TCB tăng.", ["S5", "S6"], s, allowed) == \
+        ["direction"]
+    assert kinds("Chi phí hoạt động của TCB tăng.", ["S5", "S6"], s, allowed) == []
+
+
+def test_investor_can_buy_is_advice():
+    s = sheet()
+
+    def kinds_(t):
+        return [v.kind for v in check_sentence(t, ["S1"], s, {"TCB"}, KNOWN).violations]
+
+    assert "advice" in kinds_("Nhà đầu tư có thể mua TCB.")
+    assert "advice" in kinds_("Cổ đông có thể tiếp tục nắm giữ TCB.")
+    assert "advice" in kinds_("Bạn có thể bán bớt TCB.")
+    assert "advice" in kinds_("Nhà đầu tư vẫn có thể tích lũy TCB.")
+    assert "advice" not in kinds_("Ngân hàng có thể đầu tư thêm vào công nghệ.")
+    assert "advice" not in kinds_("LNST của cổ đông ngân hàng mẹ có thể giữ được đà tăng.")

@@ -77,3 +77,50 @@ def test_steps_delta_and_known_tickers():
     docs = [{"plan": {"tickers": ["TCB"]}, "sheet": [{"ticker": "VIB"}, {"ticker": None}]}]
     golden = [{"tags": [], "expect": {"tickers": ["HPG"]}}, {"tags": ["mã không tồn tại"], "expect": {"tickers": ["XYZ"]}}]
     assert agent_eval.known_tickers(docs, golden) == {"TCB", "VIB", "HPG"}
+
+
+class _Http(Exception):
+    def __init__(self, status):
+        super().__init__(f"http {status}")
+        self.status_code = status
+
+
+def test_error_classification_and_retries():
+    from services.llm import ProviderUnavailable
+    t = agent_eval.is_transient
+    assert t(_Http(429)) and t(_Http(503)) and t(_Http(408)) and t(ProviderUnavailable("x", sticky=True))
+    assert t(type("APIConnectionError", (Exception,), {})("mất mạng"))
+    assert not t(_Http(401)) and not t(_Http(400)) and not t(ProviderUnavailable("từ chối", sticky=False))
+    assert not t(RuntimeError("bị cắt do vượt giới hạn độ dài")) and not t(ValueError("json sai"))
+
+    calls = []
+
+    def flaky(fail_times, exc):
+        def fn():
+            calls.append(1)
+            if len(calls) <= fail_times:
+                raise exc
+            return "ok"
+        return fn
+
+    sleeps = []
+    assert agent_eval.with_retries(flaky(2, _Http(503)), sleep=sleeps.append) == ("ok", None)
+    assert len(calls) == 3 and len(sleeps) == 2                       # thử lại tối đa 2 lần
+    calls.clear()
+    res, fail = agent_eval.with_retries(flaky(9, _Http(503)), sleep=lambda s: None)
+    assert res is None and fail[0] == "transient_exhausted" and len(calls) == 3
+    calls.clear()
+    res, fail = agent_eval.with_retries(flaky(9, RuntimeError("cắt")), sleep=lambda s: None)
+    assert fail[0] == "deterministic" and len(calls) == 1               # lỗi tất định không thử lại
+
+
+def test_summary_counts_failed_runs_and_missing_questions():
+    failed = _write_cache(status="failed") | {"_error_kind": "deterministic", "error": "RuntimeError('cắt')"}
+    failed.pop("guard_log")
+    s = agent_eval.provider_stats({"1": _write_cache(), "2": failed}, eligible_n=44)
+    assert s["st"]["not_done"] == 1 and s["errors"] == {"deterministic": 1} and s["eligible"] == 44
+    text = "\n".join(agent_eval.format_stats("openai", s))
+    assert "2/44 câu đã có kết quả" in text and "không xong 1" in text and "deterministic" in text
+    rows = [{"expect": {"tickers": ["TCB"]}, "tags": []}, {"expect": {"tickers": []}, "tags": []},
+            {"expect": {"tickers": ["XYZ"]}, "tags": ["mã không tồn tại"]}]
+    assert len(agent_eval.eligible(rows)) == 1

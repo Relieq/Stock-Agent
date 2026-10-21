@@ -9,7 +9,8 @@ Kết quả gọi mô hình lưu ở Data/raw/agent_eval/<nhà cung cấp>/: ch�
 "năm nay", "quý vừa rồi" có cùng đáp án ở mọi lần đo. Hai nhà cung cấp chạy cùng bộ câu, cùng bảng số.
 
 Công bằng giữa hai nhà: bản đọc công văn giải trình lưu riêng theo nhà (<nhà>/explanations/), chi phí đọc công văn tách khỏi
-chi phí viết; lỗi tạm thời (mạng, hết hạn mức) không được lưu nên lần chạy sau thử lại; mỗi bản lưu ghi mã mô hình đã trả
+chi phí viết; lỗi mạng/máy chủ thử lại tối đa 2 lần, còn lỗi tất định (bị cắt, từ chối, JSON sai...) hoặc lỗi mạng vẫn
+không qua được lưu thành báo cáo không xong (không bỏ khỏi mẫu số); mỗi bản lưu ghi mã mô hình đã trả
 lời, kho còn thiếu số hay không, và bảng số gốc (trước khi mô hình xin thêm) để so hai nhà trên cùng dữ liệu. Bản lưu
 cũ (không có `_fmt`) được chấm nhưng ghi "chưa rõ" ở các mục mới, và `write`/`plan` sẽ chạy lại chúng.
 """
@@ -200,12 +201,47 @@ class EvalDeps:
         self.saved.update(fields)
 
 
+MAX_RETRIES = 2
+
+
+def is_transient(e: Exception) -> bool:
+    """Lỗi tạm thời đáng thử lại: mất kết nối, quá thời gian, 408/429, lỗi máy chủ 5xx, hoặc nhà cung cấp báo không trả
+    lời được (ProviderUnavailable sticky). Sai khóa/hết tiền (401-403), bị cắt do quá dài, từ chối, JSON sai, lỗi đệ quy
+    của đồ thị: thử lại cũng ra như cũ nên không phải lỗi tạm thời."""
+    from services.llm import ProviderUnavailable
+    if isinstance(e, ProviderUnavailable):
+        return e.sticky
+    status = getattr(e, "status_code", None)
+    if status is None:
+        return type(e).__name__ in ("APIConnectionError", "APITimeoutError")
+    return status in (408, 429) or status >= 500
+
+
+def with_retries(fn, retries: int = MAX_RETRIES, pause: float = 5.0, sleep=time.sleep):
+    """Chạy `fn`; lỗi tạm thời thử lại tối đa `retries` lần. Trả (kết quả, None) hoặc (None, (loại lỗi, ngoại lệ)) với loại
+    "deterministic" hoặc "transient_exhausted". Lỗi không được bỏ khỏi mẫu số: báo cáo hỏng vẫn được ghi là không xong."""
+    for n in range(retries + 1):
+        try:
+            return fn(), None
+        except Exception as e:
+            if not is_transient(e):
+                return None, ("deterministic", e)
+            if n == retries:
+                return None, ("transient_exhausted", e)
+            sleep(pause * (n + 1))
+
+
+def eligible(rows: list[dict]) -> list[dict]:
+    """Câu mà phép đo viết chạy được: có mã, mã trong danh sách và tồn tại, kỳ có trong kho."""
+    return [g for g in rows if g["expect"]["tickers"] and "mã ngoài danh sách" not in g["tags"]
+            and "mã không tồn tại" not in g["tags"] and "kỳ ngoài kho" not in g["tags"]]
+
+
 def cmd_write(args) -> None:
     from langgraph.checkpoint.memory import InMemorySaver
     from services.analyst.graph import build
     from services.db import connect
-    rows = [g for g in load_golden(args.limit) if g["expect"]["tickers"] and "mã ngoài danh sách" not in g["tags"]
-            and "mã không tồn tại" not in g["tags"] and "kỳ ngoài kho" not in g["tags"]]
+    rows = eligible(load_golden(args.limit))
     client = None
     with connect() as conn:
         for g in rows:
@@ -214,31 +250,41 @@ def cmd_write(args) -> None:
                 continue
             client = client or client_for(args.provider)
             before, steps_before, started = client.usage.usd, client.steps_snapshot(), time.monotonic()
-            deps = EvalDeps(conn, client, g, letter_dir=out_dir(args.provider) / "explanations")
-            app = build(deps, InMemorySaver())
-            try:
-                app.invoke({"report_id": 0, "question": g["q"]}, {"configurable": {"thread_id": str(g["id"])},
-                                                                  "recursion_limit": 60})
-            except Exception as e:      # lỗi tạm thời (mạng, hết hạn mức) không phải kết quả của agent: không lưu, lần sau thử lại
-                print(f"  [{g['id']}] lỗi, không lưu: {repr(e)[:300]} ({client.usage.usd - before:.4f} USD đã tốn)")
-                continue
-            if "status" not in deps.saved:
-                print(f"  [{g['id']}] đồ thị dừng không có kết quả, không lưu")
-                continue
-            saved = deps.saved | {
+            holder = {}
+
+            def run():
+                try:
+                    conn.rollback()     # lần thử trước có thể để giao dịch dở
+                except Exception:
+                    pass
+                deps = holder["deps"] = EvalDeps(conn, client, g, letter_dir=out_dir(args.provider) / "explanations")
+                build(deps, InMemorySaver()).invoke(
+                    {"report_id": 0, "question": g["q"]},
+                    {"configurable": {"thread_id": str(g["id"])}, "recursion_limit": 60})
+                return deps
+
+            _, failure = with_retries(run)
+            deps = holder.get("deps") or EvalDeps(conn, client, g)      # dựng được thì có kế hoạch/bảng số đã ghi
+            saved = dict(deps.saved)
+            if failure:     # lỗi tất định (bị cắt, từ chối, JSON sai...) hoặc lỗi mạng vẫn không qua sau khi thử lại: tính là báo cáo không xong
+                kind, e = failure
+                saved |= {"status": "failed", "error": repr(e)[:500], "_error_kind": kind}
+            saved |= {
                 "_fmt": FMT, "_provider": client.cfg.provider, "_model": client.cfg.model,
                 "_usd": client.usage.usd - before, "_seconds": time.monotonic() - started,
                 "_steps": steps_delta(steps_before, client.steps_snapshot()),
                 "store_missing": deps.store_missing, "base_facts": deps.base_facts}
             cache.write_text(json.dumps(saved, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-            print(f"  [{g['id']}] {saved.get('status')} {saved['_usd']:.4f} USD")
+            print(f"  [{g['id']}] {saved.get('status')}{' (' + saved['_error_kind'] + ')' if failure else ''} "
+                  f"{saved['_usd']:.4f} USD")
     summary_write(args.provider)
 
 
-def provider_stats(caches: dict[str, dict], plans: dict[str, dict] | None = None) -> dict:
-    """Số liệu gộp của một nhà từ các bản lưu viết (thuần, để test). Bản lưu cũ (không `_fmt`) tính vào `legacy`."""
+def provider_stats(caches: dict[str, dict], plans: dict[str, dict] | None = None, eligible_n: int | None = None) -> dict:
+    """Số liệu gộp của một nhà từ các bản lưu viết (thuần, để test). Bản lưu cũ (không `_fmt`) tính vào `legacy`.
+    `eligible_n`: số câu phép đo viết phải chạy, để thấy câu nào chưa có kết quả."""
     st = Counter()
-    kinds = Counter()
+    kinds, errors = Counter(), Counter()
     models, usd_expl, usd_write, secs_write = set(), 0.0, 0.0, 0.0
     for d in caches.values():
         st["n"] += 1
@@ -273,8 +319,10 @@ def provider_stats(caches: dict[str, dict], plans: dict[str, dict] | None = None
                 st["done_full"] += 1
         else:
             st["not_done"] += 1
+            if d.get("_error_kind"):
+                errors[d["_error_kind"]] += 1
     plans = plans or {}
-    return {"st": st, "kinds": dict(kinds), "models": sorted(models), "usd_write": usd_write, "usd_expl": usd_expl,
+    return {"st": st, "kinds": dict(kinds), "errors": dict(errors), "eligible": eligible_n, "models": sorted(models), "usd_write": usd_write, "usd_expl": usd_expl,
             "secs_write": secs_write, "plan_usd": sum(p.get("_usd", 0.0) for p in plans.values()),
             "plan_n": len(plans), "plan_models": sorted({f"{p['_provider']}/{p['_model']}" for p in plans.values()
                                                          if "_model" in p})}
@@ -282,9 +330,11 @@ def provider_stats(caches: dict[str, dict], plans: dict[str, dict] | None = None
 
 def format_stats(provider: str, s: dict) -> list[str]:
     st, c = s["st"], s["st"]["costed"]
-    out = [f"{provider} [{', '.join(s['models'])}]: {st['n']} báo cáo; xong đủ số {st['done_full']}; "
+    have = f"{st['n']}/{s['eligible']} câu đã có kết quả" if s["eligible"] is not None else f"{st['n']} câu đã có kết quả"
+    errs = f" (lỗi: {s['errors']})" if s["errors"] else ""
+    out = [f"{provider} [{', '.join(s['models'])}]: {have}; xong đủ số {st['done_full']}; "
            f"xong nhưng thiếu số (kho chưa có BCTC của kế hoạch) {st['done_thin']}; xong, chưa rõ kho đủ số không "
-           f"{st['done_unknown']}; không xong {st['not_done']}",
+           f"{st['done_unknown']}; không xong {st['not_done']}{errs}",
            f"  lần viết đầu: {st['bad']}/{st['sentences']} câu có lỗi (đếm theo câu); lỗi theo loại, đếm theo lỗi: {s['kinds']}; "
            f"viết lại {st['rewrites']} lần; bỏ {st['dropped']} câu; còn {st['final']} câu"]
     if c:
@@ -343,7 +393,8 @@ def format_comparison(res: dict) -> list[str]:
 def summary_write(provider: str) -> None:
     caches = load_caches(provider, "write")
     if caches:
-        for line in format_stats(provider, provider_stats(caches, load_caches(provider, "plan"))):
+        for line in format_stats(provider, provider_stats(caches, load_caches(provider, "plan"),
+                                                           len(eligible(load_golden())))):
             print(line)
 
 

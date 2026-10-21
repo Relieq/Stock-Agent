@@ -124,3 +124,35 @@ def test_summary_counts_failed_runs_and_missing_questions():
     rows = [{"expect": {"tickers": ["TCB"]}, "tags": []}, {"expect": {"tickers": []}, "tags": []},
             {"expect": {"tickers": ["XYZ"]}, "tags": ["mã không tồn tại"]}]
     assert len(agent_eval.eligible(rows)) == 1
+
+
+def test_account_problems_stop_instead_of_retry_or_cache():
+    from services.llm import ProviderUnavailable
+    quota = _Http(429)
+    quota.args = ("Error code: 429 - {'error': {'code': 'insufficient_quota'}}",)
+    credit = _Http(400)
+    credit.args = ("Your credit balance is too low to access the Anthropic API",)
+    other400 = _Http(400)
+    other400.args = ("invalid request: schema",)
+    rate = _Http(429)
+    rate.args = ("Rate limit reached for requests",)
+    a = agent_eval.is_account_problem
+    assert a(quota) and a(credit) and a(_Http(402)) and a(ProviderUnavailable("hết billing", sticky=True))
+    assert not a(rate) and not a(other400) and not a(_Http(503)) and not a(RuntimeError("quota"))
+    assert not agent_eval.is_transient(quota) and agent_eval.is_transient(rate)     # 429 hết hạn mức không bị thử lại
+    assert not agent_eval.is_transient(credit) and not agent_eval.is_transient(other400)
+
+    calls = []
+
+    def boom(exc):
+        def fn():
+            calls.append(1)
+            raise exc
+        return fn
+
+    res, fail = agent_eval.with_retries(boom(quota), sleep=lambda s: None)
+    assert fail[0] == "account" and len(calls) == 1                     # dừng ngay, không thử lại
+    assert agent_eval.with_retries(boom(credit), sleep=lambda s: None)[1][0] == "account"
+    assert agent_eval.with_retries(boom(other400), sleep=lambda s: None)[1][0] == "deterministic"
+    calls.clear()
+    assert agent_eval.with_retries(boom(rate), sleep=lambda s: None)[1][0] == "transient_exhausted" and len(calls) == 3

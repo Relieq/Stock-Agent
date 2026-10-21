@@ -133,8 +133,14 @@ def cmd_plan(args) -> None:
         if got is None or "_model" not in got:      # chưa có, hoặc bản cũ chưa ghi mã mô hình: chạy (lại)
             client = client or client_for(args.provider)
             before = client.usage.usd
-            got = parse_request(client, g["q"], TODAY, companies).to_json() | {
-                "_usd": client.usage.usd - before, "_provider": client.cfg.provider, "_model": client.cfg.model}
+            try:
+                got = parse_request(client, g["q"], TODAY, companies).to_json() | {
+                    "_usd": client.usage.usd - before, "_provider": client.cfg.provider, "_model": client.cfg.model}
+            except Exception as e:
+                if is_account_problem(e):
+                    stop_for_account(args.provider, e, client.usage.usd - before)
+                    raise SystemExit(1)
+                raise
             cache.write_text(json.dumps(got, ensure_ascii=False, indent=1), encoding="utf-8")
         usd += got.get("_usd", 0.0)
         s = score_plan(got, g["expect"])
@@ -204,11 +210,34 @@ class EvalDeps:
 MAX_RETRIES = 2
 
 
+def stop_for_account(provider: str, e: Exception, usd: float) -> None:
+    print(f"Tài khoản {provider} hết tiền/hạn mức: dừng đo, nạp tiền rồi chạy lại (câu đang chạy không được lưu, "
+          f"đã tốn {usd:.4f} USD; các câu đã lưu giữ nguyên). Lỗi: {repr(e)[:300]}", file=sys.stderr)
+
+
+ACCOUNT_WORDS = ("quota", "credit", "billing")
+
+
+def is_account_problem(e: Exception) -> bool:
+    """Tài khoản hết tiền/hạn mức (OpenAI insufficient_quota = 429, Anthropic credit_balance = 400, mọi 402, hoặc thông báo
+    nhắc quota/credit/billing). Đây không phải lỗi của mô hình: phải dừng đo, không ghi vào kết quả. Kiểm trước
+    `is_transient` để 429 hết hạn mức không bị thử lại."""
+    status = getattr(e, "status_code", None)
+    if status == 402:
+        return True
+    if status in (400, 429, None):
+        text = str(e).lower()
+        return any(w in text for w in ACCOUNT_WORDS) and (status is not None or type(e).__name__ == "ProviderUnavailable")
+    return False
+
+
 def is_transient(e: Exception) -> bool:
     """Lỗi tạm thời đáng thử lại: mất kết nối, quá thời gian, 408/429, lỗi máy chủ 5xx, hoặc nhà cung cấp báo không trả
     lời được (ProviderUnavailable sticky). Sai khóa/hết tiền (401-403), bị cắt do quá dài, từ chối, JSON sai, lỗi đệ quy
-    của đồ thị: thử lại cũng ra như cũ nên không phải lỗi tạm thời."""
+    của đồ thị: thử lại cũng ra như cũ nên không phải lỗi tạm thời. Hết tiền/hạn mức (`is_account_problem`) loại trước."""
     from services.llm import ProviderUnavailable
+    if is_account_problem(e):
+        return False
     if isinstance(e, ProviderUnavailable):
         return e.sticky
     status = getattr(e, "status_code", None)
@@ -219,11 +248,14 @@ def is_transient(e: Exception) -> bool:
 
 def with_retries(fn, retries: int = MAX_RETRIES, pause: float = 5.0, sleep=time.sleep):
     """Chạy `fn`; lỗi tạm thời thử lại tối đa `retries` lần. Trả (kết quả, None) hoặc (None, (loại lỗi, ngoại lệ)) với loại
-    "deterministic" hoặc "transient_exhausted". Lỗi không được bỏ khỏi mẫu số: báo cáo hỏng vẫn được ghi là không xong."""
+    "deterministic", "transient_exhausted" hoặc "account" (hết tiền/hạn mức: người gọi phải dừng đo, không ghi kết quả).
+    Lỗi không được bỏ khỏi mẫu số: báo cáo hỏng vẫn được ghi là không xong."""
     for n in range(retries + 1):
         try:
             return fn(), None
         except Exception as e:
+            if is_account_problem(e):
+                return None, ("account", e)
             if not is_transient(e):
                 return None, ("deterministic", e)
             if n == retries:
@@ -264,6 +296,10 @@ def cmd_write(args) -> None:
                 return deps
 
             _, failure = with_retries(run)
+            if failure and failure[0] == "account":     # không phải lỗi của mô hình: không lưu, dừng cả lần đo
+                stop_for_account(args.provider, failure[1], client.usage.usd - before)
+                summary_write(args.provider)
+                raise SystemExit(1)
             deps = holder.get("deps") or EvalDeps(conn, client, g)      # dựng được thì có kế hoạch/bảng số đã ghi
             saved = dict(deps.saved)
             if failure:     # lỗi tất định (bị cắt, từ chối, JSON sai...) hoặc lỗi mạng vẫn không qua sau khi thử lại: tính là báo cáo không xong

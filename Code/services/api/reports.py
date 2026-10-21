@@ -16,7 +16,8 @@ from services.users import site_url
 router = APIRouter()
 SAMPLES = ["So sánh kết quả kinh doanh quý 3/2026 của VCB và TCB",
            "Đánh giá kết quả kinh doanh quý gần nhất của FPT so với cùng kỳ",
-           "LNST quý 3/2026 của TCB đứng thứ mấy trong các ngân hàng?"]
+           "LNST quý 3/2026 của TCB đứng thứ mấy trong các ngân hàng?",
+           "Công ty nào có KQKD quý gần nhất tốt nhất? Tại sao?"]
 
 
 def can_view(row: dict, user) -> bool:

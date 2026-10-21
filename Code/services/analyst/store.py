@@ -6,7 +6,8 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from services.analyst import catalog
-from services.analyst.facts import Group, Pair, TickerData, build_sheet, chart_specs
+from services.analyst.facts import (GROUP_LABELS, SCREEN_ORDER, Group, Pair, TickerData, build_screen, build_sheet,
+                                    chart_specs, screen_charts)
 from services.analyst.plan import Plan, label
 from services.extraction.evidence import document_evidence
 from services.extraction.pipeline import _load_record, _record_files
@@ -57,6 +58,35 @@ def latest(conn, tickers: list[str]) -> tuple[int, str] | None:
                        (tickers, len(tickers))).fetchone()
     if row is None:
         row = conn.execute(base + " ORDER BY 1 DESC, 2 DESC LIMIT 1", (tickers,)).fetchone()
+    return (row[0], row[1]) if row else None
+
+
+COVERAGE = 2 / 3      # loại screen: quý "gần nhất" là quý mà ít nhất chừng này phần các mã đang theo dõi đã có số
+
+
+def sector_kinds(sector: str) -> list[str]:
+    return list(SCREEN_ORDER) if sector == "all" else [sector]
+
+
+def tracked(conn, kinds: list[str]) -> list[str]:
+    company = [{v: k for k, v in catalog.KIND_OF_COMPANY.items()}[k] for k in kinds]
+    return [t for (t,) in conn.execute("SELECT ticker FROM companies WHERE tracked AND template = ANY(%s) ORDER BY ticker",
+                                       (company,))]
+
+
+def latest_all(conn, sector: str) -> tuple[int, str] | None:
+    """Quý gần nhất mà ít nhất 2/3 số mã đang theo dõi của nhóm đã có BCTC kiểm chứng (đầu mùa BCTC mới có vài mã thì
+    vẫn xếp theo quý trước)."""
+    tickers = tracked(conn, sector_kinds(sector))
+    if not tickers:
+        return None
+    row = conn.execute(
+        """SELECT fiscal_year, fiscal_period FROM documents
+           WHERE ticker = ANY(%s) AND doc_type = 'fs_quarter' AND content_kind = 'full'
+             AND status IN ('verified', 'approved') AND owner_user_id IS NULL AND duplicate_of IS NULL
+             AND NOT is_amended AND scope IN ('consolidated', 'standalone')
+           GROUP BY 1, 2 HAVING count(DISTINCT ticker) >= %s ORDER BY 1 DESC, 2 DESC LIMIT 1""",
+        (tickers, max(1, -(-len(tickers) * 2 // 3)))).fetchone()
     return (row[0], row[1]) if row else None
 
 
@@ -158,11 +188,9 @@ def load_ticker(conn, ticker: str, year: int, period: str, basis: str, with_flag
     return _load(conn, ticker, year, period, basis, with_flags)[0]
 
 
-def load_group(conn, kind: str, year: int, period: str, basis: str) -> Group:
-    company = {v: k for k, v in catalog.KIND_OF_COMPANY.items()}[kind]
-    tickers = [t for (t,) in conn.execute(
-        "SELECT ticker FROM companies WHERE tracked AND template = %s ORDER BY ticker", (company,))]
-    members = [d for t in tickers if (d := load_ticker(conn, t, year, period, basis, with_flags=False)) is not None]
+def load_group(conn, kind: str, year: int, period: str, basis: str, with_flags: bool = False) -> Group:
+    members = [d for t in tracked(conn, [kind]) if (d := load_ticker(conn, t, year, period, basis, with_flags))
+               is not None]
     return Group(GROUP_NAMES[kind], members)
 
 
@@ -175,8 +203,31 @@ def record_version(doc_id: int) -> str:
     return f"{p.name}:{p.stat().st_mtime_ns}"
 
 
+def _sources(docs) -> list[dict]:
+    return [{"document_id": i, "version": record_version(i)} for i in sorted(docs)]
+
+
+def screen_sheet(conn, plan: Plan):
+    """Câu hỏi "mã nào tốt nhất": nạp mọi mã đang theo dõi của từng nhóm (kèm cờ thẻ KQKD), xếp riêng từng nhóm."""
+    groups, notes = {}, []
+    for k in sector_kinds(plan.sector):
+        g = load_group(conn, k, plan.year, plan.period, plan.basis, with_flags=True)
+        n = len(tracked(conn, [k]))
+        if len(g.members) < n:
+            have = {m.ticker for m in g.members}
+            notes.append(f"{GROUP_LABELS[k].capitalize()}: {len(g.members)}/{n} mã đã có BCTC kiểm chứng cho "
+                         f"{plan.label()}; chưa có: {', '.join(t for t in tracked(conn, [k]) if t not in have)}.")
+        if g.members:
+            groups[k] = g
+    sheet, more, tops = build_screen(groups, plan.metrics, plan.measure)
+    docs = {m.document_id for g in groups.values() for m in g.members}
+    return sheet, _sources(docs), notes + more, screen_charts(groups, plan.metrics, plan.measure, tops)
+
+
 def sheet_for_plan(conn, plan: Plan):
     """(bảng số, BCTC nguồn kèm phiên bản, ghi chú, đặc tả biểu đồ)."""
+    if plan.kind == "screen":
+        return screen_sheet(conn, plan)
     data, notes = [], []
     for t in plan.tickers:
         d, why = _load(conn, t, plan.year, plan.period, plan.basis, True)
@@ -188,6 +239,5 @@ def sheet_for_plan(conn, plan: Plan):
     groups = {k: load_group(conn, k, plan.year, plan.period, plan.basis) for k in {d.kind for d in data}} \
         if plan.kind == "rank" else {}
     sheet = build_sheet(plan.kind, data, plan.metrics, groups)
-    docs = sorted({d.document_id for d in data} | {m.document_id for g in groups.values() for m in g.members})
-    sources = [{"document_id": i, "version": record_version(i)} for i in docs]
-    return sheet, sources, notes, chart_specs(plan.kind, data, plan.metrics, groups)
+    docs = {d.document_id for d in data} | {m.document_id for g in groups.values() for m in g.members}
+    return sheet, _sources(docs), notes, chart_specs(plan.kind, data, plan.metrics, groups)

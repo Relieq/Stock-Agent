@@ -1,4 +1,4 @@
-"""Hiểu yêu cầu: mô hình đổi câu hỏi tự do thành kế hoạch theo khuôn; code kiểm từng trường (mã có thật, kỳ hợp lệ, điền
+"""Hiểu yêu cầu: mô hình đổi câu hỏi gõ tự nhiên thành kế hoạch theo khuôn; code kiểm từng trường (mã có thật, kỳ hợp lệ, điền
 kỳ gần nhất) và quyết định có phải hỏi lại người dùng không (Baocao/dinh-huong/agent-bao-cao.md mục 4)."""
 
 from __future__ import annotations
@@ -10,7 +10,9 @@ from typing import Callable
 
 from services.analyst.catalog import ALL_KEYS
 
-KINDS = ("compare", "yoy", "rank")
+KINDS = ("compare", "yoy", "rank", "screen")
+SECTORS = ("all", "TCTD", "corporate", "CTCK")
+MEASURES = ("growth", "level")
 PERIODS = ("Q1", "Q2", "Q3", "Q4", "H1", "FY", "latest")
 
 PLAN_SCHEMA = {
@@ -24,8 +26,11 @@ PLAN_SCHEMA = {
         "metrics": {"type": "array", "items": {"type": "string", "enum": ALL_KEYS}},
         "unclear": {"type": "array", "items": {"type": "string"}},
         "advice_request": {"type": "boolean"},
+        "sector": {"type": "string", "enum": list(SECTORS)},
+        "measure": {"type": "string", "enum": list(MEASURES)},
     },
-    "required": ["kind", "tickers", "year", "period", "basis", "metrics", "unclear", "advice_request"],
+    "required": ["kind", "tickers", "year", "period", "basis", "metrics", "unclear", "advice_request", "sector",
+                 "measure"],
     "additionalProperties": False,
 }
 
@@ -34,7 +39,9 @@ Nam. Hôm nay là {today}. Đổi câu hỏi dưới đây thành kế hoạch t
 
 - kind: compare nếu người dùng muốn so từ hai mã trở lên với nhau trong cùng kỳ; yoy nếu hỏi về một mã (kể cả khi xin
   lời khuyên mua bán); rank nếu muốn biết một mã đứng đâu trong nhóm/ngành ("đứng thứ mấy", "so với các ngân hàng
-  khác", "so với trung bình ngành").
+  khác", "so với trung bình ngành"); screen nếu hỏi công ty/mã nào tốt nhất, đứng đầu, top mấy mà không nêu mã cụ thể
+  nào ("công ty nào có KQKD tốt nhất", "top 5 ngân hàng lãi nhiều nhất", "mã nào tăng trưởng mạnh nhất"). Câu hỏi
+  chung chung không nêu công ty và không hỏi mã nào hơn ("kết quả kinh doanh thế nào?") thì là yoy với tickers rỗng.
 - tickers: mã chứng khoán 3 ký tự người dùng nhắc, viết hoa. Người dùng có thể gọi bằng tên công ty (ví dụ
   "Techcombank" là TCB, "Vietcombank" là VCB, "Hòa Phát" là HPG, "Novaland" là NVL). Mã hoặc công ty ngoài danh sách
   đang theo dõi vẫn ghi ra (hệ thống sẽ tự tìm và kiểm mã có tồn tại không); chỉ ghi vào unclear khi không đoán được mã.
@@ -48,6 +55,11 @@ Nam. Hôm nay là {today}. Đổi câu hỏi dưới đây thành kế hoạch t
   "dự phòng" là provision; "biên gộp" là gross_margin; "chi phí hoạt động" là opex.
 - unclear: điều bạn không chắc (ví dụ tên công ty không đoán được mã), mỗi ý một câu ngắn; không có thì để rỗng.
 - advice_request: true nếu câu hỏi xin lời khuyên mua/bán/nắm giữ, giá mục tiêu, có nên đầu tư.
+- sector: nhóm công ty người dùng nói tới: TCTD (ngân hàng), CTCK (công ty chứng khoán), corporate (nhóm phi tài chính
+  có nêu rõ: "doanh nghiệp sản xuất", "bán lẻ", "bất động sản", "trừ ngân hàng"); nói chung chung "công ty", "doanh
+  nghiệp", "mã", "cổ phiếu" hoặc không nói nhóm thì all.
+- measure: level nếu xếp theo độ lớn ("lãi nhiều nhất", "doanh thu lớn nhất", "lợi nhuận cao nhất"); growth nếu xếp theo
+  mức tăng so với cùng kỳ ("tăng mạnh nhất", "tăng trưởng tốt nhất"), nói "tốt nhất", "làm ăn tốt nhất" hoặc không nói.
 
 Câu hỏi: {question}"""
 
@@ -73,6 +85,8 @@ class Plan:
     metrics: list[str] = field(default_factory=list)
     unclear: list[str] = field(default_factory=list)
     advice_request: bool = False
+    sector: str = "all"                 # loại screen: nhóm được xếp (all = xếp riêng từng nhóm)
+    measure: str = "growth"             # loại screen: xếp theo tăng trưởng so với cùng kỳ hay theo độ lớn
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -101,22 +115,37 @@ class Checked:
 TICKER_RE = re.compile(r"^[A-Z0-9]{3}$")
 
 
+ASK_TICKER = """Bạn muốn xem mã chứng khoán nào? Soi trả lời được bốn loại câu hỏi về KQKD:
+- so sánh nhiều mã cùng kỳ, ví dụ "so sánh KQKD quý 2/2026 của VCB và TCB";
+- một mã so với cùng kỳ năm trước, ví dụ "FPT quý 2/2026 làm ăn thế nào so với cùng kỳ";
+- vị trí của một mã trong nhóm, ví dụ "LNST quý 2/2026 của MBB đứng thứ mấy trong các ngân hàng";
+- mã nào tốt nhất trong các mã đang theo dõi, ví dụ "ngân hàng nào có lợi nhuận quý 2/2026 tăng mạnh nhất"."""
+
+
 def check_plan(plan: Plan, known: set[str], exists: Callable[[str], bool],
-               latest: Callable[[list[str]], tuple[int, str] | None], year_now: int | None = None) -> Checked:
+               latest: Callable[[list[str]], tuple[int, str] | None], year_now: int | None = None,
+               latest_all: Callable[[str], tuple[int, str] | None] | None = None) -> Checked:
     """`known`: mã đã có trong bảng công ty; `exists(mã)`: tìm trên Vietstock cho mã ngoài danh sách; `latest(mã)`: kỳ
-    quý gần nhất đã có BCTC kiểm chứng của mọi mã; `year_now`: năm dùng khi kỳ có nêu mà thiếu năm."""
+    quý gần nhất đã có BCTC kiểm chứng của mọi mã; `year_now`: năm dùng khi kỳ có nêu mà thiếu năm; `latest_all(nhóm)`:
+    quý gần nhất mà phần lớn các mã đang theo dõi của nhóm đã có BCTC kiểm chứng (loại screen)."""
     notes: list[str] = []
     tickers: list[str] = []
     for t in plan.tickers:
         t = t.strip().upper()
         if t and t not in tickers:
             tickers.append(t)
-    if not tickers:
-        return Checked(None, 'Bạn muốn xem mã chứng khoán nào? Ví dụ: "so sánh KQKD quý 3/2026 của VCB và TCB".')
+    kind = plan.kind
+    sector = plan.sector if plan.sector in SECTORS else "all"
+    measure = plan.measure if plan.measure in MEASURES else "growth"
+    if kind == "screen" and tickers:        # đã nêu mã: xếp các mã đó với nhau, hoặc vị trí của một mã trong nhóm
+        kind = "rank" if len(tickers) == 1 else "compare"
+        notes.append("Bạn đã nêu mã nên báo cáo " + ("xem vị trí của mã này trong nhóm." if kind == "rank"
+                                                      else "so các mã này với nhau."))
+    if not tickers and kind != "screen":
+        return Checked(None, ASK_TICKER)
     bad = [t for t in tickers if not TICKER_RE.match(t) or (t not in known and not exists(t))]
     if bad:
         return Checked(None, f"Không tìm thấy mã {', '.join(bad)}. Bạn kiểm tra lại mã giúp (mã gồm 3 ký tự, ví dụ FPT).")
-    kind = plan.kind
     if kind == "compare" and len(tickers) == 1:
         kind = "yoy"
         notes.append("Chỉ có một mã nên báo cáo so với cùng kỳ năm trước.")
@@ -126,7 +155,7 @@ def check_plan(plan: Plan, known: set[str], exists: Callable[[str], bool],
     year, period, basis = plan.year, plan.period, plan.basis
     filled_latest = period == "latest"
     if filled_latest:
-        found = latest(tickers)
+        found = latest_all(sector) if kind == "screen" and latest_all else latest(tickers) if tickers else None
         if found is None:
             return Checked(None, "Chưa có BCTC nào của các mã này trong kho. Bạn ghi rõ kỳ (ví dụ quý 2/2026) để hệ "
                                  "thống đi lấy.")
@@ -139,8 +168,12 @@ def check_plan(plan: Plan, known: set[str], exists: Callable[[str], bool],
     if period == "Q1":
         basis = "quarter"
     if filled_latest:
-        notes.append(f"Bạn không nói kỳ: dùng kỳ gần nhất đã có số của mọi mã ({label(year, period, basis)}).")
+        notes.append("Bạn không nói kỳ: dùng kỳ gần nhất " + ("mà phần lớn các mã đang theo dõi đã có số" if kind == "screen"
+                     else "đã có số của mọi mã") + f" ({label(year, period, basis)}).")
     if plan.advice_request:
         notes.append("Soi chỉ cung cấp thông tin từ BCTC, không đưa khuyến nghị mua bán.")
     metrics = [m for m in plan.metrics if m in ALL_KEYS]
-    return Checked(Plan(kind, tickers, year, period, basis, metrics, plan.unclear, plan.advice_request), None, notes)
+    if kind != "screen":                # nhóm và tiêu chí xếp chỉ dùng cho loại screen
+        sector, measure = "all", "growth"
+    return Checked(Plan(kind, tickers, year, period, basis, metrics, plan.unclear, plan.advice_request, sector, measure),
+                   None, notes)

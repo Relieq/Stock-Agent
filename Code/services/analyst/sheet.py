@@ -45,3 +45,11 @@ class FactSheet:
     @classmethod
     def from_json(cls, rows: list[dict]) -> "FactSheet":
         return cls([Fact(**r) for r in rows])
+
+
+def report_tickers(plan, sheet: FactSheet) -> set[str]:
+    """Mã báo cáo được nói tới và được xin thêm số: mã của kế hoạch; câu hỏi "mã nào tốt nhất" (không nêu mã) thì các mã
+    đứng đầu đã có dòng chỉ tiêu trong bảng số."""
+    if plan.kind == "screen":
+        return {f.ticker for f in sheet.facts if f.kind in ("metric", "ratio") and f.ticker}
+    return set(plan.tickers)

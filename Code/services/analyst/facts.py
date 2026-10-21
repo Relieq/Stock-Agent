@@ -178,6 +178,83 @@ def rank_facts(sheet: FactSheet, target: TickerData, group: Group, key: str) -> 
         sheet.add("rank", text, ticker=target.ticker, metric=key, measure=measure, order=order, names=names)
 
 
+SCREEN_TOP = 5                          # số mã đứng đầu mỗi nhóm được nạp đủ chỉ tiêu và cờ cho câu hỏi "mã nào tốt nhất"
+LOWER_IS_BETTER = {"cir"}                # tỷ lệ chi phí: thấp là tốt, như các khoản chi phí
+
+
+def better_low(key: str) -> bool:
+    return key in catalog.EXPENSES or key in LOWER_IS_BETTER
+
+
+def screen_values(group: Group, key: str, measure: str) -> list[tuple[TickerData, Decimal]]:
+    """(mã, giá trị) xếp từ cao xuống thấp: tăng trưởng so với cùng kỳ hoặc độ lớn kỳ này (chi phí theo độ lớn)."""
+    if measure == "growth":
+        items = [(m, g) for m in group.members if (g := growth(m, key)) is not None]
+    else:
+        items = [(m, abs(p.cur) if key in catalog.EXPENSES else p.cur) for m in group.members
+                 if (p := pair_of(m, key)) is not None and p.cur is not None]
+    return sorted(items, key=lambda x: x[1], reverse=True)
+
+
+def screen_top(group: Group, key: str, measure: str, top: int = SCREEN_TOP) -> list[TickerData]:
+    """Các mã tốt nhất theo tiêu chí: đầu thứ tự, hoặc cuối thứ tự với chi phí (thấp là tốt)."""
+    items = [m for m, _ in screen_values(group, key, measure)]
+    return list(reversed(items))[:top] if better_low(key) else items[:top]
+
+
+def criterion(kind: str, key: str, measure: str) -> str:
+    name = (catalog.name(kind, key) or key)
+    what = f"mức thay đổi {name} so với cùng kỳ" if measure == "growth" else f"{name} kỳ này"
+    return what + (" (thấp là tốt)" if better_low(key) else "")
+
+
+def screen_facts(sheet: FactSheet, group: Group, kind: str, key: str, measure: str) -> list[TickerData]:
+    """Dòng xếp hạng cả nhóm theo tiêu chí, rồi đủ chỉ tiêu và cờ của các mã đứng đầu. Trả về các mã đứng đầu."""
+    items = screen_values(group, key, measure)
+    if len(items) < 2:
+        return []
+    title, names = catalog.name(kind, key) or key, catalog.names(kind, key)
+    label = items[0][0].label
+    ratio = is_ratio(kind, key)
+    fmt = (lambda v: signed(v, " điểm %" if ratio else "%")) if measure == "growth" else \
+        (lambda v: ("−" if v < 0 else "") + vn(abs(v)) + "%" if ratio else money(v))
+    head = f"{title}, thay đổi so với cùng kỳ" if measure == "growth" else f"{title}, xếp theo quy mô"
+    n = len(items)
+    text = (f"Xếp hạng theo {criterion(kind, key, measure)}: {head}, {label}, {group.name} ({n} mã có số), từ cao xuống "
+            f"thấp: " + ", ".join(f"{m.ticker} {fmt(v)}" for m, v in items))
+    if n >= 3:
+        text += f"; trung vị nhóm {fmt(Decimal(str(median([v for _, v in items]))))}"
+    left = [m.ticker for m in group.members if m.ticker not in {x.ticker for x, _ in items}]
+    if left:
+        text += ("; không tính được % thay đổi (lỗ ở một kỳ hoặc thiếu số cùng kỳ): " if measure == "growth"
+                 else "; không có số: ") + ", ".join(left)
+    sheet.add("rank", text, metric=key, measure=measure, order=[m.ticker for m, _ in items], names=names)
+    top = screen_top(group, key, measure)
+    for d in top:
+        for k in dict.fromkeys([key] + catalog.keys_for(kind, [])):
+            metric_fact(sheet, d, k)
+        for t, detail in d.flags:
+            sheet.add("flag", f"Cờ cảnh báo của thẻ KQKD, {d.ticker}, {d.label}: {t}. {detail}", ticker=d.ticker)
+    return top
+
+
+def screen_keys(kinds: list[str], metrics: list[str]) -> tuple[dict[str, str], list[str]]:
+    """Chỉ tiêu xếp hạng của từng nhóm: chỉ tiêu đầu tiên người dùng nêu mà nhóm có (nhóm không có thì bỏ nhóm), không
+    nêu thì LNST của cổ đông công ty mẹ. Trả về (nhóm -> chỉ tiêu, ghi chú)."""
+    asked = [m for m in metrics if any(catalog.name(k, m) for k in kinds)]
+    if not asked:
+        note = [] if not metrics else ["Chỉ tiêu bạn nêu không có ở nhóm này: xếp theo LNST của cổ đông công ty mẹ."]
+        return {k: "npat_parent" for k in kinds}, note
+    key = asked[0]
+    keys = {k: key for k in kinds if catalog.name(k, key)}
+    skipped = [GROUP_LABELS[k] for k in kinds if k not in keys]
+    return keys, ([f"{catalog.name(next(iter(keys)), key)} không có ở {', '.join(skipped)}: chỉ xếp "
+                   f"{', '.join(GROUP_LABELS[k] for k in keys)}."] if skipped else [])
+
+
+GROUP_LABELS = {"TCTD": "nhóm ngân hàng", "corporate": "nhóm doanh nghiệp", "CTCK": "nhóm công ty chứng khoán"}
+
+
 def build_sheet(kind: str, data: list[TickerData], metrics: list[str],
                 groups: dict[str, Group] | None = None) -> FactSheet:
     sheet = FactSheet()
@@ -242,4 +319,42 @@ def chart_specs(kind: str, data: list[TickerData], metrics: list[str],
         if gr:
             specs.append({"type": "bars", "title": f"{title}: thay đổi so với cùng kỳ, {group.name}", "unit": growth_unit,
                           "items": gr, "highlight": [d.ticker]})
+    return specs
+
+
+SCREEN_ORDER = ("TCTD", "corporate", "CTCK")       # thứ tự các nhóm trong báo cáo xếp hạng toàn bộ
+
+
+def build_screen(groups: dict[str, Group], metrics: list[str], measure: str
+                 ) -> tuple[FactSheet, list[str], dict[str, list[str]]]:
+    """Bảng số cho câu hỏi "mã nào tốt nhất": xếp riêng từng nhóm (không so ngân hàng với doanh nghiệp). Trả về (bảng số,
+    ghi chú, nhóm -> các mã đứng đầu)."""
+    sheet = FactSheet()
+    kinds = [k for k in SCREEN_ORDER if k in groups]
+    keys, notes = screen_keys(kinds, metrics)
+    tops = {}
+    for k in kinds:
+        if k not in keys:
+            continue
+        top = screen_facts(sheet, groups[k], k, keys[k], measure)
+        if top:
+            tops[k] = [d.ticker for d in top]
+        else:
+            notes.append(f"{GROUP_LABELS[k].capitalize()} có dưới 2 mã có số: không xếp hạng.")
+    return sheet, notes, tops
+
+
+def screen_charts(groups: dict[str, Group], metrics: list[str], measure: str, tops: dict[str, list[str]]) -> list[dict]:
+    kinds = [k for k in SCREEN_ORDER if k in tops]
+    keys, _ = screen_keys(kinds, metrics)
+    specs = []
+    for k in kinds:
+        key = keys[k]
+        ratio = is_ratio(k, key)
+        items = [[m.ticker, round(float(v if measure == "growth" or ratio else v / B), 1)]
+                 for m, v in screen_values(groups[k], key, measure)]
+        unit = ("điểm %" if ratio else "%") if measure == "growth" else ("%" if ratio else "tỷ đồng")
+        head = "thay đổi so với cùng kỳ" if measure == "growth" else "kỳ này"
+        specs.append({"type": "bars", "title": f"{catalog.name(k, key)}: {head}, {GROUP_LABELS[k]}", "unit": unit,
+                      "items": items, "highlight": tops[k]})
     return specs

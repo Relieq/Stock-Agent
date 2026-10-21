@@ -8,8 +8,8 @@ def test_only_owner_and_admin_can_view():
     assert can_view(row, owner) and can_view(row, admin) and not can_view(row, other) and not can_view(row, None)
 
 
-def test_samples_cover_the_three_kinds():
-    assert len(SAMPLES) == 3
+def test_samples_cover_the_four_kinds():
+    assert len(SAMPLES) == 4
 
 
 def test_xac_nhan_hien_so_tien_kieu_viet_va_bao_bctc_het_han_muc():

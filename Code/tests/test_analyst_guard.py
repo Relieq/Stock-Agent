@@ -555,3 +555,33 @@ def test_shareholders_keeping_momentum_is_not_advice():
     assert "advice" in kinds_("Cổ đông nên bán MWG.")
     assert "advice" in kinds_("Các cổ đông có thể giữ cổ phiếu TCB.")
     assert "advice" in kinds_("Cổ đông có thể giữ TCB.")
+
+
+def test_screen_rank_row_checks_superlatives_and_positions():
+    from services.analyst.facts import Group, build_screen
+    from tests.test_analyst_facts import bank
+    banks = [bank(t, n, p) for t, n, p in (("TCB", 7943, 6419), ("VCB", 9000, 7785), ("VPB", 5000, 3000))]
+    sheet, _, _ = build_screen({"TCTD": Group("các ngân hàng đang theo dõi", banks)}, [], "growth")
+    rank = sheet.facts[0].id
+    ok = check_sentence("VPB có LNST tăng mạnh nhất nhóm ngân hàng, +66,7%.", [rank], sheet, set(), {"VPB", "TCB", "VCB"})
+    assert ok.violations == []
+    bad = check_sentence("VCB có LNST tăng mạnh nhất nhóm ngân hàng.", [rank], sheet, set(), {"VPB", "TCB", "VCB"})
+    assert [v.kind for v in bad.violations] == ["comparison"]
+    pos = check_sentence("TCB đứng thứ 3 trong 3 ngân hàng về mức tăng LNST.", [rank], sheet, set(), {"VPB", "TCB", "VCB"})
+    assert [v.kind for v in pos.violations] == ["comparison"]
+
+
+def test_number_after_higher_than_ticker_is_read_as_a_gap():
+    from services.analyst.facts import Group, build_screen
+    from tests.test_analyst_facts import bank
+    banks = [bank(t, n, p) for t, n, p in (("TCB", 7943, 6419), ("VCB", 9000, 7785), ("VPB", 5000, 3000))]
+    sheet, _, _ = build_screen({"TCTD": Group("các ngân hàng đang theo dõi", banks)}, ["npat_parent"], "level")
+    known = {"VPB", "TCB", "VCB"}
+    r = check_sentence("LNST của VCB cao hơn TCB 7.943 tỷ đồng.", ["S1"], sheet, set(), known)     # 7.943 tỷ là số của TCB
+    assert [v.kind for v in r.violations] == ["unsourced_number"] and "chênh lệch" in r.violations[0].detail
+    assert check_sentence("LNST của VCB là 9.000 tỷ, cao hơn TCB với 7.943 tỷ.", ["S1"], sheet, set(), known).violations == []
+    s = FactSheet()
+    s.add("compare", "LNST, thay đổi so với cùng kỳ, quý 3/2026: TCB +23,7%, VCB +15,6%; TCB cao hơn VCB 8,1 điểm %",
+          metric="npat_parent", measure="growth", order=["TCB", "VCB"], names=["lnst"])
+    r = check_sentence("LNST của TCB tăng nhanh hơn VCB 8,1 điểm %.", ["S1"], s, set(), {"TCB", "VCB"})
+    assert r.violations == []       # mức chênh có sẵn trong dòng so sánh

@@ -5,7 +5,7 @@
 <p class="small"><a href="/bao-cao">← Báo cáo của tôi</a> · Trạng thái: <b>{{ r.status_text }}</b>
   {% if r.status == "done" %} · <a href="/bao-cao/{{ r.id }}/pdf">Tải PDF</a>{% endif %}</p>
 {% if r.status == "needs_clarification" %}
-  <h1>{{ r.question }}</h1>{% include "_plan_line.html" %}<p class="note">{{ r.question_back }}</p>
+  <h1>{{ r.question }}</h1>{% include "_plan_line.html" %}<p class="note" style="white-space:pre-line">{{ r.question_back }}</p>
   <p><a href="/bao-cao">Gõ lại câu hỏi</a></p>
 {% elif r.status == "awaiting_confirmation" %}
   <h1>{{ r.question }}</h1>{% include "_plan_line.html" %}

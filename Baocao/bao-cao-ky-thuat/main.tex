@@ -194,10 +194,12 @@ sửa 152 ô (0,4\%), trung bình 8 ô ở mỗi BCTC cần sửa. Chi phí gọ
 khoảng 0,12 USD, chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
 trong chính BCTC.
 
-Trên lớp số liệu đã kiểm chứng này, một \textbf{agent} nhận câu hỏi tự do của người dùng (ví dụ \enquote{so sánh KQKD quý
-3/2026 của TCB, LPB và VPB}), tự lập kế hoạch, lấy số, viết báo cáo kèm bảng và biểu đồ; mọi con số và từ tăng/giảm,
-cao hơn/thấp hơn trong lời văn được code kiểm lại với bảng số trước khi người đọc thấy. Trên 58 câu hỏi mẫu (có 5 câu
-do người dùng thử viết), agent \textbf{hiểu đúng yêu cầu ở cả 58 câu} với cả hai nhà cung cấp mô hình.
+Trên lớp số liệu đã kiểm chứng này, một \textbf{agent} nhận câu hỏi người dùng gõ bằng lời thường, thuộc bốn loại: so
+nhiều mã cùng kỳ, một mã so với cùng kỳ, vị trí của một mã trong nhóm, và mã nào tốt nhất trong các mã đang theo dõi (ví
+dụ \enquote{công ty nào có KQKD tốt nhất hiện nay, tại sao?}). Agent tự lập kế hoạch, lấy số, viết báo cáo kèm bảng và
+biểu đồ; mọi con số và từ tăng/giảm, cao hơn/thấp hơn trong lời văn được code kiểm lại với bảng số trước khi người đọc
+thấy. Trên 66 câu hỏi mẫu (có 6 câu do người dùng thử viết), agent \textbf{hiểu đúng yêu cầu ở 65 câu} với Claude Haiku
+5.5 và 64 câu với gpt-5.4-mini.
 \end{abstract}
 
 \chapter*{Danh mục thuật ngữ và viết tắt}
@@ -606,12 +608,13 @@ Hậu điều kiện & Yêu cầu ở trạng thái đã xong hoặc bị từ c
 \toprule
 Tác nhân & Người dùng được mời; bộ canh (chạy tiếp báo cáo đang chờ) \\
 Tiền điều kiện & Đã đăng nhập, còn hạn mức báo cáo trong ngày, chưa chạm trần chi phí tháng \\
-Luồng chính & 1. Người dùng gõ câu hỏi tự do.\newline
-2. Agent hiểu câu hỏi thành kế hoạch (loại so sánh, mã, kỳ); code kiểm kế hoạch.\newline
+Luồng chính & 1. Người dùng gõ câu hỏi bằng lời thường, thuộc một trong bốn loại (mục~\ref{sec:agent}).\newline
+2. Agent hiểu câu hỏi thành kế hoạch (loại câu hỏi, mã, kỳ); code kiểm kế hoạch.\newline
 3. Code lấy số đã kiểm chứng, dựng bảng số và biểu đồ.\newline
 4. Mô hình viết lời; code kiểm từng câu, câu sai được viết lại.\newline
 5. Hệ thống hiện trang báo cáo; người dùng tải PDF nếu cần. \\
-Luồng thay thế & 2a. Không có mã hoặc mã không tồn tại: hỏi lại người dùng.\newline
+Luồng thay thế & 2a. Không có mã (trừ câu hỏi mã nào tốt nhất) hoặc mã không tồn tại: hỏi lại người dùng, kèm ví dụ
+của bốn loại câu hỏi.\newline
 3a. Kho thiếu BCTC: hỏi người dùng có cho đọc thêm không (báo chi phí, hạn mức); đồng ý thì chờ bộ canh đọc xong rồi
 chạy tiếp và gửi email.\newline
 4a. Câu vẫn sai sau 2 lần viết lại: bỏ câu đó; không còn câu nào thì báo lỗi.\newline
@@ -1256,9 +1259,17 @@ lên chỉ chủ sở hữu thấy. Trước khi đọc, hệ thống xem hai tr
 khai; file khác loại (ví dụ công văn giải trình kết quả kinh doanh) bị từ chối kèm lý do và không tính vào hạn mức.
 
 \section{Agent tạo báo cáo theo yêu cầu}\label{sec:agent}
-Người dùng gõ một câu hỏi tự do, ví dụ \enquote{so sánh KQKD quý 3/2026 của TCB, LPB và VPB}, và nhận về một báo cáo
-ngắn có lời văn, bảng số, biểu đồ. Nguyên tắc vẫn như phần đọc BCTC: \textbf{mô hình chỉ hiểu câu hỏi và viết câu, mọi
-con số do code tính và code kiểm lại}.
+Người dùng gõ câu hỏi bằng lời thường và nhận về một báo cáo ngắn có lời văn, bảng số, biểu đồ. Agent trả lời bốn loại
+câu hỏi:
+\begin{itemize}
+  \item so nhiều mã cùng kỳ, ví dụ \enquote{so sánh KQKD quý 3/2026 của TCB, LPB và VPB};
+  \item một mã so với cùng kỳ năm trước, ví dụ \enquote{FPT quý vừa rồi làm ăn thế nào};
+  \item vị trí của một mã trong nhóm, ví dụ \enquote{LNST quý 2 của MBB đứng thứ mấy trong các ngân hàng};
+  \item mã nào tốt nhất trong các mã đang theo dõi, không cần nêu mã, ví dụ \enquote{công ty nào có KQKD tốt nhất hiện
+        nay, tại sao?}.
+\end{itemize}
+Câu hỏi không thuộc loại nào, hoặc thiếu mã, được hỏi lại kèm ví dụ của cả bốn loại. Nguyên tắc vẫn như phần đọc BCTC:
+\textbf{mô hình chỉ hiểu câu hỏi và viết câu, mọi con số do code tính và code kiểm lại}.
 
 \subsection{Luồng xử lý}
 Agent là một đồ thị trạng thái (LangGraph) gồm các bước ở Hình~\ref{fig:agent}. Trạng thái được lưu vào CSDL sau mỗi
@@ -1330,10 +1341,28 @@ Bộ kiểm tra số là code, không gọi mô hình. Với mỗi câu, nó ki�
 \begin{itemize}
   \item mỗi con số khớp một số trong các dòng câu đó ghi, sai số theo chữ số cuối như in (\enquote{7,9 nghìn tỷ} khớp
         7.943 tỷ); \enquote{khoảng}, \enquote{hơn}, \enquote{dưới} được hiểu đúng nghĩa;
+  \item số đứng ngay sau \enquote{hơn} và một mã (\enquote{VCB cao hơn CTG 11.740 tỷ}) được hiểu là mức chênh giữa hai
+        mã, nên bảng số phải có đúng mức chênh đó; đặt số của chính mã đứng sau vào chỗ này là lỗi, vì người đọc sẽ
+        hiểu nhầm;
   \item từ tăng/giảm, lãi/lỗ, cao hơn/thấp hơn, cao nhất/thấp nhất và thứ hạng khớp dấu, thứ tự trong bảng số;
   \item không có ngôn ngữ khuyến nghị (\enquote{nên mua}, \enquote{giá mục tiêu}\ldots), không nhắc mã ngoài bảng số.
 \end{itemize}
 Câu sai được gửi lại mô hình kèm lý do để viết lại, tối đa 2 lần; vẫn sai thì bỏ, chỉ quản trị viên thấy câu bị bỏ.
+
+\subsection{Câu hỏi \enquote{mã nào tốt nhất}}
+\enquote{Tốt nhất} cần một tiêu chí đo được. Khi người dùng không nêu tiêu chí, agent xếp theo mức tăng LNST của cổ
+đông công ty mẹ so với cùng kỳ, ở quý gần nhất mà ít nhất 2/3 số mã đang theo dõi đã có BCTC kiểm chứng (đầu mùa BCTC
+mới có vài mã công bố thì vẫn dùng quý trước). Người dùng nêu tiêu chí khác, ví dụ \enquote{lãi nhiều nhất} hay
+\enquote{doanh thu tăng nhanh nhất}, thì xếp theo tiêu chí đó; với chi phí và tỷ lệ chi phí trên thu nhập thì thấp là
+tốt. Ngân hàng, công ty chứng khoán và các doanh nghiệp còn lại được xếp riêng, vì cấu trúc lợi nhuận khác nhau nên không
+so thẳng với nhau được. Mã lỗ ở một trong hai kỳ không có \% thay đổi; mã đó được ghi riêng trong dòng xếp hạng, không bị
+bỏ đi mà không báo.
+
+Bảng số gồm một dòng xếp hạng cho mỗi nhóm (đủ thứ tự các mã, trung vị nhóm, tiêu chí đã dùng) và đủ chỉ tiêu, cờ cảnh báo
+của thẻ KQKD cho 5 mã đứng đầu mỗi nhóm. Để trả lời \enquote{tại sao}, mô hình xin thêm nguyên nhân trong công văn giải
+trình của các mã đứng đầu (chỉ nguyên nhân đã khớp BCTC mới giữ số). Báo cáo nêu cả các cờ như nền so sánh thấp hay lợi
+nhuận đến từ ngoài hoạt động chính, để người đọc không coi một mức tăng rất lớn là dấu hiệu kinh doanh tốt. Mục đầu của
+báo cáo luôn ghi tiêu chí xếp hạng; \enquote{tốt nhất} chỉ có nghĩa theo tiêu chí đó, không phải đánh giá cổ phiếu.
 
 \subsection{Trang báo cáo}
 Mỗi con số trong lời văn là một liên kết tới dòng bảng số, và dòng bảng số dẫn tới trang BCTC gốc
@@ -1793,32 +1822,45 @@ Lần đối chiếu đầu tìm ra một lỗi lấy nhầm dòng LNST của c�
 thành bước cố định sau mỗi mùa BCTC.
 
 \section{Agent tạo báo cáo: hiểu yêu cầu}\label{sec:evalagent}
-Bộ đo gồm 58 câu hỏi tiếng Việt, mỗi câu kèm kế hoạch đúng: 53 câu tự soạn và 5 câu do người dùng thử viết theo cách
-của họ. Các câu phủ ba loại yêu cầu và nhiều cách nói: trang trọng,
+Bộ đo gồm 66 câu hỏi tiếng Việt, mỗi câu kèm kế hoạch đúng: 60 câu tự soạn và 6 câu do người dùng thử viết theo cách
+của họ. Các câu phủ cả bốn loại yêu cầu (8 câu hỏi mã nào tốt nhất, trong đó 1 câu có nêu sẵn mã) và nhiều cách nói:
+trang trọng,
 nói tắt, không dấu, sai chính tả nhẹ, gọi bằng tên công ty, nói kỳ bằng chữ (\enquote{9 tháng}, \enquote{quý vừa
 rồi}). Có cả các câu khó: thiếu mã, mã không tồn tại, mã ngoài danh sách theo dõi, kỳ chưa có trong kho, câu xin khuyến
 nghị mua bán. Hai nhà cung cấp chạy cùng bộ câu, cùng lời dặn, cùng ngày cố định (21/10/2026).
 
 \begin{table}[H]
 \centering\small
-\caption{Agent hiểu yêu cầu trên 58 câu hỏi (đếm theo câu)}\label{tab:agent-plan}
+\caption{Agent hiểu yêu cầu trên 66 câu hỏi (đếm theo câu)}\label{tab:agent-plan}
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 & \textbf{Claude Haiku 5.5} & \textbf{gpt-5.4-mini} \\ \midrule
-Hệ thống làm đúng yêu cầu (sau khi code kiểm kế hoạch) & 58/58 & 58/58 \\
-\quad trong đó 5 câu người dùng thử viết & 5/5 & 5/5 \\
-Kế hoạch mô hình trả về đúng mọi trường & 57/58 & 57/58 \\
-Chi phí mỗi câu (USD) & 0,0003 & 0,0016 \\
+Hệ thống làm đúng yêu cầu (sau khi code kiểm kế hoạch) & 65/66 & 64/66 \\
+\quad trong đó 6 câu người dùng thử viết & 6/6 & 5/6 \\
+\quad trong đó 8 câu hỏi mã nào tốt nhất & 8/8 & 6/8 \\
+Kế hoạch mô hình trả về đúng mọi trường & 64/66 & 63/66 \\
+Chi phí mỗi câu (USD) & 0,0004 & 0,0019 \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \enquote{Làm đúng yêu cầu} nghĩa là sau bước code kiểm kế hoạch, hệ thống làm đúng việc người hỏi muốn: đúng mã, đúng
-kỳ, đúng loại so sánh, hoặc hỏi lại khi thiếu mã. Câu duy nhất có kế hoạch thô lệch ở mỗi nhà là câu nói cả năm mà mô hình
-ghi cách tính \enquote{riêng quý}; code luôn tính cả năm theo lũy kế nên kết quả vẫn đúng. Lời dặn của bước này được chỉnh
-một lần sau lần chạy đầu trên 53 câu tự soạn (thêm cách hiểu \enquote{9 tháng}, \enquote{năm 2025} và mã ngoài danh
-sách), nên kết quả trên 53 câu đó có phần lạc quan. 5 câu do người dùng thử viết được thêm sau khi đã chỉnh, nên là phép
-kiểm khách quan; cả hai nhà đều hiểu đúng cả 5 câu.
+kỳ, đúng loại câu hỏi, đúng nhóm và tiêu chí xếp hạng với câu hỏi mã nào tốt nhất, hoặc hỏi lại khi thiếu mã. Ba câu
+hệ thống làm sai:
+\begin{itemize}
+  \item Claude Haiku 5.5 bỏ mã PLX (ngoài danh sách theo dõi) ở câu \enquote{GAS và PLX ai tốt hơn quý 2}, nên báo cáo chỉ
+        nói về GAS thay vì đi tìm PLX;
+  \item gpt-5.4-mini hiểu \enquote{tốt nhất} ở hai câu là xếp theo độ lớn LNST thay vì theo mức tăng. Báo cáo vẫn ghi
+        rõ tiêu chí đã dùng ở mục đầu, nên người đọc thấy ngay.
+\end{itemize}
+Ở hai câu còn lại có kế hoạch thô lệch, kết quả vẫn đúng: một câu nói cả năm mà mô hình ghi \enquote{riêng quý} (code
+luôn tính cả năm theo lũy kế), và một câu thiếu mã mà mô hình ghi sai loại câu hỏi (hệ thống vẫn hỏi lại mã).
+
+Lời dặn của bước này được chỉnh hai lần trên chính bộ câu: lần đầu sau lần chạy đầu trên 53 câu tự soạn (thêm cách hiểu
+\enquote{9 tháng}, \enquote{năm 2025} và mã ngoài danh sách); lần hai khi thêm loại câu hỏi mã nào tốt nhất (thêm một
+câu dặn: câu hỏi chung chung không nêu công ty thì không phải câu xếp hạng). Vì vậy kết quả có phần lạc quan. Giữa hai
+lần chạy trước và sau lần chỉnh thứ hai, số câu sai của mỗi nhà chênh nhiều nhất một câu nhưng câu sai đổi chỗ, vì mô hình không
+trả lời giống hệt nhau mỗi lần; chênh lệch một, hai câu giữa hai nhà nằm trong mức dao động này.
 
 % ============================================================================
 % CHƯƠNG 6: KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
@@ -1838,8 +1880,9 @@ lệch đều có lời giải thích từ chính BCTC.
 Điểm khác biệt của hệ thống không nằm ở mô hình ngôn ngữ, vì ai cũng dùng được mô hình như nhau. Điểm khác biệt là
 \textbf{lớp kiểm chứng}: mỗi con số đều có nguồn, đều đã qua kiểm tra, và có lịch sử sửa lỗi tích lũy qua từng mùa.
 Agent tạo báo cáo được đặt lên trên lớp này theo cùng nguyên tắc: mô hình hiểu câu hỏi và viết câu, code tính số và kiểm
-lại từng con số, từng từ tăng/giảm trong lời văn. Trên 58 câu hỏi mẫu, agent hiểu đúng yêu cầu ở cả 58 câu với cả hai
-nhà cung cấp mô hình.
+lại từng con số, từng từ tăng/giảm trong lời văn. Agent trả lời bốn loại câu hỏi, kể cả câu không nêu mã như
+\enquote{công ty nào có KQKD tốt nhất}. Trên 66 câu hỏi mẫu, agent hiểu đúng yêu cầu ở 65 câu với Claude Haiku 5.5 và 64
+câu với gpt-5.4-mini.
 
 \section{Hướng phát triển}
 Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện. Mỗi mục sẽ được viết đầy đủ khi hoàn thành.

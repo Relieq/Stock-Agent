@@ -17,7 +17,7 @@ from langgraph.types import interrupt
 
 from services.analyst.guard import check_draft
 from services.analyst.plan import Checked, Plan, label
-from services.analyst.sheet import FactSheet
+from services.analyst.sheet import FactSheet, report_tickers
 from services.analyst.writer import drop_sentences, feedback_lines
 
 MAX_NEED_ROUNDS = 3
@@ -118,7 +118,7 @@ def build(deps: Deps, checkpointer=None):
 
     def check(s: State) -> dict:
         plan, sheet = Plan.from_json(s["plan"]), FactSheet.from_json(s["sheet"])
-        allowed, known = set(plan.tickers), deps.known_tickers()
+        allowed, known = report_tickers(plan, sheet), deps.known_tickers()
         violations, _, warnings = check_draft(s["draft"], sheet, allowed, known)
         n = sum(len(sec["sentences"]) for sec in s["draft"].get("sections", []))
         log = s["log"] + [{"attempt": s["rewrites"], "sentences": n, "violations": [asdict(v) for v in violations],

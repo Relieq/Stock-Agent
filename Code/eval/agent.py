@@ -29,6 +29,7 @@ from pathlib import Path
 TODAY = date(2026, 10, 21)
 GOLDEN = Path(__file__).resolve().parent / "data" / "agent_requests.jsonl"     # nằm trong Code/ để container thấy
 FIELDS = ("kind", "tickers", "year", "period", "basis", "advice_request")
+SCREEN_FIELDS = ("sector", "measure")      # chỉ chấm với câu "mã nào tốt nhất" (loại screen)
 FMT = 2             # phiên bản định dạng bản lưu viết; bản cũ hơn thiếu các mục theo dõi công bằng
 EXPLANATION_STEP = "explanation_read"
 
@@ -40,7 +41,7 @@ def load_golden(limit: int | None = None) -> list[dict]:
 
 def score_plan(got: dict, expect: dict) -> dict[str, bool]:
     out = {}
-    for f in FIELDS:
+    for f in FIELDS + (SCREEN_FIELDS if expect["kind"] == "screen" else ()):
         if f == "tickers":
             out[f] = sorted(t.strip().upper() for t in got.get(f, [])) == sorted(expect[f])
         else:
@@ -54,17 +55,23 @@ def real_tickers(golden: list[dict], tracked: set[str]) -> set[str]:
 
 
 def outcome(plan: dict, real: set[str]) -> dict:
-    """Việc hệ thống thực sự làm sau khi code kiểm kế hoạch (plan.check_plan): không có mã hoặc có mã không tồn tại thì
-    hỏi lại; một mã thì không thể "so nhiều mã"; bán niên/cả năm luôn lũy kế, quý 1 luôn riêng quý."""
+    """Việc hệ thống thực sự làm sau khi code kiểm kế hoạch (plan.check_plan): không có mã (trừ câu "mã nào tốt nhất")
+    hoặc có mã không tồn tại thì hỏi lại; câu "mã nào tốt nhất" có nêu mã thì thành vị trí trong nhóm hoặc so các mã;
+    một mã thì không thể "so nhiều mã"; bán niên/cả năm luôn lũy kế, quý 1 luôn riêng quý."""
     tickers = sorted({t.strip().upper() for t in plan.get("tickers", []) if t.strip()})
-    if not tickers or any(t not in real for t in tickers):
-        return {"ask": True}
     kind = plan["kind"]
+    if kind == "screen" and tickers:
+        kind = "rank" if len(tickers) == 1 else "compare"
+    if (not tickers and kind != "screen") or any(t not in real for t in tickers):
+        return {"ask": True}
     if kind in ("compare", "yoy"):
         kind = "compare" if len(tickers) > 1 else "yoy"
     basis = "ytd" if plan["period"] in ("H1", "FY") else "quarter" if plan["period"] == "Q1" else plan["basis"]
-    return {"ask": False, "kind": kind, "tickers": tickers, "year": plan["year"], "period": plan["period"],
-            "basis": basis, "advice_request": plan["advice_request"]}
+    out = {"ask": False, "kind": kind, "tickers": tickers, "year": plan["year"], "period": plan["period"],
+           "basis": basis, "advice_request": plan["advice_request"]}
+    if kind == "screen":
+        out |= {"sector": plan.get("sector", "all"), "measure": plan.get("measure", "growth")}
+    return out
 
 
 def mutations(text: str, foreign: str = "HPG") -> list[tuple[str, str]]:
@@ -183,9 +190,13 @@ def cmd_plan(args) -> None:
             print(f"  [{g['id']}] {g['q']}: hệ thống làm khác đáp án (trường lệch {[f for f, ok in s.items() if not ok]})"
                   f" -> {got}")
     n = len(rows)
-    print(f"{args.provider}: hệ thống làm đúng yêu cầu {tally['outcome']}/{n} câu (sau khi code kiểm kế hoạch); "
-          f"kế hoạch thô của mô hình đúng hoàn toàn {tally['all']}/{n}; " +
-          ", ".join(f"{f} {tally[f]}/{n}" for f in FIELDS) + f"; chi phí {usd:.4f} USD")
+    screen = [g for g in rows if g["expect"]["kind"] == "screen"]
+    ok_screen = sum(outcome(json.loads((out_dir(args.provider) / f"{g['id']}_plan.json").read_text(encoding="utf-8")),
+                            real) == outcome(g["expect"], real) for g in screen)
+    print(f"{args.provider}: hệ thống làm đúng yêu cầu {tally['outcome']}/{n} câu (sau khi code kiểm kế hoạch; riêng câu "
+          f"\"mã nào tốt nhất\" {ok_screen}/{len(screen)}); kế hoạch thô của mô hình đúng hoàn toàn {tally['all']}/{n}; " +
+          ", ".join(f"{f} {tally[f]}/{n}" for f in FIELDS) +
+          "".join(f", {f} {tally[f]}/{len(screen)}" for f in SCREEN_FIELDS) + f"; chi phí {usd:.4f} USD")
 
 
 class EvalDeps:
@@ -207,10 +218,11 @@ class EvalDeps:
         from services.analyst import store
         from services.analyst.plan import Plan, check_plan
         e = self.gold["expect"]
-        plan = Plan(e["kind"], e["tickers"], e["year"], e["period"], e["basis"], [], [], e["advice_request"])
+        plan = Plan(e["kind"], e["tickers"], e["year"], e["period"], e["basis"], [], [], e["advice_request"],
+                    e.get("sector", "all"), e.get("measure", "growth"))
         known = self.real.known_tickers()
         return check_plan(plan, known, lambda t: False, lambda ts: store.latest(self.real.conn, ts),
-                          year_now=TODAY.year)
+                          year_now=TODAY.year, latest_all=lambda sector: store.latest_all(self.real.conn, sector))
 
     def missing(self, plan):
         from services.analyst import store
@@ -298,8 +310,10 @@ def with_retries(fn, retries: int = MAX_RETRIES, pause: float = 5.0, sleep=time.
 
 
 def eligible(rows: list[dict]) -> list[dict]:
-    """Câu mà phép đo viết chạy được: có mã, mã trong danh sách và tồn tại, kỳ có trong kho."""
-    return [g for g in rows if g["expect"]["tickers"] and "mã ngoài danh sách" not in g["tags"]
+    """Câu mà phép đo viết chạy được: có mã (hoặc câu "mã nào tốt nhất"), mã trong danh sách và tồn tại, kỳ có trong
+    kho."""
+    return [g for g in rows if (g["expect"]["tickers"] or g["expect"].get("kind") == "screen")
+            and "mã ngoài danh sách" not in g["tags"]
             and "mã không tồn tại" not in g["tags"] and "kỳ ngoài kho" not in g["tags"]]
 
 
@@ -498,6 +512,7 @@ def cmd_inject(args) -> None:
     docs = [d for p in provider_dirs() for d in load_caches(p, "write").values() if d.get("status") == "done"]
     known = known_tickers(docs, load_golden())
     caught, tried = Counter(), Counter()
+    clean, flagged = 0, 0           # câu gốc (đã đạt) có bị bộ kiểm tra hiện tại bắt nhầm không
     for d in docs:
         sheet = FactSheet.from_json(d["sheet"])
         allowed = set(d["plan"]["tickers"])
@@ -505,6 +520,8 @@ def cmd_inject(args) -> None:
         foreign = next((t for t in ["HPG"] + sorted(known) if t in known and t not in allowed and t not in sheet_text), None)
         for sec in d["result"]["draft"]["sections"]:
             for s in sec["sentences"]:
+                clean += 1
+                flagged += bool(check_sentence(s["text"], s["uses"], sheet, allowed, known).violations)
                 for kind, bad in mutations(s["text"], foreign or "HPG"):
                     if kind == "foreign_ticker" and foreign is None:
                         continue
@@ -514,6 +531,7 @@ def cmd_inject(args) -> None:
     print(f"cấy lỗi vào câu đã đạt ({len(docs)} báo cáo xong, mã lạ lấy từ {len(known)} mã đã biết); số lần cấy, mỗi câu mỗi kiểu một lần:")
     for kind in tried:
         print(f"  {kind}: bắt {caught[kind]}/{tried[kind]} ({caught[kind] / tried[kind] * 100:.1f}%)")
+    print(f"  câu gốc bị bắt nhầm: {flagged}/{clean}")
 
 
 def main() -> None:

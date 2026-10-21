@@ -8,7 +8,7 @@ from services.analyst.explanations import Check, check_section, facts_for, load_
 from services.analyst.facts import metric_fact
 from services.analyst.guard import numbers
 from services.analyst.plan import Plan
-from services.analyst.sheet import Fact, FactSheet
+from services.analyst.sheet import Fact, FactSheet, report_tickers
 
 REASON_LABELS = {"khớp": "đã đối chiếu, khớp BCTC", "khớp chiều": "đã đối chiếu, khớp chiều tăng/giảm",
                  "không kiểm được": "theo công ty, chưa kiểm được bằng số"}
@@ -33,7 +33,7 @@ def reason_line(ticker: str, c: Check) -> str | None:
 
 
 def more_metric(conn, plan: Plan, sheet: FactSheet, ticker: str, key: str) -> list[Fact]:
-    if ticker not in plan.tickers:
+    if ticker not in report_tickers(plan, sheet):
         return []
     d = store.load_ticker(conn, ticker, plan.year, plan.period, plan.basis, with_flags=False)
     f = metric_fact(sheet, d, key) if d is not None else None
@@ -43,7 +43,7 @@ def more_metric(conn, plan: Plan, sheet: FactSheet, ticker: str, key: str) -> li
 def reasons(conn, client, plan: Plan, sheet: FactSheet, ticker: str, cache_dir=None) -> list[Fact]:
     """Nguyên nhân trong công văn giải trình cùng kỳ. Chỉ đưa nguyên nhân khớp, khớp chiều hoặc chưa kiểm được (ghi rõ là
     theo công ty); nguyên nhân lệch với BCTC không đưa cho mô hình."""
-    if ticker not in plan.tickers:
+    if ticker not in report_tickers(plan, sheet):
         return []
     row = conn.execute(
         """SELECT id, fiscal_period FROM documents

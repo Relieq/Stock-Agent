@@ -14,7 +14,7 @@ from psycopg.types.json import Jsonb
 from services.analyst import catalog, store, tools
 from services.analyst.graph import build
 from services.analyst.plan import Checked, Plan, check_plan, parse_request
-from services.analyst.sheet import FactSheet
+from services.analyst.sheet import FactSheet, report_tickers
 from services.analyst.writer import write
 from services.db import database_url
 from services.notify import notify_admin, send_email
@@ -101,7 +101,8 @@ class RealDeps:
             except Exception:
                 return False
 
-        return check_plan(plan, known, exists, lambda ts: store.latest(self.conn, ts))
+        return check_plan(plan, known, exists, lambda ts: store.latest(self.conn, ts),
+                          latest_all=lambda sector: store.latest_all(self.conn, sector))
 
     def missing(self, plan: Plan) -> list[dict]:
         out = store.missing(self.conn, plan)
@@ -177,7 +178,7 @@ class RealDeps:
         tool = need.get("tool")
         ticker = str(need.get("ticker") or "").strip().upper()
         metric = str(need.get("metric") or "")
-        if tool not in NEED_TOOLS or ticker not in plan.tickers:
+        if tool not in NEED_TOOLS or ticker not in report_tickers(plan, sheet):
             return
         if tool == "metric" and metric not in catalog.ALL_KEYS:
             return

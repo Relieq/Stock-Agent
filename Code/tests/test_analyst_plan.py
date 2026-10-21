@@ -89,3 +89,28 @@ def test_catalog_keys():
     assert catalog.common_keys({"TCTD", "corporate"}, []) == ["pbt", "npat_parent"]
     assert catalog.common_keys({"TCTD"}, ["nii"]) == ["nii"]
     assert "lnst" in catalog.names("TCTD", "npat_parent")
+
+
+def test_screen_needs_no_ticker_and_uses_the_latest_quarter_most_tickers_have():
+    p = plan(kind="screen", tickers=[], period="latest", year=0, sector="TCTD", measure="level")
+    c = check_plan(p, KNOWN, exists=lambda t: False, latest=no_latest, year_now=2026,
+                   latest_all=lambda sector: (2026, "Q2") if sector == "TCTD" else None)
+    assert c.ask is None and (c.plan.kind, c.plan.tickers, c.plan.year, c.plan.period) == ("screen", [], 2026, "Q2")
+    assert (c.plan.sector, c.plan.measure) == ("TCTD", "level") and "phần lớn các mã" in c.notes[-1]
+
+
+def test_screen_with_named_tickers_becomes_rank_or_compare():
+    c = check(plan(kind="screen", tickers=["TCB"]))
+    assert c.plan.kind == "rank" and "vị trí" in c.notes[0]
+    c = check(plan(kind="screen", tickers=["TCB", "VCB"], sector="TCTD", measure="level"))
+    assert c.plan.kind == "compare" and (c.plan.sector, c.plan.measure) == ("all", "growth")   # chỉ dùng cho screen
+
+
+def test_ask_back_lists_the_four_question_kinds():
+    ask = check(plan(kind="yoy", tickers=[])).ask
+    assert ask.startswith("Bạn muốn xem mã") and ask.count("\n- ") == 4 and "tốt nhất" in ask
+
+
+def test_old_saved_plans_without_sector_still_load():
+    old = {k: v for k, v in plan().to_json().items() if k not in ("sector", "measure")}
+    assert Plan.from_json(old).sector == "all"

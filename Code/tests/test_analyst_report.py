@@ -318,3 +318,15 @@ def test_fail_stale_bao_loi_bao_cao_cho_doc_chua_gui_yeu_cau(monkeypatch):
     assert report.fail_stale(Conn()) == ["báo cáo 7: bị gián đoạn -> failed"]
     assert saved == [(7, {"status": "failed", "error": report.NOT_SENT_ERROR})]
     assert len(admin) == 1
+
+
+def test_extra_cho_cau_xep_hang_toan_bo_chi_nhan_ma_dung_dau(monkeypatch):
+    calls = []
+    monkeypatch.setattr(report.tools, "reasons", lambda conn, client, plan, sheet, t: calls.append(("reasons", t)))
+    d = _deps(calls)
+    plan, sheet = Plan("screen", [], 2026, "Q2", "quarter"), FactSheet()
+    sheet.add("rank", "Xếp hạng ...", order=["VPB", "TCB", "VCB"])
+    sheet.add("metric", "LNST ..., VPB", ticker="VPB")
+    for t in ("VPB", "VCB"):        # VCB chỉ có trong thứ tự cả nhóm, không thuộc nhóm đứng đầu
+        d.extra(plan, sheet, {"tool": "reasons", "ticker": t, "metric": "none"})
+    assert calls == [("reasons", "VPB")]

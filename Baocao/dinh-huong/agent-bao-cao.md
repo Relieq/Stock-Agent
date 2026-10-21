@@ -4,7 +4,7 @@
 
 ## 1. Mục tiêu
 
-Người dùng gõ một câu tiếng Việt tự do, ví dụ "so sánh KQKD quý 3/2026 của VCB và TCB" hoặc "đánh giá kết quả quý 3 của FPT so với cùng kỳ". Agent hiểu yêu cầu, lập kế hoạch, tự đi lấy BCTC còn thiếu, tính số, viết nhận định và trả về một báo cáo hoàn chỉnh: lời văn, bảng, biểu đồ, nguồn của từng số. Báo cáo xem trên web và tải được PDF.
+Người dùng gõ một câu tiếng Việt bằng lời thường, ví dụ "so sánh KQKD quý 3/2026 của VCB và TCB" hoặc "đánh giá kết quả quý 3 của FPT so với cùng kỳ". Agent hiểu yêu cầu, lập kế hoạch, tự đi lấy BCTC còn thiếu, tính số, viết nhận định và trả về một báo cáo hoàn chỉnh: lời văn, bảng, biểu đồ, nguồn của từng số. Báo cáo xem trên web và tải được PDF.
 
 So với mô tả đề tài đăng ký ban đầu, có bốn điểm khác:
 
@@ -17,10 +17,11 @@ So với mô tả đề tài đăng ký ban đầu, có bốn điểm khác:
 
 Có trong Project 3:
 
-- Ba loại yêu cầu:
+- Bốn loại yêu cầu:
   - **so nhiều mã cùng kỳ**;
   - **một mã so với cùng kỳ năm trước**;
-  - **vị trí của một mã trong nhóm**.
+  - **vị trí của một mã trong nhóm**;
+  - **mã nào tốt nhất trong các mã đang theo dõi** (thêm 21/10/2026, không cần nêu mã): mặc định xếp theo mức tăng LNST công ty mẹ so với cùng kỳ ở quý gần nhất mà ít nhất 2/3 số mã của nhóm đã có BCTC kiểm chứng; ngân hàng, công ty chứng khoán, doanh nghiệp khác xếp riêng; 5 mã đứng đầu mỗi nhóm được nạp đủ chỉ tiêu và cờ thẻ KQKD; "tại sao" lấy từ công văn giải trình và cờ cảnh báo. Người dùng nêu tiêu chí (chỉ tiêu, xếp theo độ lớn hay tăng trưởng, nhóm) thì theo tiêu chí đó; chi phí và CIR thì thấp là tốt.
 - Kỳ: quý, bán niên, cả năm. Cách tính: riêng quý, hoặc lũy kế từ đầu năm.
 - Nhóm so sánh:
   - ngân hàng so với các ngân hàng đang theo dõi;
@@ -83,17 +84,19 @@ Mô hình trả kế hoạch theo khuôn sau:
 
 | Trường | Giá trị |
 |---|---|
-| `kind` | `compare` (so nhiều mã) / `yoy` (một mã so cùng kỳ) / `rank` (vị trí trong nhóm) |
+| `kind` | `compare` (so nhiều mã) / `yoy` (một mã so cùng kỳ) / `rank` (vị trí trong nhóm) / `screen` (mã nào tốt nhất, không nêu mã) |
 | `tickers` | danh sách mã như người dùng viết |
 | `year`, `period` | năm; `Q1`–`Q4`, `H1`, `FY`, hoặc `latest` |
 | `basis` | `quarter` (riêng quý) / `ytd` (lũy kế từ đầu năm) |
 | `metrics` | chỉ tiêu người dùng nhắc, chọn trong danh mục; trống thì dùng bộ chỉ tiêu của thẻ KQKD |
 | `unclear` | điều mô hình không chắc |
 | `advice_request` | câu hỏi có xin khuyến nghị mua bán không |
+| `sector` | loại `screen`: `all` / `TCTD` / `corporate` / `CTCK` |
+| `measure` | loại `screen`: `growth` (mức tăng so với cùng kỳ, mặc định) / `level` (độ lớn kỳ này) |
 
 Code kiểm:
 
-- **Mã:** mã phải có trong bảng công ty, hoặc tìm được trên Vietstock như đường yêu cầu mã ngoài danh sách. Không có mã nào, hoặc mã không tồn tại, thì hỏi lại một câu.
+- **Mã:** mã phải có trong bảng công ty, hoặc tìm được trên Vietstock như đường yêu cầu mã ngoài danh sách. Không có mã nào (trừ loại `screen`), hoặc mã không tồn tại, thì hỏi lại một câu, kèm ví dụ của cả bốn loại câu hỏi. Loại `screen` mà có nêu mã thì thành `rank` (một mã) hoặc `compare` (nhiều mã).
 - **Kỳ:** `latest` được điền bằng kỳ mới nhất mà mọi mã đều có BCTC đã kiểm chứng. Người dùng không nói kỳ thì lấy kỳ gần nhất và ghi rõ trong báo cáo.
 - **Xin khuyến nghị:** vẫn làm báo cáo thông tin, kèm một câu nói rõ hệ thống không đưa khuyến nghị.
 
@@ -172,10 +175,11 @@ Bộ kiểm tra là code, không gọi mô hình, chạy trên từng câu:
 3. **Kiểm từ chỉ chiều.** "Tăng/giảm", "cải thiện/suy giảm", "lãi/lỗ", "nhanh hơn/chậm hơn", "cao hơn/thấp hơn", "cao nhất/thấp nhất" phải khớp dấu hoặc thứ tự trong bảng. Chi phí tính theo độ lớn.
    - Số đứng sau "lãi/lỗ" phải đúng dấu: số tiền ngay sau "lỗ" chỉ khớp khoản lỗ trong bảng, ngay sau "lãi" chỉ khớp khoản lãi.
    - Thứ hạng "thứ N/M", "thứ N trong M", "đứng thứ N" phải đúng: N là vị trí của mã trong dòng xếp hạng, M là số mã của dòng đó.
+   - Số đứng ngay sau "hơn <mã>" ("VCB cao hơn CTG 11.740 tỷ") là mức chênh giữa hai mã: phải có đúng mức chênh đó trong bảng số.
 4. **Các lỗi khác:**
    - số không có trong dòng nào câu đã ghi ("số không có nguồn");
    - câu dẫn mã dòng không tồn tại;
-   - câu nhắc mã chứng khoán ngoài kế hoạch;
+   - câu nhắc mã chứng khoán ngoài kế hoạch (loại `screen`: ngoài các mã đứng đầu đã có dòng chỉ tiêu) và ngoài các dòng câu đã ghi;
    - ngôn ngữ khuyến nghị ("nên mua", "nên bán", "giá mục tiêu", "khuyến nghị", "cơ hội đầu tư", …).
 
 Khi có lỗi, câu sai được gửi lại mô hình kèm danh sách lỗi để viết lại, tối đa 2 lần. Vẫn sai thì bỏ câu đó. Câu bị bỏ chỉ quản trị viên thấy.
@@ -232,7 +236,7 @@ Trạng thái của đồ thị lưu bằng gói lưu trạng thái Postgres ch�
 
 **Bộ câu yêu cầu** `Code/eval/data/agent_requests.jsonl` (nằm trong `Code/` để container thấy), khoảng 50 câu, mỗi câu kèm kế hoạch đúng. Các câu phủ:
 
-- ba loại yêu cầu;
+- bốn loại yêu cầu;
 - nhiều cách nói: trang trọng, nói tắt, không dấu, sai chính tả nhẹ, kỳ nói bằng chữ;
 - các trường hợp khó: thiếu mã, mã không tồn tại, kỳ ngoài kho, xin khuyến nghị.
 

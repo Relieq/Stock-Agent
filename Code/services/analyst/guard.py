@@ -175,6 +175,11 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
         bad("no_source", text.strip())
     elif facts:
         for n in found:
+            gap = GAP_BEFORE.search(text[:n.start])
+            if gap and not _gap_in_facts(n, gap.group(1), facts):
+                bad("unsourced_number", text[n.start:n.end].strip() + f" (số đứng ngay sau “hơn {gap.group(1)}” đọc như mức"
+                    " chênh lệch giữa hai mã; bảng số không có mức chênh này)")
+                continue
             side = _profit_side(text, n)
             pool = [(f, fn) for f, fn, loss in allowed_nums if side is None or loss == (side == "loss")]
             hit = next((f for f, fn in pool if matches(n, fn)), None)
@@ -205,6 +210,20 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
             and (item := _flipped_item(text, facts)):
         bad("direction", f"câu nói “{item}” nhưng dòng câu ghi là lãi: {text.strip()}")
     return out
+
+
+# "VCB cao hơn CTG 11.740 tỷ": số ngay sau "hơn <mã>" là mức chênh lệch, không phải số của mã đứng sau
+GAP_BEFORE = re.compile(r"hơn\s+([A-Z]{3})\s+(?:khoảng\s+|gần\s+|xấp xỉ\s+)?$")
+
+
+def _gap_in_facts(n: Num, ticker: str, facts: list[Fact]) -> bool:
+    """Bảng số có đúng mức chênh này ("TCB cao hơn VCB 5,2 điểm %") trong các dòng câu ghi."""
+    for f in facts:
+        for m in re.finditer(rf"hơn {ticker}\s+", f.text):
+            got = numbers(f.text[m.end():m.end() + 40])
+            if got and got[0].start == 0 and matches(n, got[0]):
+                return True
+    return False
 
 
 # "lãi"/"lỗ" đứng riêng (không phải "Lãi/lỗ tỷ giá", không phải "lỗi")

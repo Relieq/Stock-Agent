@@ -29,8 +29,10 @@ IGNORE = re.compile(r"(?i)\b(?:quý|Q)\s*[1-4]\b(?:\s*[/-]\s*\d{4})?|\b(?:năm|n
 APPROX = re.compile(r"(khoảng|gần|xấp xỉ|ước|chừng)\s*$")
 MORE = re.compile(r"(hơn|trên|vượt)\s*$")
 LESS = re.compile(r"(dưới|chưa đến|chưa tới|không tới)\s*$")
-# Dạng động từ ("nên mua", "có thể cân nhắc bán") luôn bị bắt; "khuyến nghị" (danh từ) có thể được phủ định
-ADVICE = re.compile(r"(?i)(nên|khuyên|có thể)\s+(?:\S+\s+){0,2}?(mua|bán|nắm giữ|giữ|tích lũy|chốt lời|cắt lỗ|đầu tư)\b"
+# Dạng động từ ("nên mua", "có thể cân nhắc bán") luôn bị bắt; "có thể" chỉ tính khi đi với "cân nhắc" hoặc "nên",
+# để câu phân tích như "có thể giữ được đà tăng" không bị coi là khuyến nghị; "khuyến nghị" (danh từ) có thể được phủ định
+ADVICE = re.compile(r"(?i)(nên|khuyên|có thể\s+(?:cân nhắc|nên))\s+(?:\S+\s+){0,2}?"
+                    r"(mua|bán|nắm giữ|giữ|tích lũy|chốt lời|cắt lỗ|đầu tư)\b"
                     r"|giá mục tiêu"
                     r"|cơ hội (đầu tư|mua)|định giá (hấp dẫn|rẻ)|thời điểm (tốt để )?(mua|bán)|khuyến nghị")
 NEGATED = re.compile(r"(?i)không\s+(?:\S+\s+){0,2}$")

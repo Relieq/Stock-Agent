@@ -96,3 +96,13 @@ def test_advice_in_verb_form_is_not_excused_by_negation_words():
     assert kinds("Soi không đưa khuyến nghị đầu tư.") == []
     assert kinds("Đây không phải là khuyến nghị mua bán.") == []
     assert kinds("Chi phí tăng có thể do lạm phát.") == []
+
+
+def test_ordinary_analysis_with_co_the_is_not_advice():
+    s = sheet()
+    for t in ["Doanh thu có thể giữ được đà tăng.",
+              "Chi phí có thể do bán hàng tăng.",
+              "Công ty có thể tiếp tục bán ra cổ phiếu quỹ.",
+              "Có thể đầu tư mạnh vào tài sản."]:
+        kinds = [v.kind for v in check_sentence(t, [], s, {"TCB", "MWG"}, KNOWN).violations]
+        assert "advice" not in kinds, t

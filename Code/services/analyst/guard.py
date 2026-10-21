@@ -192,6 +192,9 @@ CLAUSE = re.compile(r",(?!\d)|;|(?<!không)(?<!chưa)\s(?:nhờ|do|vì|khiến|g
 GROWTH_WORDS = re.compile(r"\b(?:nhanh|chậm|tăng|giảm|sụt|tốc độ|điểm phần trăm)\b|%")
 NEGATED_VERB = re.compile(r"\b(?:không|chưa|ngừng)\s+(?:\S+\s+)?$")      # "không tăng", "không còn giảm", "ngừng giảm"
 LOSS_BEFORE = re.compile(r"(?<![/\w])lỗ(?!\w)(?:\s+[^\s/]+)?\s*$")      # "lỗ giảm", "lỗ ròng giảm"; không phải "Lãi/lỗ", "lỗi"
+# "cao hơn cùng kỳ", "thấp hơn năm trước" (không có mã thứ hai): là từ chỉ chiều, không phải so sánh hai mã
+LAST_YEAR = re.compile(r"cùng kỳ|năm trước")
+COMP_AS_DIR = re.compile(r"\b(?:(cao|lớn|nhiều)|(thấp|nhỏ|ít)) hơn\b")
 
 
 def _clauses(text: str) -> list[tuple[int, int]]:
@@ -224,6 +227,36 @@ def _hint(sheet: FactSheet | None, codes: list[str], c: str | None, low: str) ->
     cands = [f for f in sheet.facts if f.order and all(t in f.order for t in codes)]
     cands.sort(key=lambda f: (not (c is not None and f.measure == c), not any(n in low for n in f.names)))
     return " — ghi thêm dòng " + ", ".join(f.id for f in cands[:2]) + " vào uses" if cands else ""
+
+
+def _signed_values(f: Fact) -> list[tuple[str, Num]]:
+    """Dòng so sánh hoặc xếp hạng theo tốc độ thay đổi: số có dấu đứng ngay sau từng mã ("VCB +64,7%, TCB −3,1%")."""
+    if f.measure != "growth" or not f.order:
+        return []
+    out = []
+    for t in f.order:
+        m = re.search(rf"(?<!\w){t}\s+(?=[+−-]\d)", f.text)
+        ns = numbers(f.text[m.end():]) if m else []
+        if ns and ns[0].start == 0:
+            out.append((t, ns[0]))
+    return out
+
+
+def _directions_by_number(clause: str, facts: list[Fact], tickers: list[str]) -> list[tuple[str, str]]:
+    """(mã, chiều) của mọi dòng câu ghi có chứa một số khớp với số trong vế: dòng chỉ tiêu có chiều, và số có dấu sau
+    mã trong dòng tốc độ thay đổi. Vế có mã thì chỉ giữ dòng của mã đó."""
+    nums = numbers(clause)
+    if not nums:
+        return []
+    out = []
+    for f in facts:
+        if f.direction and (not tickers or f.ticker in tickers):
+            if any(matches(n, fn) for n in nums for fn in numbers(f.text)):
+                out.append((f.id, f.direction))
+        for t, v in _signed_values(f):
+            if (not tickers or t in tickers) and any(matches(n, v) for n in nums):
+                out.append((f.id, "up" if v.value > 0 else "down" if v.value < 0 else "flat"))
+    return out
 
 
 def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, sheet: FactSheet | None = None) -> None:
@@ -264,8 +297,12 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                 first = bool(comp_up)           # vế đầu đứng trước vế sau trong thứ tự (lớn -> nhỏ)?
                 if declining and c == "growth":
                     first = not first           # "giảm nhanh hơn" = tăng trưởng thấp hơn
-                cands = _named([f for f in facts if f.order and a_t in f.order and b_t in f.order
-                                and (c is None or f.measure == c)], low)
+                rows = [f for f in facts if f.order and a_t in f.order and b_t in f.order]
+                if c is None:   # không rõ loại số liệu: theo dòng quy mô; không có dòng quy mô mới xét dòng tăng trưởng
+                    rows = _named(rows, low)
+                    cands = [f for f in rows if f.measure == "level"] or [f for f in rows if f.measure == "growth"]
+                else:
+                    cands = _named([f for f in rows if f.measure == c], low)
                 if not cands:
                     bad("comparison", f"không có dòng so sánh {a_t} với {b_t}: {clause.strip()}"
                                       + _hint(sheet, [a_t, b_t], c, low))
@@ -273,7 +310,11 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                     bad("comparison", clause.strip())
                 subject = a_t if len(tickers) >= 2 or a_t == tickers[0] else subject
                 continue
-            out.warnings.append(f"không rõ hai vế so sánh: {clause.strip()}")
+            as_dir = COMP_AS_DIR.search(low) if LAST_YEAR.search(low) and not up_m and not down_m else None
+            if as_dir:          # "thấp hơn cùng kỳ": kiểm như từ chỉ chiều ở dưới
+                up_m, down_m = (as_dir, None) if as_dir.group(1) else (None, as_dir)
+            else:
+                out.warnings.append(f"không rõ hai vế so sánh: {clause.strip()}")
         top, bottom = SUP_TOP.search(low), SUP_BOTTOM.search(low)
         if top or bottom:
             if "một trong những" in text.lower():       # không phải xếp hạng tuyệt đối
@@ -310,19 +351,23 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
         up, down = bool(up_m), bool(down_m)
         if LOSS_BEFORE.search(before):  # "lỗ giảm" là cải thiện, "lỗ tăng" là xấu đi
             up, down = down, up
-        linked = {l.fact_id for l in out.links if a <= l.start < b}
-        cands = [f for f in facts if f.id in linked and f.direction]
-        if not cands:
+        # mọi dòng câu ghi có số khớp với số trong vế (không chỉ dòng con số được gắn liên kết)
+        by_num = _directions_by_number(clause, facts, tickers)
+        dirs = {d for _, d in by_num}
+        if len(dirs) > 1:       # số khớp nhiều dòng trái chiều: thu hẹp theo tên chỉ tiêu vế câu nhắc
+            named = {f.id for f in facts if any(n in low for n in f.names)}
+            dirs = {d for fid, d in by_num if fid in named} or dirs
+        if not by_num:          # không có số khớp: theo tên chỉ tiêu
             cands = [f for f in facts if f.direction and any(n in low for n in f.names)
                      and (not tickers or f.ticker in tickers)]
-        if not cands:
-            # chỉ một dòng có chiều: dùng khi vế nhắc đúng mã của dòng đó (hoặc không mã nào và nhắc tên chỉ tiêu)
-            with_dir = [f for f in facts if f.direction]
-            if len(with_dir) == 1:
-                f = with_dir[0]
-                if (f.ticker and f.ticker in tickers) or (not tickers and any(n in low for n in f.names)):
-                    cands = with_dir
-        dirs = {f.direction for f in cands}
+            if not cands:
+                # chỉ một dòng có chiều: dùng khi vế nhắc đúng mã của dòng đó (hoặc không mã nào và nhắc tên chỉ tiêu)
+                with_dir = [f for f in facts if f.direction]
+                if len(with_dir) == 1:
+                    f = with_dir[0]
+                    if (f.ticker and f.ticker in tickers) or (not tickers and any(n in low for n in f.names)):
+                        cands = with_dir
+            dirs = {f.direction for f in cands}
         if len(dirs) != 1:
             out.warnings.append(f"không rõ chiều: {clause.strip()}")
             continue

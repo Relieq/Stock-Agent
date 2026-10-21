@@ -264,3 +264,79 @@ def test_connectors_split_clauses_and_mixed_words_warn():
 def test_one_of_the_fastest_is_not_a_strict_superlative():
     assert kinds("TCB là một trong những ngân hàng tăng nhanh nhất.", ["S5"]) == []
     assert kinds("TCB là ngân hàng tăng nhanh nhất.", ["S5"]) == ["comparison"]
+
+
+# --- Vòng sửa 2: câu lọt khi cấy lỗi (đảo tăng/giảm, đảo cao hơn/thấp hơn) trên các báo cáo thử ---
+
+def margin_sheet():
+    s = FactSheet()
+    s.add("ratio", "Biên lợi nhuận gộp, FPT, quý 2/2026: 31,0%; cùng kỳ 36,2%; thay đổi −5,2 điểm %", ticker="FPT",
+          metric="gross_margin", direction="down", names=["biên lợi nhuận gộp"])
+    s.add("ratio", "Biên lợi nhuận ròng, FPT, quý 2/2026: 18,6%; cùng kỳ 16,5%; thay đổi +2,2 điểm %", ticker="FPT",
+          metric="net_margin", direction="up", names=["biên lợi nhuận ròng"])
+    return s
+
+
+def test_higher_or_lower_than_last_year_is_a_direction_word():
+    s, allowed = margin_sheet(), ("FPT",)
+    assert kinds("Biên lợi nhuận gộp của FPT là 31,0%, thấp hơn 5,2 điểm % so với 36,2% cùng kỳ.", ["S1"], s,
+                 allowed) == []
+    assert kinds("Biên lợi nhuận gộp của FPT là 31,0%, cao hơn 5,2 điểm % so với 36,2% cùng kỳ.", ["S1"], s,
+                 allowed) == ["direction"]
+    assert kinds("Biên lợi nhuận ròng của FPT trong quý 2/2026 là 18,6%, cao hơn cùng kỳ 16,5%.", ["S2"], s,
+                 allowed) == []
+    assert kinds("Biên lợi nhuận ròng của FPT trong quý 2/2026 là 18,6%, thấp hơn cùng kỳ 16,5%.", ["S2"], s,
+                 allowed) == ["direction"]
+    assert kinds("Biên lợi nhuận gộp của FPT quý 2/2026 là 31,0%, thấp hơn cùng kỳ 36,2%.", ["S1"], s, allowed) == []
+    assert kinds("Biên lợi nhuận gộp của FPT quý 2/2026 là 31,0%, cao hơn cùng kỳ 36,2%.", ["S1"], s, allowed) == \
+        ["direction"]
+    assert kinds("Biên lợi nhuận ròng của FPT nhỏ hơn năm trước.", ["S2"], s, allowed) == ["direction"]
+    assert kinds("Biên lợi nhuận ròng của FPT lớn hơn năm trước.", ["S2"], s, allowed) == []
+    # có mã thứ hai thì vẫn là so sánh hai mã, không phải từ chỉ chiều
+    assert kinds("LNST của TCB tăng 23,7% so với cùng kỳ, nhanh hơn VCB.", ["S1", "S3"]) == []
+    assert kinds("LNST của TCB tăng 23,7% so với cùng kỳ, chậm hơn VCB.", ["S1", "S3"]) == ["comparison"]
+
+
+def bank_growth_sheet():
+    s = FactSheet()
+    s.add("compare", "LNST của cổ đông ngân hàng mẹ, thay đổi so với cùng kỳ, quý 2/2026: VCB +64,7%, TCB +17,7%; "
+                     "VCB cao hơn TCB 47,0 điểm %", metric="npat_parent", measure="growth", order=["VCB", "TCB"],
+          names=["lnst của cổ đông ngân hàng mẹ", "lnst"])
+    s.add("metric", "LNST của cổ đông ngân hàng mẹ, VCB, quý 2/2026: 14.542 tỷ; cùng kỳ 8.832 tỷ; "
+                    "thay đổi +64,7% (tăng 5.710 tỷ)", ticker="VCB", metric="npat_parent", direction="up",
+          names=["lnst của cổ đông ngân hàng mẹ", "lnst"])
+    s.add("metric", "LNST của cổ đông ngân hàng mẹ, TCB, quý 2/2026: 7.350 tỷ; cùng kỳ 6.247 tỷ; "
+                    "thay đổi +17,7% (tăng 1.103 tỷ)", ticker="TCB", metric="npat_parent", direction="up",
+          names=["lnst của cổ đông ngân hàng mẹ", "lnst"])
+    return s
+
+
+def test_direction_uses_every_cited_row_with_a_matching_number():
+    s = bank_growth_sheet()
+
+    def details(text, uses):
+        return [(v.kind, v.detail) for v in check_sentence(text, uses, s, {"VCB", "TCB"}, KNOWN).violations]
+
+    # số khớp cả dòng so sánh (đứng trước, không có chiều) lẫn dòng chỉ tiêu của từng mã
+    assert details("VCB tăng 64,7%, TCB tăng 17,7%.", ["S1", "S2", "S3"]) == []
+    assert details("VCB giảm 64,7%, TCB tăng 17,7%.", ["S1", "S2", "S3"]) == [("direction", "VCB giảm 64,7%")]
+    assert details("VCB tăng 64,7%, TCB giảm 17,7%.", ["S1", "S2", "S3"]) == [("direction", "TCB giảm 17,7%.")]
+    # câu chỉ ghi dòng so sánh tốc độ thay đổi: chiều theo dấu của số đứng sau mã đó
+    assert details("LNST của cổ đông ngân hàng mẹ của VCB tăng 64,7% so với cùng kỳ, còn TCB tăng 17,7%.",
+                   ["S1"]) == []
+    assert [k for k, _ in details("LNST của cổ đông ngân hàng mẹ của VCB giảm 64,7% so với cùng kỳ, còn TCB tăng "
+                                  "17,7%.", ["S1"])] == ["direction"]
+    # tên ngân hàng viết đầy đủ (không có mã): số vẫn chỉ ra đúng mã
+    assert [k for k, _ in details("LNST của cổ đông ngân hàng mẹ Vietcombank giảm 64,7% so với cùng kỳ, còn "
+                                  "Techcombank tăng 17,7%.", ["S1"])] == ["direction"]
+    assert details("LNST của cổ đông ngân hàng mẹ Vietcombank tăng 64,7% so với cùng kỳ, còn Techcombank tăng 17,7%.",
+                   ["S1"]) == []
+
+
+def test_comparison_without_growth_cue_prefers_the_level_row():
+    # S3: tăng trưởng TCB > VCB; S4: quy mô VCB > TCB
+    assert kinds("LNST của VCB cao hơn TCB.", ["S3", "S4"]) == []
+    assert kinds("LNST của TCB cao hơn VCB.", ["S3", "S4"]) == ["comparison"]
+    # không có dòng quy mô chứa cả hai mã: mới xét dòng tăng trưởng
+    assert kinds("LNST của TCB cao hơn VCB.", ["S3"]) == []
+    assert kinds("LNST của VCB cao hơn TCB.", ["S3"]) == ["comparison"]

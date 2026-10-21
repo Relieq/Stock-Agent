@@ -478,3 +478,80 @@ def test_investor_can_buy_is_advice():
     assert "advice" in kinds_("Nhà đầu tư vẫn có thể tích lũy TCB.")
     assert "advice" not in kinds_("Ngân hàng có thể đầu tư thêm vào công nghệ.")
     assert "advice" not in kinds_("LNST của cổ đông ngân hàng mẹ có thể giữ được đà tăng.")
+
+
+# --- Lượt sửa 4 lỗi báo nhầm nhỏ ---
+
+def test_metric_name_of_another_company_kind_still_names_the_row():
+    # "LNST của cổ đông công ty mẹ" là tên của doanh nghiệp; dòng ngân hàng tên khác nhưng cùng chỉ tiêu npat_parent
+    assert kinds("LNST của cổ đông công ty mẹ của TCB giảm.", ["S1"]) == ["direction"]
+    assert kinds("LNST của cổ đông công ty mẹ của TCB tăng.", ["S1"]) == []
+    assert kinds("LNST của cổ đông công ty mẹ của VCB cao hơn TCB.", ["S4"]) == []
+    assert kinds("LNST của cổ đông công ty mẹ của TCB cao hơn VCB.", ["S4"]) == ["comparison"]
+    # tên chỉ tiêu khác (LNTT) vẫn không nhận dòng LNST
+    s, allowed = overlap_sheet(), ("TCB", "VCB", "FPT")
+    assert kinds("Lợi nhuận trước thuế của TCB cao hơn VCB.", ["S1", "S2"], s, allowed) == ["comparison"]
+
+
+def fpt_sheet():
+    s = FactSheet()
+    s.add("metric", "Chi phí tài chính, FPT, quý 3/2026: 300,0 tỷ; cùng kỳ 200,0 tỷ; thay đổi +50,0% (tăng 100,0 tỷ)",
+          ticker="FPT", metric="fin_expense", direction="up", names=["chi phí tài chính"])
+    s.add("metric", "LNST của cổ đông công ty mẹ, FPT, quý 3/2026: 50,0 tỷ; cùng kỳ 40,0 tỷ; thay đổi +25,0% "
+                    "(tăng 10,0 tỷ)", ticker="FPT", metric="npat_parent", direction="up",
+          names=["lnst của cổ đông công ty mẹ", "lnst"])
+    return s
+
+
+def test_loss_word_counts_only_as_the_metric_result():
+    s, allowed = fpt_sheet(), ("FPT",)
+    assert kinds("Chi phí tài chính của FPT tăng 50,0% do lỗ tỷ giá.", ["S1"], s, allowed) == []
+    assert kinds("LNST của FPT tăng 25,0% dù còn lỗ lũy kế ở công ty con.", ["S2"], s, allowed) == []
+    assert kinds("LNST của FPT tăng 25,0% nhờ giảm lỗ từ công ty liên kết.", ["S2"], s, allowed) == []
+    assert kinds("LNST của FPT tăng 25,0% dù có khoản lỗ của công ty con.", ["S2"], s, allowed) == []
+    # chữ "lỗ" ngay sau mã hoặc tên chỉ tiêu vẫn là nói kết quả của chỉ tiêu
+    assert kinds("FPT lỗ nhiều hơn cùng kỳ.", ["S2"], s, allowed) == ["direction"]
+    assert kinds("LNST lỗ trong quý 3.", ["S2"], s, allowed) == ["direction"]
+    assert kinds("Vietcombank (FPT) lỗ nhiều hơn cùng kỳ.", ["S2"], s, allowed) == ["direction"]
+    assert kinds("Thẻ KQKD của FPT cũng ghi nhận lỗ nhưng dòng tiền âm.", ["S2"], s, allowed) == ["direction"]
+    p, allowed = profit_loss_sheet(), ("TCB", "VCB", "ABC")
+    assert kinds("TCB lỗ 50,0 tỷ.", ["S1"], p, allowed) == ["unsourced_number"]
+
+
+def test_loss_of_an_item_the_row_calls_profit_is_wrong():
+    s = FactSheet()
+    s.add("flag", "Cờ cảnh báo, FPT, quý 2/2026: lãi từ công ty liên doanh, liên kết tăng từ 107 tỷ lên 757 tỷ; "
+                  "lãi thuần từ hoạt động khác tăng 2.906 tỷ", ticker="FPT")
+    allowed = ("FPT",)
+    assert kinds("Lãi từ công ty liên doanh, liên kết tăng từ 107 tỷ lên 757 tỷ.", ["S1"], s, allowed) == []
+    assert kinds("Lỗ từ công ty liên doanh, liên kết tăng từ 107 tỷ lên 757 tỷ.", ["S1"], s, allowed) == ["direction"]
+    assert kinds("Thu nhập khác: lỗ thuần từ hoạt động khác tăng 2.906 tỷ.", ["S1"], s, allowed) == ["direction"]
+    # khoản lỗ dòng không nhắc tới: không đoán; "thoát lỗ" không nói có lỗ
+    assert kinds("FPT tăng lãi dù lỗ tỷ giá.", ["S1"], s, allowed) == []
+    assert kinds("FPT không còn lỗ từ công ty liên doanh.", ["S1"], s, allowed) == []
+    assert kinds("FPT đã bù lỗ từ công ty liên doanh.", ["S1"], s, allowed) == []
+
+
+def test_intro_sentences_without_direction_need_no_row():
+    s = compare_sheet()
+    for t in ["Phần dưới so sánh tăng trưởng lợi nhuận của TCB và VCB.",
+              "Báo cáo không đánh giá lãi lỗ ngoài BCTC.",
+              "Báo cáo không đánh giá lãi/lỗ ngoài BCTC."]:
+        assert check_sentence(t, [], s, {"TCB", "VCB"}, KNOWN).violations == [], t
+    assert [v.kind for v in check_sentence("LNST của TCB giảm mạnh so với cùng kỳ.", [], s, {"TCB"},
+                                           KNOWN).violations][:1] == ["no_source"]
+    assert [v.kind for v in check_sentence("LNST của TCB tăng trưởng mạnh.", [], s, {"TCB"},
+                                           KNOWN).violations][:1] == ["no_source"]
+
+
+def test_shareholders_keeping_momentum_is_not_advice():
+    s = sheet()
+
+    def kinds_(t):
+        return [v.kind for v in check_sentence(t, ["S1"], s, {"TCB", "MWG"}, KNOWN).violations]
+
+    assert "advice" not in kinds_("Phần lợi nhuận thuộc về cổ đông có thể giữ được đà tăng.")
+    assert "advice" in kinds_("Nhà đầu tư có thể mua TCB.")
+    assert "advice" in kinds_("Cổ đông nên bán MWG.")
+    assert "advice" in kinds_("Các cổ đông có thể giữ cổ phiếu TCB.")
+    assert "advice" in kinds_("Cổ đông có thể giữ TCB.")

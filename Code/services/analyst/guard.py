@@ -35,11 +35,15 @@ MORE = re.compile(r"(hơn|trên|vượt)\s*$")
 LESS = re.compile(r"(dưới|chưa đến|chưa tới|không tới)\s*$")
 # Dạng động từ ("nên mua", "có thể cân nhắc bán") luôn bị bắt; "có thể" chỉ tính khi đi với "cân nhắc" hoặc "nên",
 # để câu phân tích như "có thể giữ được đà tăng" không bị coi là khuyến nghị; "khuyến nghị" (danh từ) có thể được phủ định
+# "giữ" chỉ là khuyên khi đi với cổ phiếu/mã ("giữ cổ phiếu TCB", "giữ TCB"), không phải "giữ được đà tăng"
+_KEEP = r"giữ(?=\s+(?:cổ phiếu|mã|(?-i:[A-Z]{3})(?!\w)))"
+# chủ thể "cổ đông" chỉ tính khi đứng đầu vế câu hoặc sau "các/những/nhà/quý"; "thuộc về cổ đông có thể giữ..." không phải
+_HOLDER = r"(?:(?:^|(?<=[,;:.])\s*)(?:các\s+|những\s+|nhà\s+|quý\s+)?|(?<!\w)(?:các|những|nhà|quý)\s+)cổ đông"
 ADVICE = re.compile(r"(?i)(nên|khuyên|có thể\s+(?:cân nhắc|nên))\s+(?:\S+\s+){0,2}?"
-                    r"(mua|bán|nắm giữ|giữ|tích lũy|chốt lời|cắt lỗ|đầu tư)\b"
+                    r"(mua|bán|nắm giữ|" + _KEEP + r"|tích lũy|chốt lời|cắt lỗ|đầu tư)\b"
                     # "nhà đầu tư/cổ đông/bạn có thể mua...": có chủ thể là người đầu tư thì "có thể" cũng là khuyên
-                    r"|(?<!\w)(?:nhà đầu tư|cổ đông|bạn)\s+(?:(?:vẫn|cũng|hoàn toàn)\s+)?có thể\s+(?:\S+\s+){0,2}?"
-                    r"(?:mua|bán|nắm giữ|giữ|tích lũy|chốt lời|cắt lỗ|đầu tư|gom)\b"
+                    r"|(?:(?<!\w)(?:nhà đầu tư|bạn)|" + _HOLDER + r")\s+(?:(?:vẫn|cũng|hoàn toàn)\s+)?có thể\s+"
+                    r"(?:\S+\s+){0,2}?(?:mua|bán|nắm giữ|" + _KEEP + r"|tích lũy|chốt lời|cắt lỗ|đầu tư|gom)\b"
                     r"|giá mục tiêu"
                     r"|cơ hội (đầu tư|mua)|định giá (hấp dẫn|rẻ)|thời điểm (tốt để )?(mua|bán)|khuyến nghị")
 NEGATED = re.compile(r"(?i)không\s+(?:\S+\s+){0,2}$")
@@ -196,6 +200,10 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
             and not any("lỗ" in PROFIT_WORD.findall(f.text.lower()) for f in facts) \
             and not any(v.kind in ("direction", "unsourced_number") for v in out.violations):
         bad("direction", f"câu nói lỗ nhưng các dòng câu ghi không có khoản lỗ nào: {text.strip()}")
+    # "lỗ từ công ty liên kết" mà dòng ghi "lãi từ công ty liên kết": ngược dấu của chính khoản đó
+    elif facts and not any(v.kind in ("direction", "unsourced_number") for v in out.violations) \
+            and (item := _flipped_item(text, facts)):
+        bad("direction", f"câu nói “{item}” nhưng dòng câu ghi là lãi: {text.strip()}")
     return out
 
 
@@ -218,17 +226,41 @@ def _profit_side(text: str, n: Num) -> str | None:
     return "loss" if word.group(1).lower() == "lỗ" else "profit"
 
 
+LOSS_EXIT = re.compile(r"\b(?:cắt|thoát|hết|khỏi|xóa|bù|tránh)\s+$")     # "cắt lỗ", "thoát lỗ": không nói có lỗ
+
+
 def _loss_claim(text: str) -> bool:
-    """Câu khẳng định có lỗ: chữ "lỗ" đứng riêng, không bị phủ định, không phải "cắt lỗ", "thoát lỗ", "bù lỗ"..."""
+    """Câu khẳng định chỉ tiêu bị lỗ: chữ "lỗ" đứng riêng ngay sau mã hoặc tên chỉ tiêu, không bị phủ định, không phải
+    "cắt lỗ", "thoát lỗ", "bù lỗ", không phải khoản lỗ khác ("lỗ tỷ giá", "lỗ lũy kế")."""
     low = text.lower()
     for m in PROFIT_WORD.finditer(low):
         if m.group(1) != "lỗ":
             continue
         before = low[:m.start()]
-        if NEGATED_VERB.search(before) or re.search(r"\b(?:cắt|thoát|hết|khỏi|xóa|bù|tránh)\s+$", before):
+        if NEGATED_VERB.search(before) or LOSS_EXIT.search(before):
+            continue
+        if not _LOSS_OWNER.search(text[:m.start()]) or _LOSS_OTHER.match(text, m.end()):
             continue
         return True
     return False
+
+
+def _flipped_item(text: str, facts: list[Fact]) -> str | None:
+    """Câu gọi "lỗ X" một khoản mà dòng câu ghi gọi "lãi X" (cùng hai từ theo sau, dòng không có "lỗ X"): trả về cụm
+    "lỗ X" của câu."""
+    low = text.lower()
+    rows = [re.sub(r"\s+", " ", f.text.lower()) for f in facts]
+    for m in PROFIT_WORD.finditer(low):
+        before = low[:m.start()]
+        if m.group(1) != "lỗ" or NEGATED_VERB.search(before) or LOSS_EXIT.search(before):
+            continue
+        words = re.findall(r"\w+", low[m.end():])[:2]
+        if not words:
+            continue
+        tail = r"\W+".join(map(re.escape, words)) + r"(?!\w)"
+        if any(re.search(r"(?<![/\w])lãi\W+" + tail, r) and not re.search(r"(?<![/\w])lỗ\W+" + tail, r) for r in rows):
+            return text[m.start():m.end()] + " " + " ".join(words)
+    return None
 
 
 def _fact_numbers(f: Fact) -> list[tuple[Num, bool]]:
@@ -248,6 +280,9 @@ def _direction_claim(text: str) -> bool:
     """Câu có nói chiều (tăng/giảm, cao/thấp hơn cùng kỳ, lãi/lỗ): là nhận định về số liệu, phải ghi dòng số."""
     for a, b in _clauses(text):
         low = text[a:b].lower().replace("tăng trưởng âm", "giảm")
+        # danh từ không nói chiều: "so sánh tăng trưởng lợi nhuận", "đánh giá lãi lỗ"
+        low = GROWTH_NOUN.sub(lambda m: " " * len(m.group(0)), low)
+        low = re.sub(r"lãi\s*(?:/|,|và|hay|hoặc)?\s*lỗ(?!\w)", lambda m: " " * len(m.group(0)), low)
         if bool(UP.search(low)) != bool(DOWN.search(low)):
             return True
         if LAST_YEAR.search(low) and COMP_AS_DIR.search(low):
@@ -323,8 +358,31 @@ def _clauses(text: str) -> list[tuple[int, int]]:
     return [(a, b) for a, b in spans if text[a:b].strip()]
 
 
-VOCAB = frozenset(n for kind in catalog.METRICS for key in list(catalog.METRICS[kind]) + list(catalog.RATIOS[kind])
-                  for n in catalog.names(kind, key))
+def _name_keys() -> dict[str, frozenset[str]]:
+    """Tên chỉ tiêu (viết thường) -> các mã chỉ tiêu có tên đó, gộp mọi loại công ty: "lnst của cổ đông công ty mẹ" và
+    "lnst của cổ đông ngân hàng mẹ" đều là npat_parent."""
+    out: dict[str, set[str]] = {}
+    for kind in catalog.METRICS:
+        for key in list(catalog.METRICS[kind]) + list(catalog.RATIOS[kind]):
+            for n in catalog.names(kind, key):
+                out.setdefault(n, set()).add(key)
+    return {n: frozenset(k) for n, k in out.items()}
+
+
+NAME_KEYS = _name_keys()
+VOCAB = frozenset(NAME_KEYS)
+# "lỗ" là kết quả của chính chỉ tiêu: ngay sau mã hoặc tên chỉ tiêu, có thể qua vài trợ từ ("TCB lỗ", "LNST lỗ",
+# "TCB có lỗ", "LNST của TCB vẫn lỗ")
+_LOSS_OWNER = re.compile(r"(?:(?<!\w)[A-Z]{3}\)?|(?i:" + "|".join(sorted(map(re.escape, VOCAB), key=len, reverse=True))
+                         + r"))\s+(?i:(?:vẫn|còn|bị|có|đã|lại|cũng|tiếp tục|chuyển sang|quay lại|báo|ghi nhận)\s+){0,3}$")
+# "lỗ tỷ giá", "lỗ lũy kế", "lỗ từ...", "lỗ của công ty con": khoản lỗ khác, không phải kết quả của chỉ tiêu
+_LOSS_OTHER = re.compile(r"(?i)\s+(?:tỷ giá|lũy kế|từ|của|chênh lệch|đầu tư|thanh lý|khác)(?!\w)")
+# "tăng trưởng" làm danh từ: sau "so sánh/về/mức/tốc độ/đà/sự..." hoặc ngay trước "của"/tên chỉ tiêu ("tăng trưởng lợi
+# nhuận"); "LNST tăng trưởng mạnh" vẫn là động từ chỉ chiều
+GROWTH_NOUN = re.compile(r"(?:(?<=so sánh )|(?<=về )|(?<=mức )|(?<=tốc độ )|(?<=đà )|(?<=sự )|(?<=xét )"
+                         r"|(?<=đánh giá )|(?<=phân tích )|(?<=triển vọng ))tăng trưởng(?!\w)"
+                         r"|tăng trưởng(?=\s+(?:của|" + "|".join(sorted(map(re.escape, VOCAB), key=len, reverse=True))
+                         + r")(?!\w))")
 
 
 def _mentioned(low: str, facts: list[Fact]) -> set[str]:
@@ -343,9 +401,11 @@ def _mentioned(low: str, facts: list[Fact]) -> set[str]:
 
 
 def _named_ids(facts: list[Fact], low: str) -> tuple[set[str], bool]:
-    """(mã các dòng có tên được nhắc theo khớp dài nhất, vế có nhắc tên chỉ tiêu nào không)."""
+    """(mã các dòng có tên được nhắc theo khớp dài nhất, vế có nhắc tên chỉ tiêu nào không). Dòng được nhắc khi tên
+    khớp thuộc đúng chỉ tiêu của dòng (tên của loại công ty khác cũng được) hoặc nằm trong tên của dòng."""
     names = _mentioned(low, facts)
-    return {f.id for f in facts if names & set(f.names)}, bool(names)
+    keys = {k for n in names for k in NAME_KEYS.get(n, ())}
+    return {f.id for f in facts if (f.metric and f.metric in keys) or names & set(f.names)}, bool(names)
 
 
 def _named(facts: list[Fact], low: str) -> list[Fact]:

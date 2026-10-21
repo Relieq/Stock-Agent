@@ -16,6 +16,8 @@ dependencies = [
     "pillow>=10",
     "anthropic>=0.70",
     "openpyxl>=3.1",
+    "langgraph>=1.2",
+    "langgraph-checkpoint-postgres>=3.2",
 ]
 
 [project.optional-dependencies]

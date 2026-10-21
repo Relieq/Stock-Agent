@@ -22,7 +22,11 @@ def plan(**kw):
 
 
 def check(p, latest=(2026, "Q3")):
-    return check_plan(p, KNOWN, exists=lambda t: t == "ABC", latest=lambda ts: latest)
+    return check_plan(p, KNOWN, exists=lambda t: t == "ABC", latest=lambda ts: latest, year_now=2026)
+
+
+def no_latest(ts):
+    raise AssertionError("không được tra kỳ gần nhất khi kỳ đã nêu")
 
 
 def test_schema_has_no_nullable_enum():
@@ -58,6 +62,18 @@ def test_kind_follows_number_of_tickers_and_latest_is_filled():
     assert check(plan(period="Q1", basis="ytd")).plan.basis == "quarter"
     assert check(plan(advice_request=True)).notes[-1].startswith("Soi chỉ cung cấp thông tin")
     assert check(plan(metrics=["npat_parent", "khong_co"])).plan.metrics == ["npat_parent"]
+
+
+def test_concrete_period_without_year_uses_current_year_not_latest():
+    c = check_plan(plan(period="Q3", year=0), KNOWN, exists=lambda t: False, latest=no_latest, year_now=2026)
+    assert (c.plan.year, c.plan.period) == (2026, "Q3") and "năm 2026" in c.notes[-1]
+    assert "kỳ gần nhất" not in " ".join(c.notes)
+
+
+def test_basis_follows_final_period_after_latest_fill():
+    c = check(plan(period="latest", year=0, basis="ytd"), latest=(2026, "Q1"))
+    assert c.plan.basis == "quarter" and c.plan.period == "Q1"
+    assert "quý 1/2026" in c.notes[-1]
 
 
 def test_labels():

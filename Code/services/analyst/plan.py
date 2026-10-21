@@ -99,9 +99,9 @@ TICKER_RE = re.compile(r"^[A-Z0-9]{3}$")
 
 
 def check_plan(plan: Plan, known: set[str], exists: Callable[[str], bool],
-               latest: Callable[[list[str]], tuple[int, str] | None]) -> Checked:
+               latest: Callable[[list[str]], tuple[int, str] | None], year_now: int | None = None) -> Checked:
     """`known`: mã đã có trong bảng công ty; `exists(mã)`: tìm trên Vietstock cho mã ngoài danh sách; `latest(mã)`: kỳ
-    quý gần nhất đã có BCTC kiểm chứng của mọi mã."""
+    quý gần nhất đã có BCTC kiểm chứng của mọi mã; `year_now`: năm dùng khi kỳ có nêu mà thiếu năm."""
     notes: list[str] = []
     tickers: list[str] = []
     for t in plan.tickers:
@@ -121,16 +121,21 @@ def check_plan(plan: Plan, known: set[str], exists: Callable[[str], bool],
         kind = "compare"
         notes.append("Có nhiều mã nên báo cáo so các mã với nhau, kèm thay đổi so với cùng kỳ.")
     year, period, basis = plan.year, plan.period, plan.basis
-    if period in ("H1", "FY"):
-        basis = "ytd"
-    if period == "Q1":
-        basis = "quarter"
-    if period == "latest" or not year:
+    filled_latest = period == "latest"
+    if filled_latest:
         found = latest(tickers)
         if found is None:
             return Checked(None, "Chưa có BCTC nào của các mã này trong kho. Bạn ghi rõ kỳ (ví dụ quý 2/2026) để hệ "
                                  "thống đi lấy.")
         year, period = found
+    elif not year:
+        year = year_now if year_now is not None else date.today().year
+        notes.append(f"Bạn không nói năm: dùng năm {year}.")
+    if period in ("H1", "FY"):
+        basis = "ytd"
+    if period == "Q1":
+        basis = "quarter"
+    if filled_latest:
         notes.append(f"Bạn không nói kỳ: dùng kỳ gần nhất đã có số của mọi mã ({label(year, period, basis)}).")
     if plan.advice_request:
         notes.append("Soi chỉ cung cấp thông tin từ BCTC, không đưa khuyến nghị mua bán.")

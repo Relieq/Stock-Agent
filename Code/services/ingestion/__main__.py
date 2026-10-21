@@ -30,6 +30,8 @@ def _tickers(conn, arg: str | None) -> list[str]:
 def cmd_migrate(args) -> None:
     with connect() as conn:
         done = migrate(conn)
+    from services.analyst.report import setup_checkpoints
+    setup_checkpoints()          # bảng lưu trạng thái đồ thị của agent báo cáo (LangGraph), tạo nếu chưa có
     print("Đã áp dụng: " + ", ".join(done) if done else "CSDL đã ở phiên bản mới nhất.")
 
 

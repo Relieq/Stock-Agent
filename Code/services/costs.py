@@ -120,9 +120,29 @@ def requested_documents(conn) -> set[int]:
               AND created_at >= {MONTH_START}""")}
 
 
+def add_reports(rep: Report, conn) -> None:
+    """Cộng chi phí của agent báo cáo (bảng reports, theo bước) vào bảng chi phí: tổng, tháng, ngày, bước."""
+    rows = conn.execute("SELECT created_at, usage FROM reports WHERE usage IS NOT NULL").fetchall()
+    for created, usage in rows:
+        day = created.astimezone(VN).strftime("%Y-%m-%d")
+        for step, u in (usage or {}).items():
+            targets = [rep.total, rep.by_month.setdefault(day[:7], Tally()), rep.by_day.setdefault(day, Tally()),
+                       rep.by_step.setdefault(step, Tally())]
+            if day.startswith(rep.month):
+                targets.append(rep.by_step_month.setdefault(step, Tally()))
+            for t in targets:
+                t.add(None, u.get("calls", 0), u.get("input_tokens", 0), u.get("output_tokens", 0), u.get("usd", 0.0))
+
+
+def report_spend(conn) -> float:
+    """Chi phí agent báo cáo trong tháng (tính vào trần tháng cùng phần đọc theo yêu cầu)."""
+    rows = conn.execute(f"SELECT usage FROM reports WHERE usage IS NOT NULL AND created_at >= {MONTH_START}").fetchall()
+    return sum(u.get("usd", 0.0) for (usage,) in rows for u in (usage or {}).values())
+
+
 def requested_spend(conn, rep: Report | None = None) -> float:
-    """Chi phí tính vào trần tháng: chỉ các BCTC đọc theo yêu cầu người dùng. Đọc theo lịch cho các mã đang theo dõi
-    (VN30...) không tính, vì người vận hành báo trước và duyệt chi phí từng đợt."""
+    """Chi phí tính vào trần tháng: các BCTC đọc theo yêu cầu người dùng và agent báo cáo. Đọc theo lịch cho các mã đang
+    theo dõi (VN30...) không tính, vì người vận hành báo trước và duyệt chi phí từng đợt."""
     rep = rep or report()
     docs = requested_documents(conn)
-    return sum(d.tally.usd for d in rep.docs if d.document_id in docs)
+    return sum(d.tally.usd for d in rep.docs if d.document_id in docs) + report_spend(conn)

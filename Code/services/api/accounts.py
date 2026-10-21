@@ -172,7 +172,7 @@ def admin_costs(request: Request, tb: str | None = None):
     """Chi phí gọi mô hình: tháng này so với trần, theo ngày, theo bước, theo tài liệu, theo người yêu cầu; nhà cung
     cấp mô hình đang dùng và các lần tự chuyển sang nhà dự phòng."""
     require_admin(request)
-    from services.costs import recent_switches, report
+    from services.costs import add_reports, recent_switches, report
     from services.llm import configured, provider_order, step_providers
     try:
         providers, order = configured(), provider_order()
@@ -183,6 +183,7 @@ def admin_costs(request: Request, tb: str | None = None):
     rep = report()
     doc_cost = {d.document_id: d.tally.usd for d in rep.docs}
     with connect() as conn:
+        add_reports(rep, conn)
         rows = conn.execute(
             """SELECT u.email, count(*) AS requests,
                       count(*) FILTER (WHERE r.note IS DISTINCT FROM 'có sẵn trong kho') AS new_reads,

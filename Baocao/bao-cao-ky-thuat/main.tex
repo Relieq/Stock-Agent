@@ -1276,7 +1276,9 @@ chỗ, kể cả khi dịch vụ khởi động lại.
   \node[dnode, below=6mm of c] (d2) {};
   \node[act=60mm, below=10mm of d2] (e) {Tính bảng số và biểu đồ từ số đã kiểm chứng (code)};
   \node[act=60mm, below=of e] (f) {Viết lời, mỗi câu ghi các dòng số đã dùng (mô hình)};
-  \node[act=60mm, below=of f] (g) {Kiểm từng câu với bảng số (code)};
+  \node[dnode, below=6mm of f] (d5) {};
+  \node[act=60mm, below=10mm of d5] (g) {Kiểm từng câu với bảng số (code)};
+  \node[act=30mm] (more) at ($(d5)+(-5.2,0)$) {Lấy thêm số mô hình xin, nối vào bảng số (code)};
   \node[dnode, below=6mm of g] (d3) {};
   \node[act=60mm, below=10mm of d3] (h) {Bỏ câu còn sai; dựng trang web và PDF};
   \node[stop, below=of h] (x1) {};
@@ -1295,9 +1297,10 @@ chỗ, kể cả khi dịch vụ khởi động lại.
   \draw[flow] (d4) -- node[right,guard]{[đồng ý]} (w);
   \draw[flow] (w.east) -- ++(0.5,0) |- (c.east);
   \draw[flow] (d4.west) -- node[above,guard]{[không]} ($(d4.west -| e.east)+(0.5,0)$) |- (e.east);
-  \draw[flow] (e)--(f); \draw[flow] (f)--(g); \draw[flow] (g)--(d3);
-  \draw[flow] ($(f.west)+(0,-0.15)$) -- ++(-0.6,0) |- node[pos=0.25,left,guard,align=center]{[xin thêm số,\\tối đa 3 lần]}
-    ($(f.west)+(0,0.15)$);
+  \draw[flow] (e)--(f); \draw[flow] (f)--(d5); \draw[flow] (g)--(d3);
+  \draw[flow] (d5) -- node[right,guard]{[viết xong]} (g);
+  \draw[flow] (d5) -- node[above,guard,align=center]{[xin thêm số,\\tối đa 3 lần]} (more);
+  \draw[flow] (more) |- (f.west);
   \draw[flow] (d3.east) -- ++(3.6,0) |- node[pos=0.25,right,guard,align=left]{[còn câu sai,\\chưa quá 2 lần]} (f.east);
   \draw[flow] (d3) -- node[right,guard]{[đạt, hoặc đã viết lại 2 lần]} (h);
   \draw[flow] (h)--(x1);

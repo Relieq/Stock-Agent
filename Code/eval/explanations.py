@@ -13,44 +13,9 @@ import json
 import sys
 from collections import Counter
 
-from services.analyst.explanations import PROMPT, SCHEMA, check_section
+from services.analyst.explanations import check_section, facts_for, read_letter
 from services.db import connect
-from services.extraction.pipeline import LOCATE_LONG_SIDE, _load_record
-from services.extraction.sources import candidates, open_pdf, render_page
 from services.ingestion.registry import raw_data_dir
-from services.metrics.card import Facts
-
-MAX_PAGES = 6
-PAGE_LONG_SIDE = 1600       # công văn chữ to hơn bảng số: ảnh vừa phải là đọc được
-
-
-def facts_for(conn, ticker: str, year: int, period: str, scope: str, period_kind: str):
-    """BCTC đã kiểm chứng ứng với một phần của công văn: quý/lũy kế -> BCTC quý cùng kỳ; bán niên -> BCTC bán niên (phần
-    nói về quý 2 thì BCTC quý 2); năm -> BCTC năm. Phần riêng (công ty mẹ): chưa có."""
-    if scope == "separate":
-        return None
-    if period == "H1" and period_kind == "quarter":
-        doc_type, per = "fs_quarter", "Q2"
-    elif period == "H1":
-        doc_type, per = "fs_semiannual", "H1"
-    elif period == "FY":
-        doc_type, per = "fs_annual", "FY"
-    else:
-        doc_type, per = "fs_quarter", period
-    row = conn.execute(
-        """SELECT id FROM documents WHERE ticker = %s AND fiscal_year = %s AND fiscal_period = %s AND doc_type = %s
-             AND content_kind = 'full' AND scope IN ('consolidated', 'standalone') AND status IN ('verified', 'approved')
-             AND owner_user_id IS NULL AND duplicate_of IS NULL AND NOT is_amended
-           ORDER BY (scope = 'consolidated') DESC LIMIT 1""", (ticker, year, per, doc_type)).fetchone()
-    if row is None:
-        return None
-    return Facts(row[0], _load_record(conn, row[0]))
-
-
-def read_letter(client, path) -> dict:
-    doc = open_pdf(candidates(path)[0])
-    images = [(f"Trang {p}", render_page(doc, p, PAGE_LONG_SIDE)) for p in range(1, min(doc.page_count, MAX_PAGES) + 1)]
-    return client.json_from_images(PROMPT, images, SCHEMA, "explanation_read")
 
 
 def main() -> None:

@@ -113,7 +113,7 @@ Các công cụ là hàm Python bọc code đã có. Số trả về luôn kèm 
 
 | Công cụ | Làm gì | Ai dùng |
 |---|---|---|
-| `availability` | (mã, kỳ) đã có BCTC kiểm chứng chưa. Kỳ năm trước lấy từ cột cùng kỳ của BCTC năm nay khi không có BCTC riêng. Chỉ dùng BCTC công khai, không dùng file người dùng tải lên riêng | bước 2 |
+| `availability` | (mã, kỳ) đã có BCTC kiểm chứng chưa. BCTC bán niên/năm chưa có thì dùng lũy kế ở BCTC quý 2/quý 4; kỳ chưa có BCTC thì đề nghị đọc thêm (để có cả số cùng kỳ), không lấy cột cùng kỳ của năm sau thay vào. Chỉ dùng BCTC công khai, không dùng file người dùng tải lên riêng | bước 2 |
 | `request_reading` | đưa (mã, kỳ) vào hàng chờ đọc (`services/ondemand.py`) | sau khi người dùng xác nhận |
 | `metric_values` | giá trị chỉ tiêu theo mã, kỳ, cách tính, kỳ này và cùng kỳ (`Facts` của thẻ) | bước 3; mô hình xin thêm ở bước 4 |
 | `peer_group` | danh sách mã cùng nhóm | bước 3 |
@@ -260,7 +260,8 @@ Không gọi mô hình:
 |---|---|
 | `services/analyst/catalog.py` | danh mục chỉ tiêu và tỷ lệ theo loại công ty |
 | `services/analyst/plan.py` | khuôn kế hoạch, lời dặn, hiểu yêu cầu, kiểm kế hoạch |
-| `services/analyst/facts.py` | kiểm kho, bảng số (dòng `S…`, so sánh tính sẵn, nguồn) |
+| `services/analyst/facts.py` | bảng số (dòng `S…`, so sánh tính sẵn) và số cho biểu đồ, không đụng CSDL |
+| `services/analyst/store.py` | đọc CSDL: tìm BCTC, kỳ gần nhất, phần thiếu, nạp số một mã và cả nhóm |
 | `services/analyst/tools.py` | các công cụ mục 5 |
 | `services/analyst/writer.py` | khuôn bài viết, lời dặn, vòng xin thêm |
 | `services/analyst/guard.py` | bộ kiểm tra số (thuần, không phụ thuộc CSDL) |

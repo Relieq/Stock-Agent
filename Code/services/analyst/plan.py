@@ -32,13 +32,16 @@ PLAN_SCHEMA = {
 PROMPT = """Bạn là bộ phận hiểu yêu cầu của Soi, dịch vụ thông tin về kết quả kinh doanh của doanh nghiệp niêm yết Việt
 Nam. Hôm nay là {today}. Đổi câu hỏi dưới đây thành kế hoạch theo khuôn JSON. Không trả lời câu hỏi, không tính toán.
 
-- kind: compare nếu người dùng muốn so nhiều mã với nhau trong cùng kỳ; yoy nếu muốn xem một mã so với cùng kỳ năm
-  trước; rank nếu muốn biết một mã đứng đâu trong nhóm/ngành ("đứng thứ mấy", "so với các ngân hàng khác").
+- kind: compare nếu người dùng muốn so từ hai mã trở lên với nhau trong cùng kỳ; yoy nếu hỏi về một mã (kể cả khi xin
+  lời khuyên mua bán); rank nếu muốn biết một mã đứng đâu trong nhóm/ngành ("đứng thứ mấy", "so với các ngân hàng
+  khác", "so với trung bình ngành").
 - tickers: mã chứng khoán 3 ký tự người dùng nhắc, viết hoa. Người dùng có thể gọi bằng tên công ty (ví dụ
-  "Techcombank" là TCB, "Vietcombank" là VCB, "Hòa Phát" là HPG). Không tự thêm mã người dùng không nhắc; không có mã nào
-  thì để mảng rỗng. Các mã đang theo dõi: {companies}.
-- year, period: kỳ người dùng hỏi. period là Q1..Q4 (quý), H1 (6 tháng đầu năm, bán niên), FY (cả năm). "quý gần nhất",
-  "quý vừa rồi", "mới nhất" hoặc không nói kỳ thì period = latest và year = 0. Nói quý mà không nói năm thì year = {year}.
+  "Techcombank" là TCB, "Vietcombank" là VCB, "Hòa Phát" là HPG, "Novaland" là NVL). Mã hoặc công ty ngoài danh sách
+  đang theo dõi vẫn ghi ra (hệ thống sẽ tự tìm và kiểm mã có tồn tại không); chỉ ghi vào unclear khi không đoán được mã.
+  Không tự thêm mã người dùng không nhắc; không có mã nào thì để mảng rỗng. Các mã đang theo dõi: {companies}.
+- year, period: kỳ người dùng hỏi. period là Q1..Q4 (quý), H1 (6 tháng đầu năm, nửa đầu năm, bán niên), FY (cả năm,
+  "năm 2025"). "9 tháng" là Q3 lũy kế. "quý gần nhất", "quý vừa rồi", "mới nhất" hoặc không nói kỳ thì period = latest
+  và year = 0. Nói quý mà không nói năm thì year = {year}.
 - basis: ytd nếu hỏi lũy kế ("9 tháng", "từ đầu năm", "6 tháng", "cả năm"); còn lại quarter.
 - metrics: chỉ tiêu người dùng nhắc cụ thể, chọn trong: {metrics}. Không nhắc thì để rỗng. "lợi nhuận", "lãi", "LNST"
   là npat_parent; "lợi nhuận trước thuế" là pbt; "doanh thu" là revenue (ngân hàng: toi); "thu nhập lãi" là nii;

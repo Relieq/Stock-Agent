@@ -177,3 +177,18 @@ def test_account_problems_stop_instead_of_retry_or_cache():
     assert agent_eval.with_retries(boom(other400), sleep=lambda s: None)[1][0] == "deterministic"
     calls.clear()
     assert agent_eval.with_retries(boom(rate), sleep=lambda s: None)[1][0] == "transient_exhausted" and len(calls) == 3
+
+
+def test_outcome_follows_what_the_system_does():
+    real = {"TCB", "VCB", "FPT", "PLX"}
+    exp = {"kind": "yoy", "tickers": ["TCB"], "year": 2026, "period": "Q3", "basis": "quarter", "advice_request": True}
+    # mô hình ghi "compare" cho một mã: code đổi thành so với cùng kỳ, kết quả như nhau
+    assert agent_eval.outcome(dict(exp, kind="compare"), real) == agent_eval.outcome(exp, real)
+    # cả năm luôn lũy kế
+    fy = dict(exp, period="FY", basis="quarter")
+    assert agent_eval.outcome(fy, real)["basis"] == "ytd"
+    # không có mã và mã không tồn tại đều dẫn tới hỏi lại
+    assert agent_eval.outcome(dict(exp, tickers=[]), real) == agent_eval.outcome(dict(exp, tickers=["XYZ"]), real)
+    # bỏ sót một mã thì khác
+    two = dict(exp, kind="compare", tickers=["TCB", "PLX"])
+    assert agent_eval.outcome(dict(two, tickers=["TCB"]), real) != agent_eval.outcome(two, real)

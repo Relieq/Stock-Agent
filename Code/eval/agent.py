@@ -48,6 +48,25 @@ def score_plan(got: dict, expect: dict) -> dict[str, bool]:
     return out
 
 
+def real_tickers(golden: list[dict], tracked: set[str]) -> set[str]:
+    """Mã có thật: mã đang theo dõi và mã trong đáp án của bộ câu (trừ câu "mã không tồn tại")."""
+    return tracked | {t for g in golden if "mã không tồn tại" not in g["tags"] for t in g["expect"]["tickers"]}
+
+
+def outcome(plan: dict, real: set[str]) -> dict:
+    """Việc hệ thống thực sự làm sau khi code kiểm kế hoạch (plan.check_plan): không có mã hoặc có mã không tồn tại thì
+    hỏi lại; một mã thì không thể "so nhiều mã"; bán niên/cả năm luôn lũy kế, quý 1 luôn riêng quý."""
+    tickers = sorted({t.strip().upper() for t in plan.get("tickers", []) if t.strip()})
+    if not tickers or any(t not in real for t in tickers):
+        return {"ask": True}
+    kind = plan["kind"]
+    if kind in ("compare", "yoy"):
+        kind = "compare" if len(tickers) > 1 else "yoy"
+    basis = "ytd" if plan["period"] in ("H1", "FY") else "quarter" if plan["period"] == "Q1" else plan["basis"]
+    return {"ask": False, "kind": kind, "tickers": tickers, "year": plan["year"], "period": plan["period"],
+            "basis": basis, "advice_request": plan["advice_request"]}
+
+
 def mutations(text: str, foreign: str = "HPG") -> list[tuple[str, str]]:
     """Các cách làm sai một câu đã đạt: đổi số (lệch 10%), đảo tăng/giảm, đảo so sánh, đảo cao nhất/thấp nhất, đảo lãi/lỗ,
     đổi thứ hạng (thứ N thành N+1), chèn câu khuyến nghị, chèn mã lạ (`foreign`). Chỉ giữ cách làm câu đổi thật; "tăng
@@ -137,6 +156,7 @@ def cmd_plan(args) -> None:
         companies = conn.execute("SELECT ticker, name FROM companies WHERE tracked ORDER BY ticker").fetchall()
     tally, usd = Counter(), 0.0
     rows = load_golden(args.limit)
+    real = real_tickers(load_golden(), {t for t, _ in companies})
     for g in rows:
         cache = out_dir(args.provider, create=True) / f"{g['id']}_plan.json"
         got = json.loads(cache.read_text(encoding="utf-8")) if cache.exists() else None
@@ -157,10 +177,14 @@ def cmd_plan(args) -> None:
         tally["all"] += all(s.values())
         for f, ok in s.items():
             tally[f] += ok
-        if not all(s.values()):
-            print(f"  [{g['id']}] {g['q']}: sai {[f for f, ok in s.items() if not ok]} -> {got}")
+        same = outcome(got, real) == outcome(g["expect"], real)
+        tally["outcome"] += same
+        if not same:
+            print(f"  [{g['id']}] {g['q']}: hệ thống làm khác đáp án (trường lệch {[f for f, ok in s.items() if not ok]})"
+                  f" -> {got}")
     n = len(rows)
-    print(f"{args.provider}: kế hoạch đúng hoàn toàn {tally['all']}/{n}; " +
+    print(f"{args.provider}: hệ thống làm đúng yêu cầu {tally['outcome']}/{n} câu (sau khi code kiểm kế hoạch); "
+          f"kế hoạch thô của mô hình đúng hoàn toàn {tally['all']}/{n}; " +
           ", ".join(f"{f} {tally[f]}/{n}" for f in FIELDS) + f"; chi phí {usd:.4f} USD")
 
 

@@ -30,6 +30,27 @@ def test_mutations_skip_unchanged_and_growth_word():
     assert "tốt hơn VIB." in dict(agent_eval.mutations(text, foreign="VIB"))["foreign_ticker"]
 
 
+def test_mutations_flip_profit_loss_and_rank():
+    muts = dict(agent_eval.mutations("VCB lỗ 30,0 tỷ, còn TCB xếp thứ 2/3 trong nhóm."))
+    assert muts["profit_loss"] == "VCB lãi 30,0 tỷ, còn TCB xếp thứ 2/3 trong nhóm."
+    assert muts["rank"] == "VCB lỗ 30,0 tỷ, còn TCB xếp thứ 3/3 trong nhóm."
+    assert dict(agent_eval.mutations("TCB lãi 50 tỷ."))["profit_loss"] == "TCB lỗ 50 tỷ."
+    assert dict(agent_eval.mutations("TCB đứng thứ 4 trong 4 ngân hàng."))["rank"] == "TCB đứng thứ 5 trong 4 ngân hàng."
+    # "lãi/lỗ" (tên khoản mục), "thu nhập lãi", "lãi suất" không đảo; "quý thứ 3" không phải thứ hạng
+    muts = dict(agent_eval.mutations("Thu nhập lãi thuần và lãi/lỗ tỷ giá của TCB tăng, lãi suất quý thứ 3 ổn định."))
+    assert "profit_loss" not in muts and "rank" not in muts
+
+
+def test_golden_has_light_typos_with_plans():
+    rows = {g["id"]: g for g in agent_eval.load_golden()}
+    typos = [g for g in rows.values() if "sai chính tả nhẹ" in g["tags"]]
+    assert {51, 52, 53} <= {g["id"] for g in typos}
+    assert rows[51]["expect"]["kind"] == "compare" and sorted(rows[51]["expect"]["tickers"]) == ["TCB", "VCB"]
+    assert rows[52]["expect"] == {"kind": "yoy", "tickers": ["FPT"], "year": 2026, "period": "Q2", "basis": "quarter",
+                                  "advice_request": False}
+    assert rows[53]["expect"]["kind"] == "rank" and rows[53]["expect"]["tickers"] == ["TCB"]
+
+
 def _write_cache(provider="anthropic", usd=0.01, expl=0.002, missing=None, base=("a", "b"), status="done", fmt=2):
     d = {"status": status, "plan": {"tickers": ["TCB", "VCB"], "year": 2026}, "_usd": usd, "_seconds": 10.0,
          "guard_log": {"attempts": [{"sentences": 4, "violations": [

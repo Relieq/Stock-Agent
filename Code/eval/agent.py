@@ -49,10 +49,10 @@ def score_plan(got: dict, expect: dict) -> dict[str, bool]:
 
 
 def mutations(text: str, foreign: str = "HPG") -> list[tuple[str, str]]:
-    """Các cách làm sai một câu đã đạt: đổi số (lệch 10%), đảo tăng/giảm, đảo so sánh, đảo cao nhất/thấp nhất, chèn câu
-    khuyến nghị, chèn mã lạ (`foreign`). Chỉ giữ cách làm câu đổi thật; "tăng trưởng" không đảo (thành "giảm trưởng" không
-    còn là câu tiếng Việt)."""
-    from services.analyst.guard import numbers
+    """Các cách làm sai một câu đã đạt: đổi số (lệch 10%), đảo tăng/giảm, đảo so sánh, đảo cao nhất/thấp nhất, đảo lãi/lỗ,
+    đổi thứ hạng (thứ N thành N+1), chèn câu khuyến nghị, chèn mã lạ (`foreign`). Chỉ giữ cách làm câu đổi thật; "tăng
+    trưởng" không đảo (thành "giảm trưởng" không còn là câu tiếng Việt)."""
+    from services.analyst.guard import numbers, ranks
     out = []
     ns = [n for n in numbers(text) if n.kind != "plain"]
     if ns:
@@ -71,6 +71,16 @@ def mutations(text: str, foreign: str = "HPG") -> list[tuple[str, str]]:
             if re.search(pat, text):
                 out.append((kind, re.sub(pat, b, text, count=1)))
                 break
+    # đảo lãi/lỗ: chữ đứng riêng, không phải "lãi/lỗ" (tên khoản mục), "thu nhập/chi phí lãi", "lãi suất/vay"
+    m = re.search(r"(?i)(?<![/\w])(?<!thu nhập )(?<!chi phí )(lãi|lỗ)(?![/\w])(?!\s+(?:suất|vay)\b)", text)
+    if m:
+        w = "lỗ" if m.group(1).lower() == "lãi" else "lãi"
+        out.append(("profit_loss", text[:m.start()] + (w.capitalize() if m.group(1)[0].isupper() else w)
+                    + text[m.end():]))
+    rs = ranks(text)
+    if rs:          # đổi thứ hạng: thứ N thành N+1
+        r = rs[0]
+        out.append(("rank", text[:r.start("n")] + str(int(r.group("n")) + 1) + text[r.end("n"):]))
     out.append(("advice", text.rstrip(".") + "; nhà đầu tư nên mua cổ phiếu này."))
     out.append(("foreign_ticker", text.rstrip(".") + f", tốt hơn {foreign}."))
     return [(k, t) for k, t in out if t != text]

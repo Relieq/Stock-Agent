@@ -190,6 +190,12 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
             bad("foreign_ticker", t)
     _check_directions(text, facts, out, bad, sheet)
     _check_ranks(text, facts, bad, sheet)
+    # nói "lỗ" mà các dòng câu ghi không có khoản lỗ nào (số âm hoặc chữ "lỗ"); câu đã bị bắt sai chiều hoặc sai dấu
+    # (số tiền sau "lỗ" đã kiểm ở trên) thì không báo thêm
+    if facts and _loss_claim(text) and not any(loss for _, _, loss in allowed_nums) \
+            and not any("lỗ" in PROFIT_WORD.findall(f.text.lower()) for f in facts) \
+            and not any(v.kind in ("direction", "unsourced_number") for v in out.violations):
+        bad("direction", f"câu nói lỗ nhưng các dòng câu ghi không có khoản lỗ nào: {text.strip()}")
     return out
 
 
@@ -210,6 +216,19 @@ def _profit_side(text: str, n: Num) -> str | None:
     if re.search(r"[,;:.](?!\d)", between) or len(between.split()) > 3:
         return None
     return "loss" if word.group(1).lower() == "lỗ" else "profit"
+
+
+def _loss_claim(text: str) -> bool:
+    """Câu khẳng định có lỗ: chữ "lỗ" đứng riêng, không bị phủ định, không phải "cắt lỗ", "thoát lỗ", "bù lỗ"..."""
+    low = text.lower()
+    for m in PROFIT_WORD.finditer(low):
+        if m.group(1) != "lỗ":
+            continue
+        before = low[:m.start()]
+        if NEGATED_VERB.search(before) or re.search(r"\b(?:cắt|thoát|hết|khỏi|xóa|bù|tránh)\s+$", before):
+            continue
+        return True
+    return False
 
 
 def _fact_numbers(f: Fact) -> list[tuple[Num, bool]]:

@@ -392,6 +392,17 @@ def test_profit_and_loss_amounts_keep_their_sign():
     assert kinds("TCB thoát lỗ, LNST đạt 50,0 tỷ.", ["S1"], s, allowed) == []
 
 
+def test_loss_claim_needs_a_loss_in_the_cited_rows():
+    s, allowed = profit_loss_sheet(), ("TCB", "VCB", "ABC")
+    # TCB lãi cả hai kỳ: nói "lỗ" (không kèm số) là ngược với số liệu
+    assert kinds("TCB lỗ nhiều hơn cùng kỳ.", ["S1"], s, allowed) == ["direction"]
+    assert kinds("Thẻ KQKD ghi TCB có lỗ nhưng dòng tiền âm.", ["S1"], s, allowed) == ["direction"]
+    assert kinds("VCB chuyển sang lỗ.", ["S2"], s, allowed) == []           # dòng có khoản lỗ
+    assert kinds("TCB không lỗ.", ["S1"], s, allowed) == []                  # phủ định
+    assert kinds("TCB đã thoát lỗ.", ["S1"], s, allowed) == []
+    assert kinds("Lãi/lỗ tỷ giá của TCB tăng.", ["S1"], s, allowed) == []
+
+
 def rank4_sheet():
     s = FactSheet()
     s.add("rank", "LNST, thay đổi so với cùng kỳ, quý 3/2026, các ngân hàng (4 mã có số): TCB xếp thứ 3 trong 4; "

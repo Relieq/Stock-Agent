@@ -1,6 +1,6 @@
 from decimal import Decimal as D
 
-from services.analyst.guard import check_draft, check_sentence, matches, numbers
+from services.analyst.guard import _clauses, check_draft, check_sentence, matches, numbers
 from services.analyst.sheet import FactSheet
 
 KNOWN = {"TCB", "VCB", "VPB", "FPT", "MWG", "HPG"}
@@ -121,8 +121,8 @@ def compare_sheet():
     return s
 
 
-def kinds(text, uses, s=None):
-    return [v.kind for v in check_sentence(text, uses, s or compare_sheet(), {"TCB", "VCB"}, KNOWN).violations]
+def kinds(text, uses, s=None, allowed=("TCB", "VCB")):
+    return [v.kind for v in check_sentence(text, uses, s or compare_sheet(), set(allowed), KNOWN).violations]
 
 
 def test_direction_words_must_match_the_numbers():
@@ -158,4 +158,93 @@ def test_loss_wording_and_unresolved_clauses():
           metric="npat_parent", direction="up", names=["lnst"])
     assert [v.kind for v in check_sentence("ABC lỗ giảm còn 50 tỷ.", ["S1"], s, {"ABC"}, {"ABC"}).violations] == []
     r = check_sentence("Mọi thứ đều tăng.", ["S1"], s, {"ABC"}, {"ABC"})
-    assert r.violations == []            # câu không nói chỉ tiêu nào, không có số: chỉ cảnh báo
+    assert r.violations == []            # câu không nói chỉ tiêu hay mã nào: không đoán chiều, chỉ cảnh báo
+    assert r.warnings and r.warnings[0].startswith("không rõ chiều")
+
+
+# --- Vòng sửa 1: các câu đúng từng bị bắt nhầm, các câu sai từng bị bỏ lọt ---
+
+def growth_sheet():
+    s = FactSheet()
+    s.add("rank", "Thay đổi so với cùng kỳ, quý 3/2026: AAA +10%, BBB −5%, CCC −20%; thứ tự: AAA, BBB, CCC",
+          measure="growth", order=["AAA", "BBB", "CCC"], names=["lnst"])
+    return s
+
+
+def loss_sheet():
+    s = FactSheet()
+    s.add("metric", "LNST, ABC, quý 3/2026: 50 tỷ; cùng kỳ −100 tỷ; chuyển từ lỗ sang lãi", ticker="ABC",
+          direction="up", names=["lnst"])
+    s.add("metric", "LNST, XYZ, quý 3/2026: −80 tỷ; cùng kỳ 20 tỷ", ticker="XYZ", direction="down", names=["lnst"])
+    s.add("metric", "Lãi/lỗ tỷ giá, ABC, quý 3/2026: 30 tỷ; cùng kỳ 10 tỷ", ticker="ABC", direction="up",
+          names=["lãi/lỗ tỷ giá"])
+    return s
+
+
+def test_scale_and_growth_are_read_per_clause():
+    assert kinds("Về quy mô, VCB cao hơn TCB, nhưng TCB tăng nhanh hơn.", ["S3", "S4"]) == []
+    assert kinds("Về quy mô, VCB cao hơn TCB; LNST của TCB tăng 23,7%.", ["S1", "S4"]) == []
+    assert kinds("Điểm nhấn là VCB lớn hơn TCB về LNST.", ["S4"]) == []         # "Điểm nhấn" không phải "điểm %"
+    assert kinds("Điểm nhấn là TCB lớn hơn VCB về LNST.", ["S4"]) == ["comparison"]
+
+
+def test_decimal_comma_does_not_split_clauses():
+    assert len(_clauses("LNST của TCB tăng 23,7%")) == 1
+    assert len(_clauses("TCB tăng 23,7%, còn VCB tăng 15,6%")) == 2
+
+
+def test_single_ticker_clause_keeps_the_right_side():
+    assert kinds("VCB tăng 15,6%, còn TCB tăng nhanh hơn.", ["S3"]) == []
+    assert kinds("VCB tăng 15,6%, còn TCB tăng chậm hơn.", ["S3"]) == ["comparison"]
+    assert kinds("So với VCB, TCB tăng nhanh hơn.", ["S3"]) == []
+    assert kinds("So với VCB, TCB tăng chậm hơn.", ["S3"]) == ["comparison"]
+    assert kinds("LNST của TCB tăng 23,7%, nhanh hơn VCB.", ["S1", "S3"]) == []          # VCB sau từ so sánh: vế sau
+    assert kinds("LNST của TCB tăng 23,7%, chậm hơn VCB.", ["S1", "S3"]) == ["comparison"]
+
+
+def test_comparison_without_two_sides_is_a_warning_not_a_guess():
+    r = check_sentence("Tăng nhanh hơn.", ["S3"], compare_sheet(), {"TCB", "VCB"}, KNOWN)
+    assert r.violations == [] and any("so sánh" in w for w in r.warnings)
+
+
+def test_decline_words_flip_the_comparison():
+    g = growth_sheet()
+    allowed = ("AAA", "BBB", "CCC")
+    assert kinds("CCC giảm mạnh nhất nhóm.", ["S1"], g, allowed) == []
+    assert kinds("AAA giảm mạnh nhất nhóm.", ["S1"], g, allowed) == ["comparison"]
+    assert kinds("CCC giảm nhanh hơn BBB.", ["S1"], g, allowed) == []
+    assert kinds("BBB giảm nhanh hơn CCC.", ["S1"], g, allowed) == ["comparison"]
+    assert kinds("BBB giảm ít hơn CCC.", ["S1"], g, allowed) == []
+    assert kinds("CCC giảm ít hơn BBB.", ["S1"], g, allowed) == ["comparison"]
+    # "giảm ít nhất" chưa rõ nghĩa trong bảng xếp theo tăng trưởng: chỉ cảnh báo
+    r = check_sentence("AAA giảm ít nhất nhóm.", ["S1"], g, set(allowed), KNOWN)
+    assert r.violations == [] and r.warnings
+
+
+def test_loss_inversion_only_for_loss_right_before_the_verb():
+    s, allowed = loss_sheet(), ("ABC", "XYZ")
+    assert kinds("LNST của XYZ giảm do khoản lỗ mở rộng.", ["S2"], s, allowed) == []
+    assert kinds("LNST của ABC tăng so với khoản lỗ 100 tỷ cùng kỳ.", ["S1"], s, allowed) == []
+    assert kinds("Lãi/lỗ tỷ giá tăng.", ["S3"], s, allowed) == []
+    assert kinds("ABC lỗ giảm còn 50 tỷ.", ["S1"], s, allowed) == []
+    assert kinds("ABC lỗ tăng.", ["S1"], s, allowed) == ["direction"]
+
+
+def test_negation_and_compound_words_are_not_direction():
+    assert kinds("Chi phí dự phòng của TCB không tăng.", ["S2"]) == []
+    assert kinds("Chi phí dự phòng của TCB giảm 38,8%, nhờ công ty tăng cường quản trị rủi ro.", ["S2"]) == []
+    r = check_sentence("Chi phí dự phòng của TCB không tăng.", ["S2"], sheet(), {"TCB"}, KNOWN)
+    assert r.warnings
+    assert kinds("LNST của TCB tăng vốn điều lệ, giảm giá cổ phiếu.", ["S1"]) == []
+
+
+def test_connectors_split_clauses_and_mixed_words_warn():
+    assert kinds("LNST của TCB tăng nhờ chi phí dự phòng giảm.", ["S1", "S2"]) == []
+    assert kinds("LNST của TCB giảm nhờ chi phí dự phòng tăng.", ["S1", "S2"]) == ["direction", "direction"]
+    r = check_sentence("LNST của TCB tăng và giảm.", ["S1"], sheet(), {"TCB"}, KNOWN)
+    assert r.violations == [] and r.warnings
+
+
+def test_one_of_the_fastest_is_not_a_strict_superlative():
+    assert kinds("TCB là một trong những ngân hàng tăng nhanh nhất.", ["S5"]) == []
+    assert kinds("TCB là ngân hàng tăng nhanh nhất.", ["S5"]) == ["comparison"]

@@ -180,14 +180,18 @@ def _negated(text: str, start: int) -> bool:
     return bool(m) and not re.search(r"[,;.]", m.group(0))
 
 
-UP = re.compile(r"(?i)\b(tăng|cải thiện|đi lên)\b")
-DOWN = re.compile(r"(?i)\b(giảm|sụt|đi xuống)\b")
-COMP_UP = re.compile(r"(nhanh hơn|cao hơn|lớn hơn|nhiều hơn|mạnh hơn|vượt)")
-COMP_DOWN = re.compile(r"(chậm hơn|thấp hơn|nhỏ hơn|ít hơn|yếu hơn|kém)")
-SUP_TOP = re.compile(r"(cao nhất|lớn nhất|nhanh nhất|mạnh nhất|nhiều nhất|dẫn đầu|đứng đầu)")
-SUP_BOTTOM = re.compile(r"(thấp nhất|nhỏ nhất|chậm nhất|yếu nhất|ít nhất|kém nhất|đứng cuối)")
-CLAUSE = re.compile(r"[,;]|\s(?:trong khi|còn|nhưng|song|tuy nhiên|đồng thời)\s")
-GROWTH_WORDS = re.compile(r"nhanh|chậm|tăng|giảm|tốc độ|%|điểm")
+UP = re.compile(r"(?i)\b(tăng(?!\s+(?:cường|vốn)\b)|cải thiện|đi lên)\b")      # "tăng cường", "tăng vốn": không phải chiều
+DOWN = re.compile(r"(?i)\b(giảm(?!\s+(?:trừ|giá)\b)|sụt|đi xuống)\b")           # "giảm trừ", "giảm giá": không phải chiều
+COMP_UP = re.compile(r"(nhanh hơn|cao hơn|lớn hơn|nhiều hơn|mạnh hơn|sâu hơn|vượt)")
+COMP_DOWN = re.compile(r"(chậm hơn|thấp hơn|nhỏ hơn|ít hơn|yếu hơn|nhẹ hơn|kém(?!\s+nhất))")
+SUP_TOP = re.compile(r"(cao nhất|lớn nhất|nhanh nhất|mạnh nhất|nhiều nhất|sâu nhất|dẫn đầu|đứng đầu)")
+SUP_BOTTOM = re.compile(r"(thấp nhất|nhỏ nhất|chậm nhất|yếu nhất|ít nhất|nhẹ nhất|kém nhất|đứng cuối)")
+# Dấu phẩy thập phân ("23,7%") không tách vế; từ nối nhân quả/đối lập tách vế (trừ "không còn", "chưa còn")
+CLAUSE = re.compile(r",(?!\d)|;|(?<!không)(?<!chưa)\s(?:nhờ|do|vì|khiến|giúp|mặc dù|dù|trong khi|còn|nhưng|song"
+                    r"|tuy nhiên|đồng thời)\s")
+GROWTH_WORDS = re.compile(r"\b(?:nhanh|chậm|tăng|giảm|sụt|tốc độ|điểm phần trăm)\b|%")
+NEGATED_VERB = re.compile(r"\b(?:không|chưa|ngừng)\s+(?:\S+\s+)?$")      # "không tăng", "không còn giảm", "ngừng giảm"
+LOSS_BEFORE = re.compile(r"(?<![/\w])lỗ(?!\w)(?:\s+[^\s/]+)?\s*$")      # "lỗ giảm", "lỗ ròng giảm"; không phải "Lãi/lỗ", "lỗi"
 
 
 def _clauses(text: str) -> list[tuple[int, int]]:
@@ -205,44 +209,94 @@ def _named(facts: list[Fact], low: str) -> list[Fact]:
     return hit or facts
 
 
+def _cue(low: str) -> str | None:
+    """Vế câu nói về quy mô (level), tốc độ thay đổi (growth) hay không rõ (None: chấp nhận dòng loại nào cũng được)."""
+    if "quy mô" in low:
+        return "level"
+    return "growth" if GROWTH_WORDS.search(low) else None
+
+
 def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad) -> None:
-    """Từ tăng/giảm khớp chiều của dòng được ghi; so sánh hai mã và cao nhất/thấp nhất khớp thứ tự trong bảng số."""
+    """Từ tăng/giảm khớp chiều của dòng được ghi; so sánh hai mã và cao nhất/thấp nhất khớp thứ tự trong bảng số.
+    Xét từng vế câu; loại số liệu (quy mô hay tốc độ thay đổi) cũng đọc theo từng vế."""
     subject: str | None = None          # mã làm chủ ngữ ở vế trước ("TCB tăng 23,7%, cao hơn VCB")
+    prev_low, prev_tickers = "", []
     for a, b in _clauses(text):
         clause = text[a:b]
         low = clause.lower().replace("tăng trưởng âm", "giảm")
         tickers = list(dict.fromkeys(TICKER.findall(clause)))
-        measure = "growth" if GROWTH_WORDS.search(text.lower()) else "level"
+        p_low, p_tickers = prev_low, prev_tickers
+        prev_low, prev_tickers = low, tickers
+        up_m, down_m = UP.search(low), DOWN.search(low)
+        declining = bool(down_m) and not up_m
+
+        def cue(carried: bool) -> str | None:
+            """Vế không tự nói rõ thì lấy ý từ vế trước khi vế trước là câu dẫn không có mã hoặc chủ ngữ được mang sang."""
+            own = _cue(low)
+            if own is None and p_low and (carried or not p_tickers):
+                own = _cue(p_low)
+            return own
+
         comp_up, comp_down = COMP_UP.search(low), COMP_DOWN.search(low)
         if comp_up or comp_down:
-            pair = tickers[:2] if len(tickers) >= 2 else (
-                [subject, tickers[0]] if len(tickers) == 1 and subject and subject != tickers[0] else None)
+            comp = comp_up or comp_down
+            pair, carried = None, False
+            if len(tickers) >= 2:
+                pair = tickers[:2]
+            elif len(tickers) == 1 and subject and subject != tickers[0]:
+                at = re.search(rf"(?<!\w){tickers[0].lower()}(?!\w)", low)
+                # mã đứng sau từ so sánh là vế sau ("..., nhanh hơn VCB"); đứng trước là chủ ngữ ("..., còn TCB nhanh hơn")
+                pair = [subject, tickers[0]] if at and at.start() > comp.start() else [tickers[0], subject]
+                carried = True
             if pair:
                 a_t, b_t = pair
+                c = cue(carried)
+                first = bool(comp_up)           # vế đầu đứng trước vế sau trong thứ tự (lớn -> nhỏ)?
+                if declining and c == "growth":
+                    first = not first           # "giảm nhanh hơn" = tăng trưởng thấp hơn
                 cands = _named([f for f in facts if f.order and a_t in f.order and b_t in f.order
-                                and f.measure == measure], low)
+                                and (c is None or f.measure == c)], low)
                 if not cands:
                     bad("comparison", f"không có dòng so sánh {a_t} với {b_t}: {clause.strip()}")
-                elif not any((f.order.index(a_t) < f.order.index(b_t)) == bool(comp_up) for f in cands):
+                elif not any((f.order.index(a_t) < f.order.index(b_t)) == first for f in cands):
                     bad("comparison", clause.strip())
-                subject = subject or a_t
+                subject = a_t if len(tickers) >= 2 or a_t == tickers[0] else subject
                 continue
+            out.warnings.append(f"không rõ hai vế so sánh: {clause.strip()}")
         top, bottom = SUP_TOP.search(low), SUP_BOTTOM.search(low)
         if top or bottom:
+            if "một trong những" in text.lower():       # không phải xếp hạng tuyệt đối
+                continue
             who = tickers[0] if tickers else subject
             if who:
-                cands = _named([f for f in facts if f.order and who in f.order and f.measure == measure], low)
+                c = cue(not tickers)
+                first = bool(top)
+                if declining and c == "growth":
+                    if top and "đầu" not in top.group(0):      # "giảm mạnh nhất" = tăng trưởng thấp nhất
+                        first = False
+                    else:                                      # "giảm ít nhất", "dẫn đầu mức giảm": chưa rõ nghĩa
+                        out.warnings.append(f"không rõ cực: {clause.strip()}")
+                        continue
+                cands = _named([f for f in facts if f.order and who in f.order and (c is None or f.measure == c)], low)
                 if not cands:
                     bad("comparison", f"không có dòng xếp hạng cho {who}: {clause.strip()}")
-                elif not any((f.order[0] if top else f.order[-1]) == who for f in cands):
+                elif not any((f.order[0] if first else f.order[-1]) == who for f in cands):
                     bad("comparison", clause.strip())
             continue
         if tickers:
             subject = tickers[0]
-        up, down = bool(UP.search(low)), bool(DOWN.search(low))
-        if up == down:
+        if up_m and down_m:
+            out.warnings.append(f"vế vừa có tăng vừa có giảm: {clause.strip()}")
             continue
-        if "lỗ" in low:                 # "lỗ giảm" là cải thiện, "lỗ tăng" là xấu đi
+        if not up_m and not down_m:
+            continue
+        word = up_m or down_m
+        before = low[:word.start()]
+        if NEGATED_VERB.search(before):
+            out.warnings.append(f"chiều bị phủ định: {clause.strip()}")
+            continue
+        up, down = bool(up_m), bool(down_m)
+        if LOSS_BEFORE.search(before):  # "lỗ giảm" là cải thiện, "lỗ tăng" là xấu đi
             up, down = down, up
         linked = {l.fact_id for l in out.links if a <= l.start < b}
         cands = [f for f in facts if f.id in linked and f.direction]
@@ -250,8 +304,12 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad) -> 
             cands = [f for f in facts if f.direction and any(n in low for n in f.names)
                      and (not tickers or f.ticker in tickers)]
         if not cands:
+            # chỉ một dòng có chiều: dùng khi vế nhắc đúng mã của dòng đó (hoặc không mã nào và nhắc tên chỉ tiêu)
             with_dir = [f for f in facts if f.direction]
-            cands = with_dir if len(with_dir) == 1 else []
+            if len(with_dir) == 1:
+                f = with_dir[0]
+                if (f.ticker and f.ticker in tickers) or (not tickers and any(n in low for n in f.names)):
+                    cands = with_dir
         dirs = {f.direction for f in cands}
         if len(dirs) != 1:
             out.warnings.append(f"không rõ chiều: {clause.strip()}")

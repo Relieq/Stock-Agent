@@ -62,3 +62,48 @@ def test_chart_specs():
     assert [s["type"] for s in specs] == ["paired", "bars"]
     assert specs[0]["items"] == [["TCB", 7943.0, 6419.0], ["VCB", 9000.0, 7785.0]]
     assert specs[1]["items"] == [["TCB", 23.7], ["VCB", 15.6]]
+
+
+def corp(ticker, **pairs):
+    return TickerData(ticker, "corporate", "quý 3/2026", {k: Pair(D(a) * B, D(b) * B) for k, (a, b) in pairs.items()})
+
+
+def test_ratio_keeps_sign_when_loss_making():
+    d = corp("ABC", gross_profit=(-100, 100), revenue=(1000, 1000))
+    (f,) = build_sheet("yoy", [d], ["gross_margin"]).facts
+    assert ": −10,0%; cùng kỳ 10,0%" in f.text and "−20,0 điểm %" in f.text and f.direction == "down"
+
+
+def test_level_rank_of_expenses_uses_magnitude_even_if_stored_negative():
+    members = [bank("AAA", 1, 1), bank("BBB", 1, 1), bank("CCC", 1, 1)]
+    for m, v in zip(members, (-3000, -2000, -1000)):
+        m.values["opex"] = Pair(D(v) * B, D(v) * B)
+    sheet = build_sheet("rank", [members[1]], ["opex"], {"TCTD": Group("nhóm thử", members)})
+    level = next(f for f in sheet.facts if f.kind == "rank" and f.measure == "level")
+    assert level.order == ["AAA", "BBB", "CCC"] and "BBB xếp thứ 2 trong 3" in level.text
+    assert "trung vị nhóm 2.000 tỷ" in level.text and "−" not in level.text
+
+
+def test_flat_change_is_said_as_unchanged():
+    d = corp("ABC", revenue=(100, 100), gross_profit=(10, 10))
+    flat = build_sheet("yoy", [d], ["revenue"]).facts[0]
+    assert flat.direction == "flat" and "không đổi so với cùng kỳ" in flat.text
+    assert "tăng" not in flat.text and "%" not in flat.text
+    d.values["revenue"] = Pair(D(100) * B, D(100) * B)
+    (ratio,) = build_sheet("yoy", [d], ["gross_margin"]).facts
+    assert "không đổi so với cùng kỳ" in ratio.text and "điểm %" not in ratio.text
+
+
+def test_ties_in_compare_are_said_as_equal():
+    a, b = bank("AAA", 200, 100), bank("BBB", 100, 50)
+    sheet = build_sheet("compare", [a, b], ["npat_parent"])
+    growth = next(f for f in sheet.facts if f.kind == "compare" and f.measure == "growth")
+    assert "AAA và BBB bằng nhau" in growth.text and "cao hơn" not in growth.text
+    c, d = bank("CCC", 100, 90), bank("DDD", 100, 80)
+    level = next(f for f in build_sheet("compare", [c, d], ["npat_parent"]).facts if f.measure == "level")
+    assert "CCC và DDD bằng nhau" in level.text and "gấp" not in level.text
+
+
+def test_chart_unit_is_points_for_ratio_keys():
+    specs = chart_specs("compare", [bank("TCB", 7943, 6419), bank("VCB", 9000, 7785)], ["cir"])
+    assert [s["unit"] for s in specs] == ["điểm %"]

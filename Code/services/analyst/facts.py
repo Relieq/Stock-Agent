@@ -62,7 +62,9 @@ def pair_of(d: TickerData, key: str) -> Pair | None:
         return None
 
     def r(a: Decimal | None, b: Decimal | None) -> Decimal | None:
-        return None if a is None or not b else abs(a) / abs(b) * 100
+        if a is None or not b:
+            return None
+        return (abs(a) if num in catalog.EXPENSES else a) / abs(b) * 100   # chi phí theo độ lớn; lợi nhuận giữ dấu
 
     return Pair(r(n.cur, m.cur), r(n.prev, m.prev), n.sources + m.sources)
 
@@ -90,7 +92,7 @@ def direction(d: TickerData, key: str) -> str | None:
 
 def _show(d: TickerData, key: str, v: Decimal) -> str:
     if is_ratio(d.kind, key):
-        return vn(v) + "%"
+        return ("−" if v < 0 else "") + vn(abs(v)) + "%"
     return ty(abs(v)) if key in catalog.EXPENSES else money(v)
 
 
@@ -106,12 +108,15 @@ def metric_fact(sheet: FactSheet, d: TickerData, key: str) -> Fact | None:
         parts.append(f"cùng kỳ {_show(d, key, p.prev)}")
         g = growth(d, key)
         if is_ratio(d.kind, key):
-            parts.append(f"thay đổi {signed(g, ' điểm %')}")
-        elif g is not None:
-            delta = abs(p.cur) - abs(p.prev) if key in catalog.EXPENSES else p.cur - p.prev
-            parts.append(f"thay đổi {signed(g, '%')} ({'tăng' if delta >= 0 else 'giảm'} {ty(abs(delta))})")
+            parts.append("không đổi so với cùng kỳ" if g == 0 else f"thay đổi {signed(g, ' điểm %')}")
         else:
-            parts.append(change_text(p.cur, p.prev, key in catalog.PROFIT))
+            delta = abs(p.cur) - abs(p.prev) if key in catalog.EXPENSES else p.cur - p.prev
+            if delta == 0:
+                parts.append("không đổi so với cùng kỳ")
+            elif g is not None:
+                parts.append(f"thay đổi {signed(g, '%')} ({'tăng' if delta > 0 else 'giảm'} {ty(abs(delta))})")
+            else:
+                parts.append(change_text(p.cur, p.prev, key in catalog.PROFIT))
     return sheet.add("ratio" if is_ratio(d.kind, key) else "metric", "; ".join(parts), ticker=d.ticker, metric=key,
                      direction=direction(d, key), names=catalog.names(d.kind, key), sources=p.sources)
 
@@ -134,16 +139,22 @@ def compare_facts(sheet: FactSheet, data: list[TickerData], key: str) -> None:
         text = f"{title}, xếp theo quy mô, {label}: " + ", ".join(f"{d.ticker} {_show(d, key, p.cur)}" for d, p in lv)
         (d0, p0), (d1, p1) = lv[0], lv[1]
         if len(lv) == 2 and ratio:
-            text += f"; {d0.ticker} cao hơn {d1.ticker} {vn(p0.cur - p1.cur)} điểm %"
+            gap = vn(p0.cur - p1.cur)
+            text += (f"; {d0.ticker} và {d1.ticker} bằng nhau" if gap == "0,0"
+                     else f"; {d0.ticker} cao hơn {d1.ticker} {gap} điểm %")
         elif len(lv) == 2 and p0.cur > 0 and p1.cur > 0:
-            text += f"; {d0.ticker} gấp {vn(p0.cur / p1.cur, 2)} lần {d1.ticker}"
+            times = vn(p0.cur / p1.cur, 2)
+            text += (f"; {d0.ticker} và {d1.ticker} bằng nhau" if times == "1,00"
+                     else f"; {d0.ticker} gấp {times} lần {d1.ticker}")
         sheet.add("compare", text, metric=key, measure="level", order=[d.ticker for d, _ in lv], names=names)
     gr = sorted(((d, g) for d in data if (g := growth(d, key)) is not None), key=lambda x: x[1], reverse=True)
     if len(gr) >= 2:
         unit = " điểm %" if ratio else "%"
         text = f"{title}, thay đổi so với cùng kỳ, {label}: " + ", ".join(f"{d.ticker} {signed(g, unit)}" for d, g in gr)
         if len(gr) == 2:
-            text += f"; {gr[0][0].ticker} cao hơn {gr[1][0].ticker} {vn(gr[0][1] - gr[1][1])} điểm %"
+            gap = vn(gr[0][1] - gr[1][1])
+            text += (f"; {gr[0][0].ticker} và {gr[1][0].ticker} bằng nhau" if gap == "0,0"
+                     else f"; {gr[0][0].ticker} cao hơn {gr[1][0].ticker} {gap} điểm %")
         sheet.add("compare", text, metric=key, measure="growth", order=[d.ticker for d, _ in gr], names=names)
 
 
@@ -151,8 +162,9 @@ def rank_facts(sheet: FactSheet, target: TickerData, group: Group, key: str) -> 
     title, names = catalog.name(target.kind, key) or key, catalog.names(target.kind, key)
     ratio = is_ratio(target.kind, key)
     gr = sorted(((m, g) for m in group.members if (g := growth(m, key)) is not None), key=lambda x: x[1], reverse=True)
-    lv = sorted(((m, p.cur) for m in group.members if (p := pair_of(m, key)) is not None and p.cur is not None),
-                key=lambda x: x[1], reverse=True)
+    lv = sorted(((m, abs(p.cur) if key in catalog.EXPENSES else p.cur) for m in group.members
+                 if (p := pair_of(m, key)) is not None and p.cur is not None),
+                key=lambda x: x[1], reverse=True)   # chi phí xếp theo độ lớn, như dòng so sánh
     for measure, items, fmt, head in (
             ("growth", gr, lambda v: signed(v, " điểm %" if ratio else "%"), f"{title}, thay đổi so với cùng kỳ"),
             ("level", lv, lambda v: _show(target, key, v), f"{title}, xếp theo quy mô")):
@@ -209,6 +221,7 @@ def chart_specs(kind: str, data: list[TickerData], metrics: list[str],
     keys = catalog.common_keys({d.kind for d in data}, metrics)
     key = next((k for k in keys if not all(is_ratio(d.kind, k) for d in data)), keys[0])
     title = _title({d.kind for d in data}, key)
+    growth_unit = "điểm %" if all(is_ratio(d.kind, key) for d in data) else "%"
     if kind == "compare":
         items = [[d.ticker, _ty_float(p.cur), _ty_float(p.prev)] for d in data
                  if (p := d.values.get(key)) is not None and p.cur is not None]
@@ -217,7 +230,7 @@ def chart_specs(kind: str, data: list[TickerData], metrics: list[str],
                           "highlight": []})
         gr = [[d.ticker, round(float(g), 1)] for d in data if (g := growth(d, key)) is not None]
         if len(gr) >= 2:
-            specs.append({"type": "bars", "title": f"{title}: thay đổi so với cùng kỳ", "unit": "%", "items": gr,
+            specs.append({"type": "bars", "title": f"{title}: thay đổi so với cùng kỳ", "unit": growth_unit, "items": gr,
                           "highlight": []})
         return specs
     for d in data:
@@ -227,6 +240,6 @@ def chart_specs(kind: str, data: list[TickerData], metrics: list[str],
         gr = sorted(([m.ticker, round(float(g), 1)] for m in group.members if (g := growth(m, key)) is not None),
                     key=lambda x: -x[1])
         if gr:
-            specs.append({"type": "bars", "title": f"{title}: thay đổi so với cùng kỳ, {group.name}", "unit": "%",
+            specs.append({"type": "bars", "title": f"{title}: thay đổi so với cùng kỳ, {group.name}", "unit": growth_unit,
                           "items": gr, "highlight": [d.ticker]})
     return specs

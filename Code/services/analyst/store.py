@@ -10,6 +10,7 @@ from services.analyst.facts import Group, Pair, TickerData, build_sheet, chart_s
 from services.analyst.plan import Plan, label
 from services.extraction.evidence import document_evidence
 from services.extraction.pipeline import _load_record, _record_files
+from services.extraction.rules import BANK_INCOME_PARTS
 from services.metrics.card import Facts, Value
 
 HIDDEN = {"conflict", "second_differs"}       # ô "cần xem lại": không đưa vào báo cáo
@@ -18,20 +19,26 @@ GROUP_NAMES = {"TCTD": "các ngân hàng đang theo dõi", "CTCK": "các công t
 PERIOD_DOCS = {"H1": [("fs_semiannual", "H1"), ("fs_quarter", "Q2")], "FY": [("fs_annual", "FY"), ("fs_quarter", "Q4")]}
 
 
-def find_document(conn, ticker: str, year: int, period: str) -> tuple[int, str] | None:
-    """BCTC dùng cho (mã, kỳ): quý -> BCTC quý; bán niên -> BCTC bán niên, chưa có thì lũy kế ở BCTC quý 2; năm -> BCTC
-    năm, chưa có thì lũy kế ở BCTC quý 4. Ưu tiên hợp nhất."""
+def _find(conn, ticker: str, year: int, period: str) -> tuple[int, str, str] | None:
+    """(mã tài liệu, loại, kỳ của tài liệu): kỳ của tài liệu khác kỳ hỏi khi lấy lũy kế ở BCTC quý (bán niên -> Q2)."""
     for doc_type, per in PERIOD_DOCS.get(period, [("fs_quarter", period)]):
         row = conn.execute(
             """SELECT id FROM documents WHERE ticker = %s AND fiscal_year = %s AND fiscal_period = %s AND doc_type = %s
                  AND content_kind = 'full' AND scope IN ('consolidated', 'standalone')
                  AND status IN ('verified', 'approved') AND NOT is_amended AND owner_user_id IS NULL
                  AND duplicate_of IS NULL
-               ORDER BY (scope = 'consolidated') DESC, source_listed_at DESC LIMIT 1""",
+               ORDER BY (scope = 'consolidated') DESC, source_listed_at DESC NULLS LAST LIMIT 1""",
             (ticker, year, per, doc_type)).fetchone()
         if row:
-            return row[0], doc_type
+            return row[0], doc_type, per
     return None
+
+
+def find_document(conn, ticker: str, year: int, period: str) -> tuple[int, str] | None:
+    """BCTC dùng cho (mã, kỳ): quý -> BCTC quý; bán niên -> BCTC bán niên, chưa có thì lũy kế ở BCTC quý 2; năm -> BCTC
+    năm, chưa có thì lũy kế ở BCTC quý 4. Ưu tiên hợp nhất."""
+    found = _find(conn, ticker, year, period)
+    return (found[0], found[1]) if found else None
 
 
 def reading_period(period: str) -> str:
@@ -40,19 +47,16 @@ def reading_period(period: str) -> str:
 
 
 def latest(conn, tickers: list[str]) -> tuple[int, str] | None:
-    """Quý gần nhất mà mọi mã đều có BCTC đã kiểm chứng; không có quý chung thì quý mới nhất trong kho (phần thiếu sẽ được
-    đề nghị đọc thêm)."""
-    row = conn.execute(
-        """SELECT fiscal_year, fiscal_period FROM documents
-           WHERE ticker = ANY(%s) AND doc_type = 'fs_quarter' AND content_kind = 'full' AND status IN ('verified', 'approved')
-             AND owner_user_id IS NULL AND duplicate_of IS NULL AND scope IN ('consolidated', 'standalone')
-           GROUP BY 1, 2 HAVING count(DISTINCT ticker) = %s ORDER BY 1 DESC, 2 DESC LIMIT 1""",
-        (tickers, len(tickers))).fetchone()
+    """Quý gần nhất mà mọi mã đều có BCTC đã kiểm chứng; không có quý chung thì quý mới nhất của các mã được hỏi (phần
+    thiếu sẽ được đề nghị đọc thêm); không mã nào có thì None."""
+    base = """SELECT fiscal_year, fiscal_period FROM documents
+              WHERE ticker = ANY(%s) AND doc_type = 'fs_quarter' AND content_kind = 'full'
+                AND status IN ('verified', 'approved') AND owner_user_id IS NULL AND duplicate_of IS NULL
+                AND NOT is_amended AND scope IN ('consolidated', 'standalone')"""
+    row = conn.execute(base + " GROUP BY 1, 2 HAVING count(DISTINCT ticker) = %s ORDER BY 1 DESC, 2 DESC LIMIT 1",
+                       (tickers, len(tickers))).fetchone()
     if row is None:
-        row = conn.execute(
-            """SELECT fiscal_year, fiscal_period FROM documents WHERE doc_type = 'fs_quarter' AND content_kind = 'full'
-                 AND status IN ('verified', 'approved') AND owner_user_id IS NULL
-               ORDER BY 1 DESC, 2 DESC LIMIT 1""").fetchone()
+        row = conn.execute(base + " ORDER BY 1 DESC, 2 DESC LIMIT 1", (tickers,)).fetchone()
     return (row[0], row[1]) if row else None
 
 
@@ -72,11 +76,23 @@ def missing(conn, plan: Plan) -> list[dict]:
     return out
 
 
-def columns(doc_type: str, basis: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """Cột kỳ này, cùng kỳ (thử lần lượt). BCTC bán niên/năm in một cặp cột cả kỳ, có khi chép vào q_*."""
-    if doc_type != "fs_quarter" or basis == "ytd":
+def columns(doc_type: str, doc_period: str, basis: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Cột kỳ này, cùng kỳ (thử lần lượt). BCTC bán niên/năm in một cặp cột cả kỳ, có khi chép vào q_*; BCTC quý 1 thì quý
+    cũng là lũy kế. BCTC quý 2-4 lấy lũy kế: chỉ cột ytd_*, không lấy số quý thay vào."""
+    if basis != "ytd":
+        return ("q_cur",), ("q_prev_year",)
+    if doc_type != "fs_quarter" or doc_period == "Q1":
         return ("ytd_cur", "q_cur"), ("ytd_prev_year", "q_prev_year")
-    return ("q_cur",), ("q_prev_year",)
+    return ("ytd_cur",), ("ytd_prev_year",)
+
+
+def _derived_inputs(f: Facts, key: str) -> list[str]:
+    """Mã các dòng mà số tính (không có nguồn riêng) của chỉ tiêu này được cộng/trừ từ đó."""
+    if key == "toi":
+        return list(BANK_INCOME_PARTS)
+    if key == "npat_parent":
+        return [c for c in (f.code("IS", "npat"), f.code("IS", "minority")) if c]
+    return []
 
 
 def _first(f: Facts, key: str, cols: tuple[str, ...], hidden: set[tuple[str, str, str]]) -> Value:
@@ -86,34 +102,46 @@ def _first(f: Facts, key: str, cols: tuple[str, ...], hidden: set[tuple[str, str
             continue
         if v.source is not None and ("IS", v.source.code, col) in hidden:
             return Value(None)
+        if v.source is None and any(("IS", c, col) in hidden for c in _derived_inputs(f, key)):
+            return Value(None)      # số tính từ ô "cần xem lại" cũng ẩn
         return v
     return Value(None)
 
 
-def load_ticker(conn, ticker: str, year: int, period: str, basis: str, with_flags: bool = True) -> TickerData | None:
-    found = find_document(conn, ticker, year, period)
+def _load(conn, ticker: str, year: int, period: str, basis: str, with_flags: bool):
+    """(số của mã, lý do không có): lý do là "document" (chưa có BCTC), "record" (chưa có kết quả đọc) hoặc "template"
+    (mẫu BCTC chưa hỗ trợ, như bảo hiểm)."""
+    found = _find(conn, ticker, year, period)
     if found is None:
-        return None
-    doc_id, doc_type = found
-    record = _load_record(conn, doc_id)
+        return None, "document"
+    doc_id, doc_type, doc_period = found
+    try:
+        record = _load_record(conn, doc_id)
+    except RuntimeError:
+        return None, "record"
     ev = document_evidence(conn, doc_id)
     f = Facts(doc_id, record, {(m.statement, m.key) for m in ev.missing} if ev else None)
     kind = catalog.KIND_OF_TEMPLATE.get(f.template)
     if kind is None:
-        return None
+        return None, "template"
     hidden = {k for k, v in (ev.status.items() if ev else []) if v["status"] in HIDDEN}
-    cur_cols, prev_cols = columns(doc_type, basis)
+    cur_cols, prev_cols = columns(doc_type, doc_period, basis)
     values = {}
     for key in catalog.METRICS[kind]:
         cur, prev = _first(f, key, cur_cols, hidden), _first(f, key, prev_cols, hidden)
         values[key] = Pair(cur.value, prev.value, [asdict(s) for s in (cur.source, prev.source) if s is not None])
     flags: list[tuple[str, str]] = []
-    if with_flags and doc_type == "fs_quarter":
+    if with_flags and doc_type == "fs_quarter" and basis == "quarter":
         from services.metrics.service import card_for
         got = card_for(conn, doc_id)
         if got is not None:
-            flags = [(fl.title, fl.detail) for fl in got[0].flags]
-    return TickerData(ticker, kind, label(year, period, basis), values, flags, doc_id)
+            flags = [(fl.title, fl.detail) for fl in got[0].flags
+                     if not any((s.statement, s.code, s.column) in hidden for s in fl.sources)]
+    return TickerData(ticker, kind, label(year, period, basis), values, flags, doc_id), None
+
+
+def load_ticker(conn, ticker: str, year: int, period: str, basis: str, with_flags: bool = True) -> TickerData | None:
+    return _load(conn, ticker, year, period, basis, with_flags)[0]
 
 
 def load_group(conn, kind: str, year: int, period: str, basis: str) -> Group:
@@ -137,9 +165,10 @@ def sheet_for_plan(conn, plan: Plan):
     """(bảng số, BCTC nguồn kèm phiên bản, ghi chú, đặc tả biểu đồ)."""
     data, notes = [], []
     for t in plan.tickers:
-        d = load_ticker(conn, t, plan.year, plan.period, plan.basis)
+        d, why = _load(conn, t, plan.year, plan.period, plan.basis, True)
         if d is None:
-            notes.append(f"Chưa có BCTC đã kiểm chứng của {t} cho {plan.label()}: báo cáo không có số của mã này.")
+            notes.append(f"Chưa hỗ trợ mẫu BCTC của {t} (bảo hiểm): báo cáo không có số của mã này." if why == "template"
+                         else f"Chưa có BCTC đã kiểm chứng của {t} cho {plan.label()}: báo cáo không có số của mã này.")
             continue
         data.append(d)
     groups = {k: load_group(conn, k, plan.year, plan.period, plan.basis) for k in {d.kind for d in data}} \

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Báo cáo · Soi{% endblock %}
+{% block body %}
+<h1>Báo cáo theo yêu cầu</h1>
+{% if tb %}<p class="note">{{ tb }}</p>{% endif %}
+<form method="post" action="/bao-cao" class="ask">
+  <textarea name="question" rows="3" maxlength="1000" placeholder="Ví dụ: So sánh kết quả kinh doanh quý 3/2026 của VCB và TCB" required></textarea>
+  <button>Tạo báo cáo</button>
+</form>
+<p class="small muted">Câu mẫu:
+  {% for s in samples %}<button type="button" class="link sample" onclick="document.querySelector('.ask textarea').value=this.textContent">{{ s }}</button>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+<p class="small muted">Mỗi người tối đa {{ limit }} báo cáo mỗi ngày; báo cáo trùng câu hỏi khi số liệu chưa đổi được dùng lại, không tính.</p>
+<h2>Báo cáo của tôi</h2>
+<table class="list">
+  {% for b in rows %}<tr><td><a href="/bao-cao/{{ b.id }}">{{ b.question }}</a></td><td class="small muted">{{ b.status }}</td><td class="small muted">{{ b.created_at | gio }}</td></tr>
+  {% else %}<tr><td class="muted">Chưa có báo cáo nào.</td></tr>{% endfor %}
+</table>
+{% endblock %}

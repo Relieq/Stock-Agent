@@ -205,6 +205,9 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             )
         # Yêu cầu của người dùng: mã ngoài danh sách, file tải lên
         lines += process_queue(conn, vision)
+        # Báo cáo của agent đang chờ đọc BCTC: chạy tiếp khi các yêu cầu đọc đã xong
+        from services.analyst.report import resume_waiting
+        lines += resume_waiting(conn)
         lines += new_explanations
     stamp = datetime.now(VN_TZ).strftime("%d/%m %H:%M")
     print(f"[{stamp}] {stats['seen']} tài liệu trong danh sách, {stats['new']} mới (HOSE: {hstats['seen']} BCTC, "

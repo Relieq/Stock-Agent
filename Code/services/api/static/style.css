@@ -119,3 +119,10 @@ ul.plain { list-style:none; padding:0; } ul.plain li { padding:4px 0; border-bot
 .sharebox { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
 .sharebox img { max-width:100%; border:1px solid var(--line); border-radius:6px; }
 @media (max-width: 600px) { .calrow { flex-direction:column; gap:0; } .calrow .when { width:auto; } }
+.report a.num{color:#1a4e8a;text-decoration:none;border-bottom:1px dotted #1a4e8a}
+.report table.facts{border-collapse:collapse;width:100%;font-size:.9em}
+.report table.facts td{border-top:1px solid #e2e2e2;padding:4px 6px;vertical-align:top}
+.report table.facts tr:target{background:#fff6d6}
+.report figure.chart{margin:12px 0;max-width:680px}
+.ask textarea{width:100%;max-width:680px;font:inherit;padding:8px}
+.report .ai{margin-top:18px}

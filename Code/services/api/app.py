@@ -34,6 +34,8 @@ app = FastAPI(title="Soi")
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 app.include_router(accounts_router)
+from services.api.reports import router as reports_router  # noqa: E402
+app.include_router(reports_router)
 
 # Trang và ảnh chia sẻ thẻ KQKD công khai để mạng xã hội đọc được thẻ xem trước; chỉ thẻ đã kiểm chứng/duyệt tay
 PUBLIC_PATHS = ("/dang-nhap", "/static/", "/chia-se/", "/anh/")

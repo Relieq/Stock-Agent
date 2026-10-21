@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Soi{% endblock %}</title>
-<link rel="stylesheet" href="/static/style.css?v=4">
+<link rel="stylesheet" href="/static/style.css?v=5">
 </head>
 <body>
 {% set me = request.state.user if request and request.state and request.state.user is defined else none %}
 <header class="top"><a href="/mua-bctc" class="brand">Soi</a>
-  {% if me %}<nav class="nav"><a href="/mua-bctc">Mùa BCTC</a> <a href="/lich">Lịch</a> <a href="/theo-doi">Theo dõi</a> <a href="/yeu-cau">Yêu cầu</a>
+  {% if me %}<nav class="nav"><a href="/mua-bctc">Mùa BCTC</a> <a href="/bao-cao">Báo cáo</a> <a href="/lich">Lịch</a> <a href="/theo-doi">Theo dõi</a> <a href="/yeu-cau">Yêu cầu</a>
     {% if me.is_admin %}<a href="/duyet">Duyệt</a> <a href="/quan-tri">Người dùng</a> <a href="/quan-tri/chi-phi">Chi phí</a> <a href="/noi-bo" class="muted">Nội bộ</a>{% endif %}
     <form method="post" action="/dang-xuat" class="inline"><button class="link" title="{{ me.email }}">Đăng xuất</button></form></nav>{% endif %}
 </header>

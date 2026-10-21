@@ -311,6 +311,8 @@ CREATE TABLE events (
 
 ## 7. AI Analyst Agent
 
+> Đặc tả chi tiết cho Project 3 (agent tạo báo cáo theo yêu cầu, chốt 21/10/2026): [agent-bao-cao.md](agent-bao-cao.md).
+
 ```mermaid
 flowchart LR
     Q[Yêu cầu người dùng] --> U[Hiểu yêu cầu<br/>mã, kỳ, kiểu phân tích]

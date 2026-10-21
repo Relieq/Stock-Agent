@@ -192,8 +192,8 @@ trong chính BCTC.
 
 Trên lớp số liệu đã kiểm chứng này, một \textbf{agent} nhận câu hỏi tự do của người dùng (ví dụ \enquote{so sánh KQKD quý
 3/2026 của TCB, LPB và VPB}), tự lập kế hoạch, lấy số, viết báo cáo kèm bảng và biểu đồ; mọi con số và từ tăng/giảm,
-cao hơn/thấp hơn trong lời văn được code kiểm lại với bảng số trước khi người đọc thấy. Trên bộ 53 câu hỏi mẫu, agent
-\textbf{hiểu đúng yêu cầu ở cả 53 câu} với cả hai nhà cung cấp mô hình. Phần đo chất lượng lời văn trên cả bộ câu, chỉ số
+cao hơn/thấp hơn trong lời văn được code kiểm lại với bảng số trước khi người đọc thấy. Trên 58 câu hỏi mẫu (có 5 câu
+do người dùng thử viết), agent \textbf{hiểu đúng yêu cầu ở cả 58 câu} với cả hai nhà cung cấp mô hình. Phần đo chất lượng lời văn trên cả bộ câu, chỉ số
 tài chính mở rộng, đánh giá trên bộ dữ liệu vàng và triển khai cho người dùng thật được liệt kê ở
 Chương~\ref{chap:ketluan} dưới dạng đề mục.
 \end{abstract}
@@ -2061,19 +2061,21 @@ nhầm dòng}. Vì vậy đối chiếu nguồn ngoài đã trở thành bước
 \end{ghichu}
 
 \section{Agent tạo báo cáo: hiểu yêu cầu}\label{sec:evalagent}
-Bộ đo gồm 53 câu hỏi tiếng Việt, mỗi câu kèm kế hoạch đúng. Các câu phủ ba loại yêu cầu và nhiều cách nói: trang trọng,
+Bộ đo gồm 58 câu hỏi tiếng Việt, mỗi câu kèm kế hoạch đúng: 53 câu tự soạn và 5 câu do người dùng thử viết theo cách
+của họ. Các câu phủ ba loại yêu cầu và nhiều cách nói: trang trọng,
 nói tắt, không dấu, sai chính tả nhẹ, gọi bằng tên công ty, nói kỳ bằng chữ (\enquote{9 tháng}, \enquote{quý vừa
 rồi}). Có cả các câu khó: thiếu mã, mã không tồn tại, mã ngoài danh sách theo dõi, kỳ chưa có trong kho, câu xin khuyến
 nghị mua bán. Hai nhà cung cấp chạy cùng bộ câu, cùng lời dặn, cùng ngày cố định (21/10/2026).
 
 \begin{table}[H]
 \centering\small
-\caption{Agent hiểu yêu cầu trên 53 câu hỏi (đếm theo câu)}\label{tab:agent-plan}
+\caption{Agent hiểu yêu cầu trên 58 câu hỏi (đếm theo câu)}\label{tab:agent-plan}
 \begin{tabularx}{\linewidth}{@{}Xrr@{}}
 \toprule
 & \textbf{Claude Haiku 5.5} & \textbf{gpt-5.4-mini} \\ \midrule
-Hệ thống làm đúng yêu cầu (sau khi code kiểm kế hoạch) & 53/53 & 53/53 \\
-Kế hoạch mô hình trả về đúng mọi trường & 52/53 & 52/53 \\
+Hệ thống làm đúng yêu cầu (sau khi code kiểm kế hoạch) & 58/58 & 58/58 \\
+\quad trong đó 5 câu người dùng thử viết & 5/5 & 5/5 \\
+Kế hoạch mô hình trả về đúng mọi trường & 57/58 & 57/58 \\
 Chi phí mỗi câu (USD) & 0,0003 & 0,0016 \\
 \bottomrule
 \end{tabularx}
@@ -2082,8 +2084,9 @@ Chi phí mỗi câu (USD) & 0,0003 & 0,0016 \\
 \enquote{Làm đúng yêu cầu} nghĩa là sau bước code kiểm kế hoạch, hệ thống làm đúng việc người hỏi muốn: đúng mã, đúng
 kỳ, đúng loại so sánh, hoặc hỏi lại khi thiếu mã. Câu duy nhất có kế hoạch thô lệch ở mỗi nhà là câu nói cả năm mà mô hình
 ghi cách tính \enquote{riêng quý}; code luôn tính cả năm theo lũy kế nên kết quả vẫn đúng. Lời dặn của bước này được chỉnh
-một lần sau lần chạy đầu trên chính bộ câu (thêm cách hiểu \enquote{9 tháng}, \enquote{năm 2025} và mã ngoài danh sách),
-nên kết quả trên có phần lạc quan; các câu hỏi do người dùng thật góp thêm sẽ dùng để kiểm lại.
+một lần sau lần chạy đầu trên 53 câu tự soạn (thêm cách hiểu \enquote{9 tháng}, \enquote{năm 2025} và mã ngoài danh
+sách), nên kết quả trên 53 câu đó có phần lạc quan. 5 câu do người dùng thử viết được thêm sau khi đã chỉnh, nên là phép
+kiểm khách quan; cả hai nhà đều hiểu đúng cả 5 câu.
 
 Phần viết lời và bộ kiểm tra số sẽ được đo trên cả bộ câu khi mùa BCTC quý 3 về đủ số (mục hướng phát triển).
 
@@ -2113,7 +2116,7 @@ lệch đều có lời giải thích từ chính BCTC.
 Điểm khác biệt của hệ thống không nằm ở mô hình ngôn ngữ, vì ai cũng dùng được mô hình như nhau. Điểm khác biệt là
 \textbf{lớp kiểm chứng}: mỗi con số đều có nguồn, đều đã qua kiểm tra, và có lịch sử sửa lỗi tích lũy qua từng mùa.
 Agent tạo báo cáo được đặt lên trên lớp này theo cùng nguyên tắc: mô hình hiểu câu hỏi và viết câu, code tính số và kiểm
-lại từng con số, từng từ tăng/giảm trong lời văn. Trên 53 câu hỏi mẫu, agent hiểu đúng yêu cầu ở cả 53 câu với cả hai
+lại từng con số, từng từ tăng/giảm trong lời văn. Trên 58 câu hỏi mẫu, agent hiểu đúng yêu cầu ở cả 58 câu với cả hai
 nhà cung cấp mô hình.
 
 \section{Hướng phát triển}

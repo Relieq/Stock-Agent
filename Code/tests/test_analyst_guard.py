@@ -106,3 +106,56 @@ def test_ordinary_analysis_with_co_the_is_not_advice():
               "Có thể đầu tư mạnh vào tài sản."]:
         kinds = [v.kind for v in check_sentence(t, [], s, {"TCB", "MWG"}, KNOWN).violations]
         assert "advice" not in kinds, t
+
+
+def compare_sheet():
+    s = sheet()
+    s.add("compare", "LNST của cổ đông ngân hàng mẹ, thay đổi so với cùng kỳ, quý 3/2026: TCB +23,7%, VCB +15,6%; "
+                     "TCB cao hơn VCB 8,1 điểm %", metric="npat_parent", measure="growth", order=["TCB", "VCB"],
+          names=["lnst"])
+    s.add("compare", "LNST của cổ đông ngân hàng mẹ, xếp theo quy mô, quý 3/2026: VCB 9.000 tỷ, TCB 7.943 tỷ; "
+                     "VCB gấp 1,13 lần TCB", metric="npat_parent", measure="level", order=["VCB", "TCB"], names=["lnst"])
+    s.add("rank", "LNST, thay đổi so với cùng kỳ, quý 3/2026, các ngân hàng (3 mã có số): TCB xếp thứ 2 trong 3; "
+                  "thứ tự: VPB +60,1%, TCB +23,7%, VCB +15,6%", ticker="TCB", metric="npat_parent", measure="growth",
+          order=["VPB", "TCB", "VCB"], names=["lnst"])
+    return s
+
+
+def kinds(text, uses, s=None):
+    return [v.kind for v in check_sentence(text, uses, s or compare_sheet(), {"TCB", "VCB"}, KNOWN).violations]
+
+
+def test_direction_words_must_match_the_numbers():
+    assert kinds("LNST của TCB tăng 23,7%.", ["S1"]) == []
+    assert kinds("LNST của TCB giảm 23,7%.", ["S1"]) == ["direction"]
+    assert kinds("Chi phí dự phòng của TCB giảm 38,8%.", ["S2"]) == []          # chi phí: theo độ lớn
+    assert kinds("LNST của TCB tăng, còn chi phí dự phòng giảm.", ["S1", "S2"]) == []
+    assert kinds("LNST của TCB giảm, còn chi phí dự phòng tăng.", ["S1", "S2"]) == ["direction", "direction"]
+
+
+def test_comparisons_follow_the_order_in_the_sheet():
+    assert kinds("LNST của TCB tăng nhanh hơn VCB 8,1 điểm %.", ["S3"]) == []
+    assert kinds("LNST của VCB tăng nhanh hơn TCB.", ["S3"]) == ["comparison"]
+    assert kinds("Về quy mô, LNST của VCB cao hơn TCB, gấp 1,13 lần.", ["S4"]) == []
+    assert kinds("Về quy mô, LNST của TCB lớn hơn VCB.", ["S4"]) == ["comparison"]
+    # chủ ngữ ở vế trước: "TCB tăng 23,7%, cao hơn VCB"
+    assert kinds("LNST của TCB tăng 23,7%, nhanh hơn VCB.", ["S1", "S3"]) == []
+    assert kinds("LNST của TCB tăng nhanh hơn VCB.", ["S1"]) == ["comparison"]   # không ghi dòng so sánh
+
+
+def test_superlatives_use_the_rank_order():
+    s = compare_sheet()
+    assert [v.kind for v in check_sentence("VPB tăng mạnh nhất nhóm.", ["S5"], s, {"TCB"}, KNOWN).violations] == []
+    assert [v.kind for v in check_sentence("VCB tăng nhanh nhất nhóm.", ["S5"], s, {"TCB", "VCB"}, KNOWN).violations] \
+        == ["comparison"]
+    assert [v.kind for v in check_sentence("VCB tăng chậm nhất nhóm.", ["S5"], s, {"TCB", "VCB"}, KNOWN).violations] \
+        == []
+
+
+def test_loss_wording_and_unresolved_clauses():
+    s = FactSheet()
+    s.add("metric", "LNST, ABC, quý 3/2026: −50 tỷ; cùng kỳ −100 tỷ; lỗ thu hẹp từ 100 tỷ còn 50 tỷ", ticker="ABC",
+          metric="npat_parent", direction="up", names=["lnst"])
+    assert [v.kind for v in check_sentence("ABC lỗ giảm còn 50 tỷ.", ["S1"], s, {"ABC"}, {"ABC"}).violations] == []
+    r = check_sentence("Mọi thứ đều tăng.", ["S1"], s, {"ABC"}, {"ABC"})
+    assert r.violations == []            # câu không nói chỉ tiêu nào, không có số: chỉ cảnh báo

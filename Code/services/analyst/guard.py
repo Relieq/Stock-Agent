@@ -180,9 +180,85 @@ def _negated(text: str, start: int) -> bool:
     return bool(m) and not re.search(r"[,;.]", m.group(0))
 
 
-def _check_directions(text, facts, out, bad) -> None:
-    """Từ chỉ chiều và so sánh (Task 2)."""
-    return None
+UP = re.compile(r"(?i)\b(tăng|cải thiện|đi lên)\b")
+DOWN = re.compile(r"(?i)\b(giảm|sụt|đi xuống)\b")
+COMP_UP = re.compile(r"(nhanh hơn|cao hơn|lớn hơn|nhiều hơn|mạnh hơn|vượt)")
+COMP_DOWN = re.compile(r"(chậm hơn|thấp hơn|nhỏ hơn|ít hơn|yếu hơn|kém)")
+SUP_TOP = re.compile(r"(cao nhất|lớn nhất|nhanh nhất|mạnh nhất|nhiều nhất|dẫn đầu|đứng đầu)")
+SUP_BOTTOM = re.compile(r"(thấp nhất|nhỏ nhất|chậm nhất|yếu nhất|ít nhất|kém nhất|đứng cuối)")
+CLAUSE = re.compile(r"[,;]|\s(?:trong khi|còn|nhưng|song|tuy nhiên|đồng thời)\s")
+GROWTH_WORDS = re.compile(r"nhanh|chậm|tăng|giảm|tốc độ|%|điểm")
+
+
+def _clauses(text: str) -> list[tuple[int, int]]:
+    spans, start = [], 0
+    for m in CLAUSE.finditer(text):
+        spans.append((start, m.start()))
+        start = m.end()
+    spans.append((start, len(text)))
+    return [(a, b) for a, b in spans if text[a:b].strip()]
+
+
+def _named(facts: list[Fact], low: str) -> list[Fact]:
+    """Các dòng mà vế câu nhắc tên chỉ tiêu; không nhắc tên nào thì giữ cả."""
+    hit = [f for f in facts if any(n in low for n in f.names)]
+    return hit or facts
+
+
+def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad) -> None:
+    """Từ tăng/giảm khớp chiều của dòng được ghi; so sánh hai mã và cao nhất/thấp nhất khớp thứ tự trong bảng số."""
+    subject: str | None = None          # mã làm chủ ngữ ở vế trước ("TCB tăng 23,7%, cao hơn VCB")
+    for a, b in _clauses(text):
+        clause = text[a:b]
+        low = clause.lower().replace("tăng trưởng âm", "giảm")
+        tickers = list(dict.fromkeys(TICKER.findall(clause)))
+        measure = "growth" if GROWTH_WORDS.search(text.lower()) else "level"
+        comp_up, comp_down = COMP_UP.search(low), COMP_DOWN.search(low)
+        if comp_up or comp_down:
+            pair = tickers[:2] if len(tickers) >= 2 else (
+                [subject, tickers[0]] if len(tickers) == 1 and subject and subject != tickers[0] else None)
+            if pair:
+                a_t, b_t = pair
+                cands = _named([f for f in facts if f.order and a_t in f.order and b_t in f.order
+                                and f.measure == measure], low)
+                if not cands:
+                    bad("comparison", f"không có dòng so sánh {a_t} với {b_t}: {clause.strip()}")
+                elif not any((f.order.index(a_t) < f.order.index(b_t)) == bool(comp_up) for f in cands):
+                    bad("comparison", clause.strip())
+                subject = subject or a_t
+                continue
+        top, bottom = SUP_TOP.search(low), SUP_BOTTOM.search(low)
+        if top or bottom:
+            who = tickers[0] if tickers else subject
+            if who:
+                cands = _named([f for f in facts if f.order and who in f.order and f.measure == measure], low)
+                if not cands:
+                    bad("comparison", f"không có dòng xếp hạng cho {who}: {clause.strip()}")
+                elif not any((f.order[0] if top else f.order[-1]) == who for f in cands):
+                    bad("comparison", clause.strip())
+            continue
+        if tickers:
+            subject = tickers[0]
+        up, down = bool(UP.search(low)), bool(DOWN.search(low))
+        if up == down:
+            continue
+        if "lỗ" in low:                 # "lỗ giảm" là cải thiện, "lỗ tăng" là xấu đi
+            up, down = down, up
+        linked = {l.fact_id for l in out.links if a <= l.start < b}
+        cands = [f for f in facts if f.id in linked and f.direction]
+        if not cands:
+            cands = [f for f in facts if f.direction and any(n in low for n in f.names)
+                     and (not tickers or f.ticker in tickers)]
+        if not cands:
+            with_dir = [f for f in facts if f.direction]
+            cands = with_dir if len(with_dir) == 1 else []
+        dirs = {f.direction for f in cands}
+        if len(dirs) != 1:
+            out.warnings.append(f"không rõ chiều: {clause.strip()}")
+            continue
+        d = dirs.pop()
+        if (up and d == "down") or (down and d == "up"):
+            bad("direction", clause.strip())
 
 
 def check_draft(draft: dict, sheet: FactSheet, allowed: set[str], known: set[str]

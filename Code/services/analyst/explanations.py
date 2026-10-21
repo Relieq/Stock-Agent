@@ -442,11 +442,13 @@ def read_letter(client, path) -> dict:
     return client.json_from_images(PROMPT, images, SCHEMA, "explanation_read")
 
 
-def load_letter(conn, client, doc_id: int) -> dict:
-    """Kết quả đọc công văn: lấy từ Data/raw/explanations/<id>.json nếu đã đọc, chưa thì đọc (khoảng 0,0016 USD) và lưu."""
+def load_letter(conn, client, doc_id: int, cache_dir=None) -> dict:
+    """Kết quả đọc công văn: lấy từ Data/raw/explanations/<id>.json nếu đã đọc, chưa thì đọc (khoảng 0,0016 USD) và lưu.
+    `cache_dir`: thư mục lưu riêng (chương trình đo mỗi nhà cung cấp một thư mục để không dùng chung bản đọc)."""
     import json
+    from pathlib import Path
     from services.ingestion.registry import raw_data_dir
-    cache = raw_data_dir() / "explanations" / f"{doc_id}.json"
+    cache = (Path(cache_dir) if cache_dir else raw_data_dir() / "explanations") / f"{doc_id}.json"
     if cache.exists():
         return json.loads(cache.read_text(encoding="utf-8"))
     key = conn.execute("SELECT storage_key FROM document_files WHERE document_id = %s ORDER BY downloaded_at DESC LIMIT 1",

@@ -22,7 +22,7 @@ def more_metric(conn, plan: Plan, sheet: FactSheet, ticker: str, key: str) -> li
     return [f] if f else []
 
 
-def reasons(conn, client, plan: Plan, sheet: FactSheet, ticker: str) -> list[Fact]:
+def reasons(conn, client, plan: Plan, sheet: FactSheet, ticker: str, cache_dir=None) -> list[Fact]:
     """Nguyên nhân trong công văn giải trình cùng kỳ. Chỉ đưa nguyên nhân khớp, khớp chiều hoặc chưa kiểm được (ghi rõ là
     theo công ty); nguyên nhân lệch với BCTC không đưa cho mô hình."""
     if ticker not in plan.tickers:
@@ -38,7 +38,7 @@ def reasons(conn, client, plan: Plan, sheet: FactSheet, ticker: str) -> list[Fac
     doc_id, period = row
     src = [{"document_id": doc_id, "page": None, "label": "Công văn giải trình", "raw": None}]
     out = []
-    for sec in load_letter(conn, client, doc_id).get("sections", []):
+    for sec in load_letter(conn, client, doc_id, cache_dir).get("sections", []):
         if sec["scope"] == "separate" or sec["period_kind"] not in PERIOD_KINDS[plan.basis]:
             continue
         res = check_section(sec, facts_for(conn, ticker, plan.year, period, sec["scope"], sec["period_kind"]))

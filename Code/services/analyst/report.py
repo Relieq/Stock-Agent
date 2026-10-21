@@ -76,6 +76,8 @@ def estimate_read_usd() -> float:
 
 
 class RealDeps:
+    letter_cache_dir = None     # thư mục lưu bản đọc công văn; None = thư mục chung Data/raw/explanations
+
     def __init__(self, conn, report_id: int, client=None):
         self.conn, self.report_id = conn, report_id
         row = conn.execute("SELECT u.id, u.email, u.role, u.daily_quota FROM reports r JOIN users u ON u.id = r.user_id"
@@ -184,7 +186,9 @@ class RealDeps:
             return
         self._served.add(key)
         if tool == "reasons":
-            tools.reasons(self.conn, self.client, plan, sheet, ticker)
+            # chỉ chương trình đo đặt thư mục công văn riêng; chạy thật dùng thư mục chung
+            kw = {"cache_dir": self.letter_cache_dir} if self.letter_cache_dir else {}
+            tools.reasons(self.conn, self.client, plan, sheet, ticker, **kw)
         else:
             tools.more_metric(self.conn, plan, sheet, ticker, metric)
 

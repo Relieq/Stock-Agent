@@ -35,7 +35,9 @@ def reason_line(ticker: str, c: Check) -> str | None:
 def more_metric(conn, plan: Plan, sheet: FactSheet, ticker: str, key: str) -> list[Fact]:
     if ticker not in report_tickers(plan, sheet):
         return []
-    d = store.load_ticker(conn, ticker, plan.year, plan.period, plan.basis, with_flags=False)
+    if plan.kind == "trend":        # câu hỏi xu hướng: thêm dòng xu hướng của chỉ tiêu đó
+        return store.trend_rows(conn, plan, sheet, ticker, key)
+    d = store.load_ticker(conn, ticker, plan.year, plan.period, plan.basis, with_flags=False, computed=(key,))
     f = metric_fact(sheet, d, key) if d is not None else None
     return [f] if f else []
 

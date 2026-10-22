@@ -13,6 +13,7 @@ from statistics import median
 
 from services.analyst import catalog
 from services.analyst.sheet import Fact, FactSheet
+from services.analyst.trend import extremes, last_streak, pct_between, qlabel, qoq_dirs, value_of
 from services.metrics.card import change_text, ty, vn
 
 B = Decimal(10) ** 9
@@ -33,6 +34,8 @@ class TickerData:
     values: dict[str, Pair]
     flags: list[tuple[str, str]] = field(default_factory=list)   # (tên cờ, chi tiết) của thẻ KQKD
     document_id: int | None = None
+    notes: list[str] = field(default_factory=list)               # tỷ lệ hỏi mà không tính được, kèm lý do
+    other_documents: list[int] = field(default_factory=list)     # BCTC khác đã dùng (số dư cuối quý trước cho ROE, NIM)
 
 
 @dataclass
@@ -50,12 +53,12 @@ def signed(x: Decimal, unit: str) -> str:
 
 
 def is_ratio(kind: str, key: str) -> bool:
-    return key in catalog.RATIOS.get(kind, {})
+    return key in catalog.RATIOS.get(kind, {}) or key in catalog.COMPUTED.get(kind, {})
 
 
 def pair_of(d: TickerData, key: str) -> Pair | None:
-    if not is_ratio(d.kind, key):
-        return d.values.get(key)
+    if not is_ratio(d.kind, key) or key in catalog.COMPUTED.get(d.kind, {}):
+        return d.values.get(key)      # tỷ lệ cần số dư bình quân: store.py đã tính sẵn (services/analyst/ratios.py)
     _, num, den = catalog.RATIOS[d.kind][key]
     n, m = d.values.get(num), d.values.get(den)
     if n is None or m is None:
@@ -96,12 +99,28 @@ def _show(d: TickerData, key: str, v: Decimal) -> str:
     return ty(abs(v)) if key in catalog.EXPENSES else money(v)
 
 
+# Cách tính in kèm dòng tỷ lệ cần số dư bình quân, để mô hình viết đúng "quy năm" (định nghĩa: ratios.py)
+COMPUTED_HOW = {
+    ("roe", "TCTD"): "LNST của cổ đông ngân hàng mẹ quy năm trên vốn chủ sở hữu bình quân đầu và cuối kỳ của cổ đông "
+                     "ngân hàng mẹ",
+    ("roe", ""): "LNST của cổ đông công ty mẹ quy năm trên vốn chủ sở hữu bình quân đầu và cuối kỳ của cổ đông công ty mẹ",
+    ("nim", "TCTD"): "thu nhập lãi thuần quy năm trên tài sản sinh lãi bình quân đầu và cuối kỳ",
+}
+
+
+def computed_how(kind: str, key: str) -> str | None:
+    if key not in catalog.COMPUTED.get(kind, {}):
+        return None
+    return COMPUTED_HOW.get((key, kind)) or COMPUTED_HOW.get((key, ""))
+
+
 def metric_fact(sheet: FactSheet, d: TickerData, key: str) -> Fact | None:
     name = catalog.name(d.kind, key)
     p = pair_of(d, key)
     if name is None or p is None or p.cur is None:
         return None
-    parts = [f"{name}, {d.ticker}, {d.label}: {_show(d, key, p.cur)}"]
+    how = computed_how(d.kind, key)
+    parts = [f"{name}, {d.ticker}, {d.label}: {_show(d, key, p.cur)}" + (f" ({how})" if how else "")]
     if p.prev is None:
         parts.append("chưa có số cùng kỳ")
     else:
@@ -357,4 +376,145 @@ def screen_charts(groups: dict[str, Group], metrics: list[str], measure: str, to
         head = "thay đổi so với cùng kỳ" if measure == "growth" else "kỳ này"
         specs.append({"type": "bars", "title": f"{catalog.name(k, key)}: {head}, {GROUP_LABELS[k]}", "unit": unit,
                       "items": items, "highlight": tops[k]})
+    return specs
+
+
+# ---- xu hướng nhiều quý -----------------------------------------------------------------------------------------
+
+Point = tuple[int, int, "TickerData | None"]        # (năm, quý, số của quý đó; None nếu chưa có BCTC kiểm chứng)
+
+
+def _value_text(kind: str, key: str, v: Decimal) -> str:
+    if is_ratio(kind, key):
+        return ("−" if v < 0 else "") + vn(abs(v)) + "%"
+    return ty(abs(v)) if key in catalog.EXPENSES else money(v)
+
+
+def _step_text(kind: str, key: str, a: Decimal, b: Decimal) -> str:
+    """Thay đổi từ quý a sang quý b: % (tỷ lệ: điểm %) kèm mức tăng/giảm; lợi nhuận âm ở một quý thì tả bằng lời."""
+    if is_ratio(kind, key):
+        return "không đổi" if b == a else signed(b - a, " điểm %")
+    expense, profit = key in catalog.EXPENSES, key in catalog.PROFIT
+    delta = abs(b) - abs(a) if expense else b - a
+    if delta == 0:
+        return "không đổi"
+    pct = pct_between(a, b, expense, profit, False)
+    word = "tăng" if delta > 0 else "giảm"
+    if pct is not None:
+        return f"{signed(pct, '%')} ({word} {ty(abs(delta))})"
+    if a < 0 and b < 0:
+        return f"lỗ {'thu hẹp' if delta > 0 else 'tăng'} từ {ty(a)} {'còn' if delta > 0 else 'lên'} {ty(b)}"
+    if a <= 0 < b:
+        return f"chuyển từ lỗ {ty(a)} sang lãi {ty(b)}" if a < 0 else f"từ hòa vốn lên lãi {ty(b)}"
+    if b <= 0 < a:
+        return f"chuyển từ lãi {ty(a)} sang lỗ {ty(b)}" if b < 0 else f"từ lãi {ty(a)} xuống hòa vốn"
+    return f"{word} {ty(abs(delta))}"
+
+
+def trend_fact(sheet: FactSheet, ticker: str, kind: str, key: str, points: list[Point]) -> Fact | None:
+    """Dòng "Xu hướng ...": giá trị từng quý, thay đổi so với quý liền trước và so với cùng kỳ của từng quý, quý cuối so
+    với quý đầu, quý cao nhất/thấp nhất, chuỗi tăng/giảm liên tiếp gần nhất. Chuỗi số (series) lưu kèm dòng để bộ kiểm
+    tra số kiểm các câu xu hướng bằng đúng các phép tính ở trend.py. Dưới 2 quý có số: không có dòng."""
+    name = catalog.name(kind, key)
+    if name is None:
+        return None
+    expense = key in catalog.EXPENSES
+    series, sources = [], []
+    for y, q, d in points:
+        p = pair_of(d, key) if d is not None else None
+        v = p.cur if p is not None else None
+        g = growth(d, key) if v is not None else None
+        series.append({"y": y, "q": q, "label": qlabel(y, q), "value": None if v is None else str(v),
+                       "yoy": None if g is None else str(g),
+                       "yoy_dir": direction(d, key) if v is not None else None})
+        if p is not None and v is not None:
+            sources += p.sources
+    have = [i for i, e in enumerate(series) if e["value"] is not None]
+    if len(have) < 2:
+        return None
+    show = lambda v: _value_text(kind, key, v)      # noqa: E731
+    how = computed_how(kind, key)
+    head = (f"Xu hướng {name}, {ticker}, {len(series)} quý từ {series[0]['label']} đến {series[-1]['label']}"
+            + (f" ({how})" if how else "") + ": ")
+    parts = [head + ", ".join(f"{e['label']} {show(value_of(e)) if e['value'] is not None else 'chưa có số'}"
+                              for e in series)]
+    steps = [f"{series[i]['label']} {_step_text(kind, key, value_of(series[i - 1]), value_of(series[i]))}"
+             for i in range(1, len(series)) if series[i - 1]["value"] is not None and series[i]["value"] is not None]
+    if steps:
+        parts.append("so với quý liền trước: " + ", ".join(steps))
+    unit = " điểm %" if is_ratio(kind, key) else "%"
+    yoy = [f"{e['label']} {signed(Decimal(e['yoy']), unit)}" for e in series if e["yoy"] is not None]
+    if yoy:
+        parts.append("so với cùng kỳ năm trước: " + ", ".join(yoy))
+    first, last = have[0], have[-1]
+    if last - first >= 2:
+        parts.append(f"{series[last]['label']} so với {series[first]['label']}: "
+                     + _step_text(kind, key, value_of(series[first]), value_of(series[last])))
+    hi, lo = extremes(series, expense)
+    parts.append(f"cao nhất trong {len(have)} quý có số là {series[hi]['label']} ({show(value_of(series[hi]))}), "
+                 f"thấp nhất là {series[lo]['label']} ({show(value_of(series[lo]))})")
+    run = last_streak(qoq_dirs(series, expense))
+    if run and run[1] >= 2:
+        parts.append(f"so với quý liền trước, {series[-1]['label']} là quý thứ {run[1]} liên tiếp "
+                     f"{'tăng' if run[0] == 'up' else 'giảm'}")
+    yrun = last_streak([e["yoy_dir"] for e in series])
+    if yrun and yrun[1] >= 2:
+        parts.append(f"so với cùng kỳ năm trước, {series[-1]['label']} là quý thứ {yrun[1]} liên tiếp "
+                     f"{'tăng' if yrun[0] == 'up' else 'giảm'}")
+    return sheet.add("trend", "; ".join(parts), ticker=ticker, metric=key, measure="trend",
+                     names=catalog.names(kind, key), sources=sources, series=series)
+
+
+def build_trend(data: dict[str, tuple[str, list[Point]]], metrics: list[str]) -> FactSheet:
+    """Bảng số cho câu hỏi xu hướng: mỗi mã, mỗi chỉ tiêu một dòng xu hướng; thêm các dòng chỉ tiêu (so với cùng kỳ) và
+    cờ của quý cuối; nhiều mã thì so các mã ở quý cuối."""
+    sheet = FactSheet()
+    last: list[TickerData] = []
+    for ticker, (kind, points) in data.items():
+        for key in catalog.keys_for(kind, metrics):
+            trend_fact(sheet, ticker, kind, key, points)
+        end = points[-1][2] if points else None
+        if end is not None:
+            last.append(end)
+            for key in catalog.keys_for(kind, metrics):
+                metric_fact(sheet, end, key)
+            for title, detail in end.flags:
+                sheet.add("flag", f"Cờ cảnh báo của thẻ KQKD, {end.ticker}, {end.label}: {title}. {detail}",
+                          ticker=end.ticker)
+    if len(last) >= 2:
+        for key in catalog.common_keys({d.kind for d in last}, metrics):
+            compare_facts(sheet, last, key)
+    return sheet
+
+
+TREND_CHARTS = 3        # số chỉ tiêu tối đa vẽ biểu đồ xu hướng
+
+
+def trend_charts(data: dict[str, tuple[str, list[Point]]], metrics: list[str]) -> list[dict]:
+    """Đường theo quý của từng chỉ tiêu (mỗi mã một đường): tỷ đồng, tỷ lệ thì %."""
+    if not data:
+        return []
+    kinds = {kind for kind, _ in data.values()}
+    keys = catalog.common_keys(kinds, metrics) if len(data) > 1 else catalog.keys_for(next(iter(kinds)), metrics)
+    window = next(iter(data.values()))[1]
+    labels = [f"Q{q}/{y}" for y, q, _ in window]
+    specs = []
+    for key in keys[:TREND_CHARTS]:
+        lines = []
+        ratio = all(is_ratio(kind, key) for kind, _ in data.values())
+        for ticker, (kind, points) in data.items():
+            vals = []
+            for _, _, d in points:
+                p = pair_of(d, key) if d is not None else None
+                v = p.cur if p is not None else None
+                if v is None:
+                    vals.append(None)
+                    continue
+                mag = abs(v) if key in catalog.EXPENSES else v
+                vals.append(round(float(mag if ratio else mag / B), 1))
+            if sum(v is not None for v in vals) >= 2:
+                lines.append({"name": ticker, "values": vals})
+        if lines:
+            specs.append({"type": "line", "title": f"{_title(kinds, key)} theo quý", "unit": "%" if ratio else "tỷ đồng",
+                          "labels": labels, "series": lines, "highlight": []})
     return specs

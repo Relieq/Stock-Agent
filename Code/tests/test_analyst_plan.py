@@ -106,9 +106,9 @@ def test_screen_with_named_tickers_becomes_rank_or_compare():
     assert c.plan.kind == "compare" and (c.plan.sector, c.plan.measure) == ("all", "growth")   # chỉ dùng cho screen
 
 
-def test_ask_back_lists_the_four_question_kinds():
+def test_ask_back_lists_the_five_question_kinds():
     ask = check(plan(kind="yoy", tickers=[])).ask
-    assert ask.startswith("Bạn muốn xem mã") and ask.count("\n- ") == 4 and "tốt nhất" in ask
+    assert ask.startswith("Bạn muốn xem mã") and ask.count("\n- ") == 5 and "tốt nhất" in ask and "xu hướng" in ask
 
 
 def test_old_saved_plans_without_sector_still_load():

@@ -1,3 +1,3 @@
 {% if r.plan %}<p class="small muted">Agent hiểu yêu cầu là:
-    {{ {"compare": "so sánh các mã", "yoy": "so với cùng kỳ năm trước", "rank": "vị trí trong nhóm", "screen": "mã nào tốt nhất trong các mã đang theo dõi"}[r.plan.kind] }}
+    {{ {"compare": "so sánh các mã", "yoy": "so với cùng kỳ năm trước", "rank": "vị trí trong nhóm", "screen": "mã nào tốt nhất trong các mã đang theo dõi", "trend": "xu hướng nhiều quý"}.get(r.plan.kind, r.plan.kind) }}
     {% if r.plan.tickers %}· mã {{ r.plan.tickers | join(", ") }} {% endif %}· {{ r.plan_label }}</p>{% endif %}

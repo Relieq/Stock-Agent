@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from services.analyst import catalog
+from services.analyst import catalog, trend
 from services.analyst.sheet import Fact, FactSheet
 from services.metrics.card import vn
 
@@ -27,7 +27,10 @@ WORD_TIMES = {"gấp đôi": 2, "gấp ba": 3}
 # Năm đứng một mình được bỏ qua, trừ khi theo sau là đơn vị ("đạt 2000 tỷ" là số liệu, không phải năm)
 IGNORE = re.compile(r"(?i)\b(?:quý|Q)\s*[1-4]\b(?:\s*[/-]\s*\d{4})?|\b(?:năm|nam)\s+\d{4}|\b\d{1,2}/(?:19|20)\d{2}\b"
                     r"|\b(?:19|20)\d{2}\b(?!\s*(?:tỷ|triệu|đồng|%|lần|điểm|nghìn|ngàn)" + _UNIT_END + r")"
-                    r"|\b\d{1,2}\s*tháng|\bVN\d+\b|(?<!thứ\s)\b\d{1,2}/\d{1,2}(?:/\d{2,4})?(?!\d)|\bH[12]\b")
+                    r"|\b\d{1,2}\s*tháng|\bVN\d+\b|(?<!thứ\s)\b\d{1,2}/\d{1,2}(?:/\d{2,4})?(?!\d)|\bH[12]\b"
+                    # số quý của xu hướng ("3 quý liên tiếp", "trong 4 quý", "quý thứ 3 liên tiếp"): kiểm riêng ở
+                    # _check_trends theo chuỗi số của dòng xu hướng, không như số liệu
+                    r"|\b\d{1,2}\s+quý(?!\w)|\bthứ\s+\d{1,2}\s+liên\s+(?:tiếp|tục)(?!\w)")
 # Thứ hạng: "thứ 2/3", "thứ 2 trong (số) 3", "đứng/xếp thứ 2"; kiểm riêng theo thứ tự của dòng xếp hạng, không như số liệu
 RANK = re.compile(r"(?i)(?<!\w)(?P<verb>(?:đứng|xếp)\s+(?:hạng\s+)?)?thứ\s+(?P<n>\d{1,3})"
                   r"(?:\s*(?:/|trên|trong(?:\s+số)?)\s*(?P<m>\d{1,3})(?!\d))?(?![\w/])")
@@ -48,7 +51,9 @@ ADVICE = re.compile(r"(?i)(nên|khuyên|có thể\s+(?:cân nhắc|nên))\s+(?:\
                     r"|giá mục tiêu"
                     r"|cơ hội (đầu tư|mua)|định giá (hấp dẫn|rẻ)|thời điểm (tốt để )?(mua|bán)|khuyến nghị")
 NEGATED = re.compile(r"(?i)không\s+(?:\S+\s+){0,2}$")
-TICKER = re.compile(r"\b[A-Z]{3}\b")
+# Tên viết tắt của tỷ lệ/đơn vị (ROE, NIM, CIR...) cũng là 3 chữ in hoa nhưng không phải mã chứng khoán
+NOT_TICKERS = ("ROE", "ROA", "NIM", "CIR", "EPS", "USD", "VND")
+TICKER = re.compile(r"\b(?!(?:" + "|".join(NOT_TICKERS) + r")\b)[A-Z]{3}\b")
 
 KINDS = {
     "unsourced_number": "số không có trong các dòng câu đã ghi",
@@ -58,6 +63,8 @@ KINDS = {
     "foreign_ticker": "nhắc mã ngoài kế hoạch và ngoài các dòng câu ghi",
     "direction": "từ tăng/giảm ngược với số liệu",
     "comparison": "so sánh (cao hơn/thấp hơn, cao nhất/thấp nhất) ngược với số liệu hoặc không có dòng so sánh",
+    "trend": "nhận định nhiều quý (tăng/giảm liên tiếp, cao nhất/thấp nhất trong các quý, so với quý trước) ngược với "
+             "số liệu hoặc không ghi dòng xu hướng",
 }
 
 
@@ -199,7 +206,8 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
     for t in sorted(set(TICKER.findall(named)) & known):
         if t not in allowed and t not in fact_text:
             bad("foreign_ticker", t)
-    _check_directions(named, facts, out, bad, sheet)
+    handled = _check_trends(named, facts, out, bad, sheet)      # vế nói diễn biến nhiều quý: kiểm theo dòng xu hướng
+    _check_directions(named, facts, out, bad, sheet, skip=handled)
     _check_ranks(named, facts, bad, sheet)
     for detail in _self_contradictions(text):
         bad("direction", detail)
@@ -422,7 +430,7 @@ def _name_keys() -> dict[str, frozenset[str]]:
     "lnst của cổ đông ngân hàng mẹ" đều là npat_parent."""
     out: dict[str, set[str]] = {}
     for kind in catalog.METRICS:
-        for key in list(catalog.METRICS[kind]) + list(catalog.RATIOS[kind]):
+        for key in list(catalog.METRICS[kind]) + list(catalog.RATIOS[kind]) + list(catalog.COMPUTED.get(kind, {})):
             for n in catalog.names(kind, key):
                 out.setdefault(n, set()).add(key)
     return {n: frozenset(k) for n, k in out.items()}
@@ -523,7 +531,7 @@ def _directions_by_number(clause: str, facts: list[Fact], tickers: list[str]) ->
     return out
 
 
-RATIO_KEYS = {k for r in catalog.RATIOS.values() for k in r}
+RATIO_KEYS = {k for r in catalog.RATIOS.values() for k in r} | {k for r in catalog.COMPUTED.values() for k in r}
 MEDIAN = re.compile(r"trung vị")
 ALL_OF = re.compile(r"(?<!\w)(?:đều|cả hai|cả ba)(?!\w)")
 
@@ -633,9 +641,11 @@ def _against_cited_words(low: str, facts: list[Fact]) -> list[str]:
     return out
 
 
-def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, sheet: FactSheet | None = None) -> None:
+def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, sheet: FactSheet | None = None,
+                      skip: set[int] = frozenset()) -> None:
     """Từ tăng/giảm khớp chiều của dòng được ghi; so sánh hai mã và cao nhất/thấp nhất khớp thứ tự trong bảng số.
-    Xét từng vế câu; loại số liệu (quy mô hay tốc độ thay đổi) cũng đọc theo từng vế."""
+    Xét từng vế câu; loại số liệu (quy mô hay tốc độ thay đổi) cũng đọc theo từng vế. `skip`: vị trí đầu các vế đã kiểm
+    theo dòng xu hướng (_check_trends)."""
     subject: str | None = None          # mã làm chủ ngữ ở vế trước ("TCB tăng 23,7%, cao hơn VCB")
     prev_low, prev_tickers = "", []
     spans = _clauses(text)
@@ -646,6 +656,10 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
         tickers = list(dict.fromkeys(TICKER.findall(clause)))
         p_low, p_tickers = prev_low, prev_tickers
         prev_low, prev_tickers = low, tickers
+        if a in skip:
+            if tickers:
+                subject = tickers[0]
+            continue
         up_m, down_m = UP.search(low), DOWN.search(low)
         declining = bool(down_m) and not up_m
 
@@ -853,6 +867,267 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
         d = dirs.pop()
         if (up and d == "down") or (down and d == "up"):
             bad("direction", clause.strip())
+
+
+# ---- xu hướng nhiều quý -----------------------------------------------------------------------------------------
+# Câu nói diễn biến qua nhiều quý chỉ kiểm được bằng dòng xu hướng (Fact.series): chuỗi tăng/giảm liên tiếp, cao nhất/
+# thấp nhất trong N quý hoặc kể từ một quý, so với quý trước hay với một quý đã nêu, và số % / tiền của thay đổi giữa các
+# quý. Phép tính dùng chung với bảng số (services/analyst/trend.py).
+
+_QN = r"(\d{1,2}|hai|ba|bốn|tư|năm|sáu|bảy|tám)"
+QN_WORDS = {"hai": 2, "ba": 3, "bốn": 4, "tư": 4, "năm": 5, "sáu": 6, "bảy": 7, "tám": 8}
+_Q = r"(?:quý|q)\s*([1-4])(?:\s*[/-]\s*((?:19|20)\d{2}))?(?!\d)"
+# "tăng 3 quý liên tiếp", "3 quý tăng liên tiếp", "quý thứ 3 liên tiếp", "liên tiếp 3 quý"
+STREAK = re.compile(r"(?i)(?<!\w)(?:" + _QN + r"\s+quý\s+(?:\S+\s+){0,2}?liên\s+(?:tiếp|tục)"
+                    r"|quý\s+thứ\s+" + _QN + r"\s+liên\s+(?:tiếp|tục)"
+                    r"|liên\s+(?:tiếp|tục)\s+(?:trong\s+)?" + _QN + r"\s+quý)(?!\w)")
+BARE_STREAK = re.compile(r"(?i)(?<!\w)liên\s+(?:tiếp|tục)(?!\w)")       # "tăng liên tiếp": ít nhất 2 quý
+WINDOW_N = re.compile(r"(?i)(?<!\w)(?:trong|của|suốt|qua)\s+" + _QN + r"\s+quý(?!\w)"
+                      r"|(?<!\w)" + _QN + r"\s+quý\s+(?:gần|vừa|qua|trở lại)")
+SINCE = re.compile(r"(?i)(?<!\w)kể\s+từ\s+" + _Q)
+ALL_Q = re.compile(r"(?i)(?<!\w)(?:các quý|cả giai đoạn|giai đoạn này|trong giai đoạn|qua từng quý|từng quý|xu hướng)"
+                   r"(?!\w)")
+REF_PREV = re.compile(r"(?i)(?<!\w)(?:so với|hơn|bằng|từ)\s+(?:mức\s+(?:của\s+)?)?quý\s+(?:liền\s+)?(?:trước|liền kề)"
+                      r"(?:\s+đó)?(?!\w)")
+REF_Q = re.compile(r"(?i)(?<!\w)(?:so với|hơn|từ)\s+(?:mức\s+(?:của\s+)?)?" + _Q)
+
+
+# giữa từ cực và quý của nó chỉ có từ nối: "cao nhất ở quý 4/2025", "thấp nhất là vào quý 1"; "cao nhất và ở quý 1" thì
+# quý sau là của vế khác
+_SUP_TO_QUARTER = re.compile(r"^\s*(?:(?:là|ở|vào|tại|rơi vào|thuộc về|trong)\s+){0,2}$")
+
+
+def _qn(s: str) -> int:
+    return int(s) if s.isdigit() else QN_WORDS[s.lower()]
+
+
+def _group_n(m: re.Match) -> int:
+    return _qn(next(g for g in m.groups() if g))
+
+
+def _changes(f: Fact) -> list[tuple[Num, str]]:
+    """Mọi thay đổi in trong dòng xu hướng, kèm chiều: so với quý liền trước (% hoặc điểm %, và mức tiền), quý cuối so
+    với quý đầu, so với cùng kỳ của từng quý."""
+    s = f.series
+    expense, ratio = f.metric in catalog.EXPENSES, f.metric in RATIO_KEYS
+    profit = f.metric in catalog.PROFIT
+    vals = [trend.value_of(e) for e in s]
+    have = [i for i, v in enumerate(vals) if v is not None]
+    pairs = [(i - 1, i) for i in range(1, len(s))] + ([(have[0], have[-1])] if len(have) >= 3 else [])
+    out = []
+    for i, j in pairs:
+        a, b = vals[i], vals[j]
+        d = trend.dir_between(a, b, expense)
+        if d is None:
+            continue
+        pct = trend.pct_between(a, b, expense, profit, ratio)
+        if pct is not None:
+            out.append((Num(abs(pct), "pp" if ratio else "pct", 0, Decimal(1)), d))
+        if not ratio:
+            delta = abs(b) - abs(a) if expense else b - a
+            out.append((Num(abs(delta), "money", 0, Decimal(1)), d))
+    for e in s:
+        if e.get("yoy") is not None and e.get("yoy_dir"):
+            out.append((Num(abs(Decimal(e["yoy"])), "pp" if ratio else "pct", 0, Decimal(1)), e["yoy_dir"]))
+    return out
+
+
+def _subject_index(f: Fact, quarter: tuple[int, int | None] | None) -> int | None:
+    if quarter is not None:
+        return trend.resolve(f.series, *quarter)
+    have = [i for i, e in enumerate(f.series) if e["value"] is not None]
+    return have[-1] if have else None
+
+
+def _word(want: str) -> str:
+    return "tăng" if want == "up" else "giảm"
+
+
+def _trend_problem(f: Fact, claim: dict) -> str | None:
+    """Lý do nhận định không khớp dòng xu hướng `f`; khớp thì None."""
+    s = f.series
+    expense = f.metric in catalog.EXPENSES
+    idx = _subject_index(f, claim.get("quarter"))
+    if idx is None:
+        q = claim.get("quarter")
+        return f"dòng {f.id} không có số của quý {q[0]}" + (f"/{q[1]}" if q and q[1] else "")
+    at = s[idx]["label"]
+    vals = [trend.value_of(e) for e in s]
+    kind, want = claim["kind"], claim.get("want")
+    if kind == "streak":
+        yoy = claim["yoy"]
+        dirs = [e.get("yoy_dir") for e in s] if yoy else trend.qoq_dirs(s, expense)
+        k = trend.streak(dirs, idx, want)
+        if k < claim["n"]:
+            base = "so với cùng kỳ" if yoy else "so với quý liền trước"
+            return (f"dòng {f.id}: {at} không {_word(want)} {base}" if k == 0 else
+                    f"dòng {f.id}: tính đến {at}, {base} chỉ {_word(want)} {k} quý liên tiếp")
+        return None
+    if kind == "ref":
+        ri = idx - 1 if claim.get("ref") is None else trend.resolve(s, *claim["ref"], before=idx)
+        if ri is None or ri < 0 or vals[ri] is None or vals[idx] is None:
+            return f"dòng {f.id} không có số của quý được so"
+        d = trend.dir_between(vals[ri], vals[idx], expense)
+        if d != want:
+            return f"dòng {f.id}: {at} so với {s[ri]['label']} là " + ("không đổi" if d == "flat" else _word(d))
+        return None
+    if kind == "extreme":
+        # khoảng xét: "kể từ quý X" -> từ quý X đến quý được nói; "trong N quý" -> N quý cuối của dòng (khung của báo
+        # cáo); không nói -> cả dòng
+        end = len(s) - 1
+        if claim.get("since") is not None:
+            start, end = trend.resolve(s, *claim["since"], before=idx + 1), idx
+            if start is None:
+                return f"dòng {f.id} không có quý bắt đầu được nêu"
+        elif claim.get("n"):
+            start = end - claim["n"] + 1
+            if start < 0 or any(vals[i] is None for i in range(start, end + 1)):
+                return f"dòng {f.id} chỉ có {sum(v is not None for v in vals)} quý có số"
+            if idx < start:
+                return f"{at} nằm ngoài {claim['n']} quý cuối của dòng {f.id}"
+        else:
+            start = 0
+        if claim["measure"] == "level":
+            items = [(i, abs(vals[i]) if expense else vals[i]) for i in range(start, end + 1) if vals[i] is not None]
+        else:
+            ratio, profit = f.metric in RATIO_KEYS, f.metric in catalog.PROFIT
+            items = [(i, g) for i in range(max(start, 1), end + 1)
+                     if (g := trend.pct_between(vals[i - 1], vals[i], expense, profit, ratio)) is not None]
+        target = next((v for i, v in items if i == idx), None)
+        if target is None or len(items) < 2:
+            return f"dòng {f.id}: không so được {at} với các quý khác"
+        best = max(v for _, v in items) if claim["top"] else min(v for _, v in items)
+        if target != best:
+            i_best = next(i for i, v in items if v == best)
+            return (f"dòng {f.id}: {'cao' if claim['top'] else 'thấp'} nhất trong khoảng này là {s[i_best]['label']}, "
+                    f"không phải {at}")
+        return None
+    if kind == "span":          # "xu hướng tăng", "đi lên qua các quý": quý cuối so với quý đầu có số
+        first = next((i for i in range(idx + 1) if vals[i] is not None), None)
+        if first is None or first == idx:
+            return f"dòng {f.id}: không đủ quý có số"
+        d = trend.dir_between(vals[first], vals[idx], expense)
+        if d != want:
+            return f"dòng {f.id}: {at} so với {s[first]['label']} là " + ("không đổi" if d == "flat" else _word(d))
+        return None
+    return None
+
+
+def _check_trends(text: str, facts: list[Fact], out: SentenceCheck, bad, sheet: FactSheet | None) -> set[int]:
+    """Kiểm các vế câu nói diễn biến nhiều quý theo dòng xu hướng câu ghi. Trả về vị trí đầu các vế đã kiểm ở đây (bộ
+    kiểm tra chiều chung bỏ qua các vế này, vì dòng chỉ tiêu chỉ có chiều so với cùng kỳ)."""
+    handled: set[int] = set()
+    rows_all = [f for f in facts if f.series]
+    subject: str | None = None
+    quarter: tuple[int, int | None] | None = None
+    for a, b in _clauses(text):
+        clause = text[a:b]
+        low = clause.lower().replace("tăng trưởng âm", "giảm")
+        tickers = list(dict.fromkeys(TICKER.findall(clause)))
+        streak_m = STREAK.search(clause)
+        bare = BARE_STREAK.search(clause) if not streak_m else None
+        win, since, allq = WINDOW_N.search(clause), SINCE.search(clause), ALL_Q.search(clause)
+        ref_prev, ref_q = REF_PREV.search(clause), REF_Q.search(clause)
+        top, bottom = SUP_TOP.search(low), SUP_BOTTOM.search(low)
+        taken = [m.span() for m in (since, ref_q) if m]
+        refs = [m for m in trend.QUARTER_REF.finditer(clause) if not any(s <= m.start() < e for s, e in taken)]
+        if refs:
+            quarter = (int(refs[-1]["q"]), int(refs[-1]["y"]) if refs[-1]["y"] else None)
+        if ref_q and quarter and ref_q.group(2) and quarter[1] and int(ref_q.group(1)) == quarter[0] \
+                and int(ref_q.group(2)) == quarter[1] - 1:
+            ref_q = None            # "so với quý 2/2025" khi nói quý 2/2026: so với cùng kỳ, kiểm như từ chỉ chiều thường
+        who = tickers or ([subject] if subject else [])
+        if tickers:
+            subject = tickers[0]
+        # chiều câu nói: tăng/giảm, hoặc cao hơn/thấp hơn khi so với một quý
+        up_m, down_m = UP.search(low), DOWN.search(low)
+        if (ref_prev or ref_q) and not (up_m or down_m):
+            up_m, down_m = COMP_UP.search(low), COMP_DOWN.search(low)
+        word = up_m or down_m
+        want = None
+        if word and not (up_m and down_m):
+            want = "up" if up_m else "down"
+            if LOSS_BEFORE.search(low[:word.start()]):
+                want = "down" if want == "up" else "up"
+            if NEGATED_VERB.search(low[:word.start()]):
+                want = None
+                out.warnings.append(f"chiều bị phủ định: {clause.strip()}")
+        sup = top or bottom
+        # cao nhất/thấp nhất nói về các quý (không phải giữa các mã): có khung ("trong 4 quý", "kể từ quý 1"), hoặc có
+        # nêu quý mà câu không ghi dòng so sánh/xếp hạng giữa các mã
+        quarter_sup = bool(sup) and bool(win or since or allq or ref_q or (
+            rows_all and (refs or quarter) and not any(f.order for f in facts)))
+        claims: list[dict] = []
+        if streak_m or bare:
+            if want:
+                claims.append({"kind": "streak", "want": want, "n": _group_n(streak_m) if streak_m else 2,
+                               "yoy": "cùng kỳ" in text[:b].lower()})
+            else:
+                out.warnings.append(f"không rõ chiều của chuỗi liên tiếp: {clause.strip()}")
+        if quarter_sup:
+            start = since or ref_q
+            raw = clause.lower()
+            # mỗi từ cực một quý: quý đứng ngay sau ("cao nhất ở quý 4/2025"), không thì quý đứng trước gần nhất
+            sups = sorted([*SUP_TOP.finditer(raw), *SUP_BOTTOM.finditer(raw)], key=lambda m: m.start())
+            for sm in sups:
+                is_top = sm.re is SUP_TOP
+                growth_word = bool(up_m or down_m) and "đầu" not in sm.group(0)
+                if growth_word and down_m and not is_top:
+                    out.warnings.append(f"không rõ cực: {clause.strip()}")
+                    continue
+                after = next((r for r in refs if r.start() >= sm.end()
+                              and _SUP_TO_QUARTER.match(raw[sm.end():r.start()])), None)
+                before = [r for r in refs if r.end() <= sm.start()]
+                r = after or (before[-1] if before else None)
+                claims.append({"kind": "extreme", "top": is_top != bool(growth_word and down_m),
+                               "measure": "growth" if growth_word else "level",
+                               "n": _group_n(win) if win and not start else None,
+                               "since": (int(start.group(1)), int(start.group(2)) if start.group(2) else None)
+                               if start else None,
+                               "quarter": (int(r["q"]), int(r["y"]) if r["y"] else None) if r else quarter})
+        elif (ref_prev or ref_q) and want:
+            claims.append({"kind": "ref", "want": want,
+                           "ref": None if ref_prev else (int(ref_q.group(1)),
+                                                         int(ref_q.group(2)) if ref_q.group(2) else None)})
+        elif allq and want and not claims:
+            claims.append({"kind": "span", "want": want})
+        strong = bool(streak_m or bare or ref_prev or ref_q or quarter_sup or (allq and want))
+        rows = [f for f in rows_all if not who or f.ticker in who]
+        ids, any_name = _named_ids(rows, low)
+        if not any_name:
+            ids, any_name = _named_ids(rows, text[:b].lower())
+        if any_name:
+            rows = [f for f in rows if f.id in ids]
+        # số trong vế khớp một thay đổi của dòng xu hướng: chiều của từ đứng trước số phải khớp chiều của thay đổi đó
+        # (số cũng có trong dòng khác câu ghi, như mức tăng so với cùng kỳ của dòng chỉ tiêu, thì để bộ kiểm tra chung)
+        num_dirs = set()
+        others = [fn for f in facts if not f.series for fn, _ in _fact_numbers(f)]
+        if rows and want:
+            for n in numbers(clause):
+                if not any(matches(n, fn) for fn in others):
+                    num_dirs |= {d for f in rows for fn, d in _changes(f) if matches(n, fn)}
+        if not strong and not num_dirs:
+            continue
+        handled.add(a)
+        if not rows:
+            hint = ""
+            if sheet is not None:
+                cands = [f.id for f in sheet.facts if f.series and (not who or f.ticker in who)]
+                hint = " — ghi thêm dòng " + ", ".join(cands[:2]) + " vào uses" if cands else ""
+            bad("trend", f"câu nói diễn biến nhiều quý nhưng không ghi dòng xu hướng tương ứng: {clause.strip()}"
+                         + hint)
+            continue
+        if num_dirs and not claims and len(num_dirs) == 1 and num_dirs != {"flat"} and want not in num_dirs:
+            bad("trend", f"“{word.group(0)}” ngược chiều với thay đổi giữa các quý trong bảng số: {clause.strip()}")
+            continue
+        need_all = bool(ALL_OF.search(low))
+        for claim in claims:
+            problems = [_trend_problem(f, {"quarter": quarter} | claim) for f in rows]
+            ok = all(p is None for p in problems) if need_all else any(p is None for p in problems)
+            if not ok:
+                bad("trend", f"{clause.strip()} — " + next(p for p in problems if p))
+                break
+    return handled
 
 
 def check_draft(draft: dict, sheet: FactSheet, allowed: set[str], known: set[str]

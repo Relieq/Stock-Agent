@@ -26,6 +26,13 @@ RATIOS: dict[str, dict[str, tuple[str, str, str]]] = {
     "TCTD": {"cir": ("Chi phí hoạt động trên tổng thu nhập hoạt động", "opex", "toi")},
     "CTCK": {},
 }
+# Tỷ lệ cần số dư bình quân trên BCĐKT và quy năm (định nghĩa ở services/analyst/ratios.py): store.py tính sẵn khi người
+# dùng hỏi, không nằm trong bộ chỉ tiêu mặc định (cần thêm BCTC quý trước); chưa có số cùng kỳ năm trước
+COMPUTED: dict[str, dict[str, str]] = {
+    "corporate": {"roe": "ROE (quy năm)"},
+    "TCTD": {"roe": "ROE (quy năm)", "nim": "NIM (quy năm)"},
+    "CTCK": {"roe": "ROE (quy năm)"},
+}
 ALIASES = {
     "npat_parent": ["lnst", "lợi nhuận sau thuế", "lãi ròng", "lợi nhuận ròng", "lợi nhuận"],
     "npat": ["lnst", "lợi nhuận sau thuế"], "pbt": ["lntt", "lợi nhuận trước thuế"], "revenue": ["doanh thu"],
@@ -35,10 +42,13 @@ ALIASES = {
     "selling_expense": ["chi phí bán hàng"], "admin_expense": ["chi phí quản lý"],
     "gross_margin": ["biên lợi nhuận gộp", "biên gộp"], "net_margin": ["biên lợi nhuận ròng", "biên ròng"],
     "cir": ["cir", "chi phí hoạt động trên"],
+    "roe": ["roe", "tỷ suất lợi nhuận trên vốn chủ sở hữu", "lợi nhuận trên vốn chủ sở hữu"],
+    "nim": ["nim", "biên lãi thuần", "tỷ lệ thu nhập lãi thuần"],
 }
 PROFIT = {"gross_profit", "pbt", "npat", "npat_parent"}
 EXPENSES = set(EXPENSE_METRICS) | {"fin_expense"}
-ALL_KEYS = sorted({k for m in METRICS.values() for k in m} | {k for r in RATIOS.values() for k in r})
+ALL_KEYS = sorted({k for m in METRICS.values() for k in m} | {k for r in RATIOS.values() for k in r}
+                  | {k for r in COMPUTED.values() for k in r})
 SHARED = ["pbt", "npat_parent"]       # có ở mọi mẫu: dùng khi so các mã khác loại
 
 
@@ -47,7 +57,12 @@ def name(kind: str, key: str) -> str | None:
         return METRICS[kind][key]
     if key in RATIOS.get(kind, {}):
         return RATIOS[kind][key][0]
-    return None
+    return COMPUTED.get(kind, {}).get(key)
+
+
+def computed(kind: str, metrics: list[str]) -> tuple[str, ...]:
+    """Các tỷ lệ cần số dư bình quân mà người dùng hỏi và loại công ty này có."""
+    return tuple(k for k in metrics if k in COMPUTED.get(kind, {}))
 
 
 def names(kind: str, key: str) -> list[str]:

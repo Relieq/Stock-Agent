@@ -70,6 +70,19 @@ SCREEN_RULES = """
   không hiểu nhầm. Người dùng hỏi tại sao thì xin reasons cho các mã đứng đầu và giải thích bằng số trong bảng."""
 
 
+TREND_RULES = """
+- Câu hỏi xu hướng nhiều quý: mục đầu tả diễn biến qua các quý bằng dòng "Xu hướng ..." của bảng số (giá trị từng quý,
+  thay đổi so với quý liền trước, quý cao nhất/thấp nhất). Câu nói về nhiều quý (tăng/giảm so với quý trước, "tăng N
+  quý liên tiếp", "cao nhất trong N quý", "giảm từ quý 1") phải ghi dòng "Xu hướng" của đúng mã và chỉ tiêu đó.
+- "Tăng/giảm N quý liên tiếp" chỉ viết khi dòng xu hướng ghi "là quý thứ N liên tiếp tăng/giảm"; "cao nhất/thấp nhất
+  trong N quý" thì N không vượt số quý có số của dòng. Quý chưa có số thì không nói gì về quý đó.
+- Nói rõ so với quý liền trước hay so với cùng kỳ năm trước; không trộn hai loại trong một vế câu."""
+
+RATIO_RULES = """
+- ROE và NIM trong bảng số là tỷ lệ quy năm (số một quý nhân 4, số lũy kế quy ra 12 tháng) trên số dư bình quân đầu và
+  cuối kỳ: khi nhắc thì viết "quy năm"."""
+
+
 def write(client, question: str, plan: Plan, sheet: FactSheet, feedback: list[str], allow_need: bool) -> dict:
     advice = ("\n- Người dùng hỏi có nên mua/bán: mở đầu bằng một câu nói rõ Soi không đưa khuyến nghị đầu tư, rồi trình "
               "bày thông tin." if plan.advice_request else "")
@@ -79,11 +92,15 @@ def write(client, question: str, plan: Plan, sheet: FactSheet, feedback: list[st
           if feedback else "")
     if plan.kind == "screen":
         what = f"xếp hạng toàn bộ các mã đang theo dõi, kỳ {plan.label()}"
+    elif plan.kind == "trend":
+        what = f"xu hướng nhiều quý, mã {', '.join(plan.tickers)}, {plan.label()}"
     else:
         what = f"loại {plan.kind}, mã {', '.join(plan.tickers)}, kỳ {plan.label()}"
+    rules = SCREEN_RULES if plan.kind == "screen" else TREND_RULES if plan.kind == "trend" else ""
+    if any(f.metric in ("roe", "nim") for f in sheet.facts):
+        rules += RATIO_RULES
     prompt = PROMPT.format(question=question.strip()[:1000], plan=what, sheet=sheet.prompt_text(), advice=advice,
-                           metrics=", ".join(ALL_KEYS), need_rule=need_rule, feedback=fb,
-                           screen=SCREEN_RULES if plan.kind == "screen" else "")
+                           metrics=", ".join(ALL_KEYS), need_rule=need_rule, feedback=fb, screen=rules)
     return client.json_from_images(prompt, [], WRITE_SCHEMA, "write_report")
 
 

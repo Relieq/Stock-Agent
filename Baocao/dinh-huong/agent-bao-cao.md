@@ -30,11 +30,16 @@ Có trong Project 3:
   - Mã ngành thêm khi mở rộng VN100.
 - Không giới hạn số mã trong một yêu cầu. Khi có nhiều mã, báo cáo chuyển sang bảng xếp hạng kèm vài câu nêu điểm nổi bật.
 
+Thêm 22/10/2026:
+
+- **xu hướng nhiều quý** (loại yêu cầu thứ năm, mặc định 4 quý gần nhất): chiều thay đổi từng quý, chuỗi tăng/giảm liên
+  tiếp, quý cao nhất/thấp nhất, biểu đồ đường; bộ kiểm tra số kiểm các câu xu hướng theo đúng chuỗi số;
+- **ROE, NIM** (chỉ khi người dùng hỏi): tử số quy năm, mẫu số là bình quân số dư đầu và cuối kỳ; định nghĩa đầy đủ ở
+  `services/analyst/ratios.py`. Chưa có số cùng kỳ năm trước (BCTC kỳ này không in số dư năm trước).
+
 Chưa làm trong Project 3:
 
-- xu hướng nhiều quý;
-- ROE, NIM (cần số bình quân nhiều kỳ);
-- đọc thuyết minh để tìm nguyên nhân (mới dùng công văn giải trình);
+- đọc thuyết minh để tìm nguyên nhân trong agent báo cáo (đang làm riêng: `agent-nguyen-nhan.md`);
 - hỏi đáp nhiều lượt;
 - link chia sẻ công khai.
 

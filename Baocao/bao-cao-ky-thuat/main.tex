@@ -194,9 +194,9 @@ sửa 152 ô (0,4\%), trung bình 8 ô ở mỗi BCTC cần sửa. Chi phí gọ
 khoảng 0,12 USD, chưa tính chi phí phát triển. Khi đối chiếu với một nguồn dữ liệu công khai, 208/211 ô khớp; ở cả 3 ô lệch, số của Soi khớp với phép cộng
 trong chính BCTC.
 
-Trên lớp số liệu đã kiểm chứng này, một \textbf{agent} nhận câu hỏi người dùng gõ bằng lời thường, thuộc bốn loại: so
-nhiều mã cùng kỳ, một mã so với cùng kỳ, vị trí của một mã trong nhóm, và mã nào tốt nhất trong các mã đang theo dõi (ví
-dụ \enquote{công ty nào có KQKD tốt nhất hiện nay, tại sao?}). Agent tự lập kế hoạch, lấy số, viết báo cáo kèm bảng và
+Trên lớp số liệu đã kiểm chứng này, một \textbf{agent} nhận câu hỏi người dùng gõ bằng lời thường, thuộc năm loại: so
+nhiều mã cùng kỳ, một mã so với cùng kỳ, vị trí của một mã trong nhóm, mã nào tốt nhất trong các mã đang theo dõi (ví
+dụ \enquote{công ty nào có KQKD tốt nhất hiện nay, tại sao?}) và xu hướng qua nhiều quý. Agent tự lập kế hoạch, lấy số, viết báo cáo kèm bảng và
 biểu đồ; mọi con số và từ tăng/giảm, cao hơn/thấp hơn trong lời văn được code kiểm lại với bảng số trước khi người đọc
 thấy. Trên 66 câu hỏi mẫu (có 6 câu do người dùng thử viết), agent \textbf{hiểu đúng yêu cầu ở 65 câu} với Claude Haiku
 5.5 và 64 câu với gpt-5.4-mini, và viết xong đủ 58/58 báo cáo ở cả hai nhà. Trên 8 câu hỏi chung, trợ lý AI đa năng có tìm
@@ -609,13 +609,13 @@ Hậu điều kiện & Yêu cầu ở trạng thái đã xong hoặc bị từ c
 \toprule
 Tác nhân & Người dùng được mời; bộ canh (chạy tiếp báo cáo đang chờ) \\
 Tiền điều kiện & Đã đăng nhập, còn hạn mức báo cáo trong ngày, chưa chạm trần chi phí tháng \\
-Luồng chính & 1. Người dùng gõ câu hỏi bằng lời thường, thuộc một trong bốn loại (mục~\ref{sec:agent}).\newline
+Luồng chính & 1. Người dùng gõ câu hỏi bằng lời thường, thuộc một trong năm loại (mục~\ref{sec:agent}).\newline
 2. Agent hiểu câu hỏi thành kế hoạch (loại câu hỏi, mã, kỳ); code kiểm kế hoạch.\newline
 3. Code lấy số đã kiểm chứng, dựng bảng số và biểu đồ.\newline
 4. Mô hình viết lời; code kiểm từng câu, câu sai được viết lại.\newline
 5. Hệ thống hiện trang báo cáo; người dùng tải PDF nếu cần. \\
 Luồng thay thế & 2a. Không có mã (trừ câu hỏi mã nào tốt nhất) hoặc mã không tồn tại: hỏi lại người dùng, kèm ví dụ
-của bốn loại câu hỏi.\newline
+của năm loại câu hỏi.\newline
 3a. Kho thiếu BCTC: hỏi người dùng có cho đọc thêm không (báo chi phí, hạn mức); đồng ý thì chờ bộ canh đọc xong rồi
 chạy tiếp và gửi email.\newline
 4a. Câu vẫn sai sau 2 lần viết lại: bỏ câu đó; không còn câu nào thì báo lỗi.\newline
@@ -1310,16 +1310,17 @@ lên chỉ chủ sở hữu thấy. Trước khi đọc, hệ thống xem hai tr
 khai; file khác loại (ví dụ công văn giải trình kết quả kinh doanh) bị từ chối kèm lý do và không tính vào hạn mức.
 
 \section{Agent tạo báo cáo theo yêu cầu}\label{sec:agent}
-Người dùng gõ câu hỏi bằng lời thường và nhận về một báo cáo ngắn có lời văn, bảng số, biểu đồ. Agent trả lời bốn loại
+Người dùng gõ câu hỏi bằng lời thường và nhận về một báo cáo ngắn có lời văn, bảng số, biểu đồ. Agent trả lời năm loại
 câu hỏi:
 \begin{itemize}
   \item so nhiều mã cùng kỳ, ví dụ \enquote{so sánh KQKD quý 3/2026 của TCB, LPB và VPB};
   \item một mã so với cùng kỳ năm trước, ví dụ \enquote{FPT quý vừa rồi làm ăn thế nào};
   \item vị trí của một mã trong nhóm, ví dụ \enquote{LNST quý 2 của MBB đứng thứ mấy trong các ngân hàng};
   \item mã nào tốt nhất trong các mã đang theo dõi, không cần nêu mã, ví dụ \enquote{công ty nào có KQKD tốt nhất hiện
-        nay, tại sao?}.
+        nay, tại sao?};
+  \item xu hướng qua nhiều quý (thêm sau khi đo, mục~\ref{sec:xuhuong}), ví dụ \enquote{LNST của TCB 4 quý gần nhất}.
 \end{itemize}
-Câu hỏi không thuộc loại nào, hoặc thiếu mã, được hỏi lại kèm ví dụ của cả bốn loại. Nguyên tắc vẫn như phần đọc BCTC:
+Câu hỏi không thuộc loại nào, hoặc thiếu mã, được hỏi lại kèm ví dụ của cả năm loại. Nguyên tắc vẫn như phần đọc BCTC:
 \textbf{mô hình chỉ hiểu câu hỏi và viết câu, mọi con số do code tính và code kiểm lại}.
 
 \subsection{Luồng xử lý}
@@ -1416,6 +1417,19 @@ của thẻ KQKD cho 5 mã đứng đầu mỗi nhóm. Để trả lời \enquot
 trình của các mã đứng đầu (chỉ nguyên nhân đã khớp BCTC mới giữ số). Báo cáo nêu cả các cờ như nền so sánh thấp hay lợi
 nhuận đến từ ngoài hoạt động chính, để người đọc không coi một mức tăng rất lớn là dấu hiệu kinh doanh tốt. Mục đầu của
 báo cáo luôn ghi tiêu chí xếp hạng; \enquote{tốt nhất} chỉ có nghĩa theo tiêu chí đó, không phải đánh giá cổ phiếu.
+
+\subsection{Xu hướng nhiều quý và các tỷ lệ ROE, NIM}\label{sec:xuhuong}
+Loại yêu cầu thứ năm hỏi một chỉ tiêu của một hay nhiều mã qua nhiều quý (mặc định 4 quý gần nhất có BCTC đã kiểm
+chứng). Code tính sẵn cho mỗi mã chiều thay đổi từng quý so với quý trước, số quý tăng hay giảm liên tiếp, quý cao nhất
+và thấp nhất, rồi đưa vào bảng số kèm biểu đồ đường. Bộ kiểm tra số có thêm luật cho câu xu hướng: \enquote{tăng 3 quý
+liên tiếp}, \enquote{cao nhất ở quý 4/2025} phải đúng với chuỗi số trong bảng.
+
+ROE và NIM chỉ tính khi người dùng hỏi. Tử số được quy năm (số riêng quý nhân 4, số lũy kế nhân 12 chia số tháng); mẫu số
+là bình quân số dư đầu và cuối kỳ trên BCĐKT. ROE dùng LNST và vốn chủ sở hữu của cổ đông công ty mẹ. NIM dùng thu nhập
+lãi thuần trên tài sản sinh lãi: tiền gửi tại NHNN, tiền gửi và cho vay các TCTD khác, chứng khoán kinh doanh, cho vay
+khách hàng, mua nợ, chứng khoán đầu tư, lấy đúng số dòng như in (đã trừ dự phòng). Thiếu một số dư, hoặc số dư nằm ở ô
+chưa được xác nhận, thì tỷ lệ để trống và ghi lý do, không thay bằng số gần đúng. Hai tỷ lệ này chưa có số cùng kỳ năm
+trước vì BCTC kỳ này không in số dư của năm trước.
 
 \subsection{Trang báo cáo}
 Mỗi con số trong lời văn là một liên kết tới dòng bảng số, và dòng bảng số dẫn tới trang BCTC gốc
@@ -2027,7 +2041,7 @@ lệch đều có lời giải thích từ chính BCTC.
 Điểm khác biệt của hệ thống không nằm ở mô hình ngôn ngữ, vì ai cũng dùng được mô hình như nhau. Điểm khác biệt là
 \textbf{lớp kiểm chứng}: mỗi con số đều có nguồn, đều đã qua kiểm tra, và có lịch sử sửa lỗi tích lũy qua từng mùa.
 Agent tạo báo cáo được đặt lên trên lớp này theo cùng nguyên tắc: mô hình hiểu câu hỏi và viết câu, code tính số và kiểm
-lại từng con số, từng từ tăng/giảm trong lời văn. Agent trả lời bốn loại câu hỏi, kể cả câu không nêu mã như
+lại từng con số, từng từ tăng/giảm trong lời văn. Agent trả lời năm loại câu hỏi, trong đó có xu hướng nhiều quý (kèm ROE, NIM khi được hỏi) và câu không nêu mã như
 \enquote{công ty nào có KQKD tốt nhất}. Trên 66 câu hỏi mẫu, agent hiểu đúng yêu cầu ở 65 câu với Claude Haiku 5.5 và 64
 câu với gpt-5.4-mini; trên 58 câu chạy trọn, cả hai nhà đều viết xong mọi báo cáo. Bộ kiểm tra bắt gần như mọi lỗi số
 liệu; trên phần câu để riêng, còn lọt khoảng 3\% lỗi tăng/giảm và 7\% lỗi so sánh. So với trợ lý
@@ -2039,7 +2053,7 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 
 \subsection{Đo độ đúng trên cả mùa BCTC quý 3/2026}\chualam
 \subsection{Đo thời gian từ lúc công bố tới lúc có thẻ trong mùa quý 3/2026}\chualam
-\subsection{Chỉ số tài chính: biên lợi nhuận gộp, ROE, tăng trưởng lũy kế}\chualam
+\subsection{Chỉ số tài chính trên thẻ KQKD: biên lợi nhuận gộp, ROE, NIM}\chualam
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam
 \subsection{Xác suất đúng cho từng ô và bước kiểm chứng tự chọn công cụ theo lợi ích trên chi phí}\chualam

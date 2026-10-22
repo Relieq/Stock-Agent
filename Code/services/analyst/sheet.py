@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, field
 @dataclass
 class Fact:
     id: str
-    kind: str                     # metric, ratio, compare, rank, flag, reason
+    kind: str                     # metric, ratio, compare, rank, flag, reason, trend
     text: str                     # câu đưa cho mô hình, chứa mọi con số được phép nói
     ticker: str | None = None
     metric: str | None = None
@@ -22,6 +22,8 @@ class Fact:
     order: list[str] = field(default_factory=list)     # dòng so sánh: mã xếp từ lớn đến nhỏ
     names: list[str] = field(default_factory=list)     # tên chỉ tiêu viết thường, để nhận ra câu nói về dòng nào
     sources: list[dict] = field(default_factory=list)  # {document_id, page, label, raw, column}
+    # dòng xu hướng: các quý từ cũ đến mới, {y, q, label, value (chuỗi số, None nếu chưa có), yoy, yoy_dir}
+    series: list[dict] = field(default_factory=list)
 
 
 @dataclass

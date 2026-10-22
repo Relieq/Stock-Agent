@@ -336,6 +336,8 @@ def _flipped_item(text: str, facts: list[Fact]) -> str | None:
         before = low[:m.start()]
         if m.group(1) != "lỗ" or NEGATED_VERB.search(before) or LOSS_EXIT.search(before):
             continue
+        if re.search(r"lãi\s*/\s*\(?\s*$", before):
+            continue        # "Lãi/(lỗ) thuần từ ..." là tên dòng, không phải câu nói lỗ (ACB quý 2 từng bị bỏ nhầm câu đúng)
         words = re.findall(r"\w+", low[m.end():])[:2]
         if not words:
             continue

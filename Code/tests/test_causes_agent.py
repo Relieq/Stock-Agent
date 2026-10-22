@@ -61,11 +61,9 @@ def test_note_items_and_parts_selection():
                       natural=-D(400) * B)
     assert fx[1][1] == -D(900) * B
     assert item_text(*fx[1], expense=False).endswith("làm LNST giảm 600 tỷ")
-    assert item_text("Giá vốn hàng hóa", D(700) * B, D(500) * B, True, ("lợi nhuận gộp", -1)).endswith(
-        "làm lợi nhuận gộp giảm 200 tỷ")
-    # TCB: thuế hiện hành cộng vào chi phí thuế -> tăng thì chi phí thuế tăng
-    assert item_text("Thuế tính trên thu nhập chịu thuế", D(3860) * B, D(2734) * B, True,
-                     ("chi phí thuế", 1)).endswith("làm chi phí thuế tăng 1.126 tỷ")
+    # Khoản con của doanh thu: chỉ ghi thuộc dòng lợi nhuận gộp, không gán cả mức tăng cho lợi nhuận gộp (MSN quý 3)
+    t = item_text("Thành phẩm", D(89350) * B, D(58627) * B, False, ("lợi nhuận gộp", 1))
+    assert t.endswith("(tăng 30.723 tỷ); thuộc dòng lợi nhuận gộp") and "làm" not in t
     parts = [Part(str(i), "x", D(0), D(0), D(e) * B) for i, e in enumerate([19147, -10321, 18567, -8401, 650, 30])]
     bd = Breakdown("61", D(0), D(1), sorted(parts, key=lambda p: -abs(p.effect)))
     assert [p.code for p in sheet_parts(bd)] == ["0", "2", "1", "3"]
@@ -81,3 +79,16 @@ def test_extra_checks_period_mix_and_unsupported_no_reason():
                       {"text": "Lũy kế 6 tháng, phí thanh toán 900 tỷ.", "uses": ["S2"]},
                       {"text": "Công ty không nêu nguyên nhân.", "uses": ["S1"]}], sh)
     assert [(x.sentence, x.kind) for x in v] == [(0, "period"), (2, "unsupported")]
+
+
+def test_guard_accepts_profit_loss_label_with_loss_value():
+    from services.analyst.guard import check_sentence
+    from services.analyst.sheet import FactSheet
+    sh = FactSheet()
+    sh.add("cause_part", "Lãi/(lỗ) thuần từ mua bán chứng khoán đầu tư quý 2/2026 của ACB: lỗ 21,3 tỷ, cùng kỳ lãi 446 tỷ "
+                         "(giảm 467 tỷ), làm LNST giảm 467 tỷ", ticker="ACB")
+    sh.add("reason", "Nguyên nhân ACB nêu trong công văn giải trình (số khớp BCTC): Lãi thuần từ mua bán chứng khoán đầu tư "
+                     "giảm 467.394 triệu đồng", ticker="ACB")
+    r = check_sentence("Lãi/(lỗ) thuần từ mua bán chứng khoán đầu tư quý 2/2026 là lỗ 21,3 tỷ đồng, so với lãi 446 tỷ đồng "
+                       "cùng kỳ, giảm 467 tỷ đồng.", ["S1", "S2"], sh, {"ACB"}, {"ACB"})
+    assert not [v for v in r.violations if v.kind == "direction"]

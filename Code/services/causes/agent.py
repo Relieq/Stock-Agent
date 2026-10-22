@@ -117,15 +117,17 @@ def item_text(lab: str, a: Decimal, b: Decimal, expense: bool, target: tuple[str
     tỷ là hoàn nhập ít đi, tức chi phí tăng và LNST giảm, từng bị viết là "làm tăng lợi nhuận")."""
     show = lambda v: ty(v) if v >= 0 else f"âm {ty(v)}"     # noqa: E731
     name, sign = target
-    # Tác động lên LNST theo tính chất dòng; lên dòng cha (target khác LNST) theo dấu của dòng trong công thức dòng cha
-    # (TCB: thuế hiện hành cộng vào chi phí thuế, tăng thì chi phí thuế tăng; giá vốn trừ khỏi lợi nhuận gộp)
-    effect = ((b - a) if expense else (a - b)) if sign == 0 else sign * (a - b)
+    effect = (b - a) if expense else (a - b)
     if a <= 0 and b <= 0 and (a, b) != (0, 0):
         change = f"độ lớn {'tăng' if -a >= -b else 'giảm'} {ty(a - b)}"     # khoản trừ: nói theo độ lớn (VPB quý 3)
     else:
         change = f"{'tăng' if a >= b else 'giảm'} {ty(a - b)}"
+    if sign != 0:
+        # Dòng là một phần của dòng lớn hơn (doanh thu trong lợi nhuận gộp): không gán cả mức thay đổi cho dòng lớn vì
+        # phần còn lại có thể đi ngược (MSN quý 3: doanh thu tăng 30.723 tỷ, lợi nhuận gộp chỉ tăng 8.912 tỷ)
+        return f"{lab} {show(a)}, cùng kỳ {show(b)} ({change}); thuộc dòng {name}"
     return (f"{lab} {show(a)}, cùng kỳ {show(b)} ({change}), "
-            f"làm {name} {'tăng' if effect >= 0 else 'giảm'} {ty(effect)}")
+            f"làm LNST {'tăng' if effect >= 0 else 'giảm'} {ty(effect)}")
 
 
 def orient_items(items: list[tuple[str, Decimal, Decimal]], natural: Decimal | None) -> list[tuple[str, Decimal, Decimal]]:
@@ -394,7 +396,12 @@ class CauseAgent:
                 items = sorted(orient_items([(lab, Decimal(a), Decimal(b)) for lab, a, b in g["items"]], natural),
                                key=lambda i: -abs(i[1] - i[2]))[:3]
                 target = self.effect_target(g["line"])
+                qv = self.st.values.get(g["line"], {})
+                q_change = abs((qv.get("q_cur") or 0) - (qv.get("q_prev_year") or 0))
                 for lab, a, b in items:
+                    if g["period"] == "ytd" and q_change < abs(a - b) * MIN_PART_SHARE:
+                        continue    # số lũy kế đổi nhiều mà dòng trong quý gần như không đổi: không giải thích được quý này
+                                    # (SSB: bán công ty con ở quý 1/2025 từng được dùng để giải thích quý 2)
                     line = self.labels.get(g["line"], g["title"]).strip()
                     sh.add("note_item", f"Thuyết minh của dòng {line} (KQKD), {per} của {self.ticker}: "
                                         + item_text(lab, a, b, expense, target),

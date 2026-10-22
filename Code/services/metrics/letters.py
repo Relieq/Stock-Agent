@@ -17,7 +17,7 @@ from services.analyst.explanations import check_section, facts_for, load_letter
 from services.ingestion.registry import raw_data_dir
 
 # Nhãn trên thẻ cho từng kết quả đối chiếu (lớp màu, lời)
-VERDICTS = {"khớp": ("ok", "khớp BCTC"), "khớp chiều": ("ok", "đúng chiều tăng/giảm trên BCTC"),
+VERDICTS = {"khớp": ("ok", "số khớp BCTC"), "khớp chiều": ("ok", "đúng chiều tăng/giảm trên BCTC"),
             "không kiểm được": ("muted", "theo công ty, chưa kiểm được bằng số"),
             "lệch": ("bad", "lệch với BCTC"), "ngược chiều": ("bad", "ngược chiều với BCTC")}
 HEADLINE = ("lợi nhuận", "doanh thu", "% thay đổi")

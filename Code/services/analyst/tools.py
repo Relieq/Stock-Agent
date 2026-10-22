@@ -10,7 +10,7 @@ from services.analyst.guard import numbers
 from services.analyst.plan import Plan
 from services.analyst.sheet import Fact, FactSheet, report_tickers
 
-REASON_LABELS = {"khớp": "đã đối chiếu, khớp BCTC", "khớp chiều": "đã đối chiếu, khớp chiều tăng/giảm",
+REASON_LABELS = {"khớp": "số đã đối chiếu, khớp BCTC", "khớp chiều": "đã đối chiếu, khớp chiều tăng/giảm",
                  "không kiểm được": "theo công ty, chưa kiểm được bằng số"}
 PERIOD_KINDS = {"quarter": ("quarter",), "ytd": ("ytd", "half_year", "year")}
 WORDS_ONLY = {"khớp chiều", "không kiểm được"}     # số trong các nguyên nhân này chưa đối chiếu được với BCTC

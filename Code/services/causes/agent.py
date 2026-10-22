@@ -56,8 +56,10 @@ cho người đọc phổ thông. Chỉ dựa vào bảng số dưới đây (s�
 {sheet}
 
 Cách viết:
-- Câu đầu nói LNST thay đổi bao nhiêu; các câu sau nói các dòng đóng góp lớn nhất và, nếu có, khoản con trong thuyết minh
-  hay nguyên nhân công ty nêu. Dòng làm LNST giảm cũng phải nhắc nếu lớn.
+- Câu đầu nói LNST thay đổi bao nhiêu; các câu sau nói các dòng đóng góp lớn nhất ở CẢ HAI chiều (làm tăng và làm giảm)
+  và, nếu có, khoản con trong thuyết minh hay nguyên nhân công ty nêu. Không bỏ một dòng lớn trong bảng để chọn dòng nhỏ.
+- Các khoản con trong cùng một thuyết minh là các khoản ngang nhau: không viết "trong đó" giữa hai khoản con.
+- Số ghi "âm ... (hoàn nhập hoặc lợi ích)" là khoản làm giảm chi phí; số ghi "lỗ" là lỗ: giữ đúng như vậy trong câu.
 - Mỗi dòng bảng số đã ghi rõ kỳ (riêng quý hay lũy kế). Viết đúng kỳ của dòng đó; không gán số lũy kế cho riêng quý,
   không rào đón về kỳ khi dòng đã ghi rõ.
 - Mỗi câu ghi trong "uses" mã các dòng bảng số câu dùng. Chỉ dùng con số có trong các dòng đã ghi, chép đúng như bảng
@@ -75,16 +77,50 @@ def _period_label(period: str, year: int, kind: str) -> str:
     return PERIOD_WORDS[kind].format(q=period[1], y=year, m=MONTHS.get(period, 12))
 
 
-def part_text(p, label: str, ticker: str) -> str:
-    """Dòng bảng số cho một dòng KQKD đóng góp vào mức thay đổi LNST. Dòng thu nhập âm là
-    lỗ: ghi chữ "lỗ" vì số in ra bỏ dấu (VPB quý 3: mua bán chứng khoán kinh doanh lỗ 363 tỷ, từng bị viết thành "chỉ còn
-    363 tỷ"). Dòng chi phí: độ lớn và chiều thay đổi của độ lớn."""
-    income = not p.expense
-    show = (lambda v: f"lỗ {ty(v)}" if v < 0 else ty(v)) if income else ty
-    size = (lambda v: v) if income else abs
-    word = "tăng" if size(p.cur) >= size(p.prev) else "giảm"
-    return (f"{p.label} {label} của {ticker}: {show(p.cur)}, cùng kỳ {show(p.prev)} ({word} "
-            f"{ty(size(p.cur) - size(p.prev))}), làm LNST {'tăng' if p.effect >= 0 else 'giảm'} {ty(p.effect)}")
+def profit_text(v: Decimal) -> str:
+    """Lợi nhuận: số âm ghi "lỗ" (VIC quý 2/2025: cùng kỳ lỗ 941 tỷ từng bị ghi "941 tỷ")."""
+    return f"lỗ {ty(v)}" if v < 0 else ty(v)
+
+
+def part_text(p, label: str, ticker: str, flip: bool = False) -> str:
+    """Dòng bảng số cho một dòng KQKD đóng góp vào mức thay đổi LNST.
+    - Dòng thu nhập: âm là lỗ, ghi chữ "lỗ" vì số in ra bỏ dấu (VPB quý 3: mua bán chứng khoán kinh doanh lỗ 363 tỷ, từng bị
+      viết thành "chỉ còn 363 tỷ").
+    - Dòng chi phí: đổi về "chi phí dương" theo cách BCTC in (`flip`: in chi phí thành số âm); chi phí âm là hoàn nhập hoặc
+      lợi ích thuế, ghi rõ, và chiều tăng/giảm tính trên số có dấu (GAS quý 2: chi phí quản lý −7,9 tỷ so với −1.283 tỷ là
+      chi phí TĂNG 1.275 tỷ; SAB, VRE: thuế hoãn lại đổi từ chi phí sang lợi ích và ngược lại)."""
+    if not p.expense:
+        cur, prev, show = p.cur, p.prev, profit_text
+    else:
+        sign = -1 if flip and not p.code.startswith("(") else 1      # phần cổ đông không kiểm soát do code tính
+        cur, prev = sign * p.cur, sign * p.prev
+        show = lambda v: ty(v) if v >= 0 else f"âm {ty(v)} (hoàn nhập hoặc lợi ích)"     # noqa: E731
+    word = "tăng" if cur >= prev else "giảm"
+    return (f"{p.label} {label} của {ticker}: {show(cur)}, cùng kỳ {show(prev)} ({word} {ty(cur - prev)}), "
+            f"làm LNST {'tăng' if p.effect >= 0 else 'giảm'} {ty(p.effect)}")
+
+
+def item_text(lab: str, a: Decimal, b: Decimal) -> str:
+    """Khoản con trong thuyết minh: hai kỳ cùng âm (bảng in khoản trừ trong ngoặc) thì so độ lớn; khác dấu thì ghi dấu
+    (VRE, BID, ACB: khoản in âm từng bị ghi "giảm" khi độ lớn tăng)."""
+    if a <= 0 and b <= 0:
+        x, y, show = -a, -b, ty
+    else:
+        x, y, show = a, b, (lambda v: ty(v) if v >= 0 else f"âm {ty(v)}")
+    return f"{lab} {show(x)}, cùng kỳ {show(y)} ({'tăng' if x >= y else 'giảm'} {ty(x - y)})"
+
+
+MAX_PARTS = 6
+MIN_PART_SHARE = Decimal("0.1")     # dòng nhỏ hơn 10% dòng đóng góp lớn nhất thì không đưa vào bảng số
+
+
+def sheet_parts(bd):
+    """Các dòng đưa vào bảng số: mọi dòng có đóng góp từ 10% dòng lớn nhất trở lên, cả hai chiều, tối đa 6 (trước đây
+    chỉ lấy đủ 80% mức thay đổi theo một chiều nên bỏ sót dòng lớn: VIC lợi nhuận gộp +18.567 tỷ, FPT, VIB)."""
+    if not bd.parts:
+        return []
+    top = max(abs(p.effect) for p in bd.parts)
+    return [p for p in bd.parts if abs(p.effect) >= top * MIN_PART_SHARE][:MAX_PARTS]
 
 
 class CauseAgent:
@@ -247,12 +283,12 @@ class CauseAgent:
                                                                             None), "label": self.labels.get(code, code),
                                  "column": col}]   # noqa: E731
         target = "của cổ đông công ty mẹ" if bd.target in ("61", "b.npat_parent", "201") else ""
-        sh.add("metric", f"LNST {target} {label} của {self.ticker}: {ty(bd.cur)}, cùng kỳ {ty(bd.prev)}, "
+        sh.add("metric", f"LNST {target} {label} của {self.ticker}: {profit_text(bd.cur)}, cùng kỳ {profit_text(bd.prev)}, "
                          f"{'tăng' if bd.change >= 0 else 'giảm'} {ty(bd.change)}".replace("  ", " "),
                ticker=self.ticker, metric="npat_parent", direction="up" if bd.change >= 0 else "down",
                sources=src(bd.target, "q_cur"))
-        for p in top_parts(bd, limit=3) + [p for p in bd.parts[:5] if p.effect * bd.change < 0][:2]:
-            sh.add("cause_part", part_text(p, label, self.ticker),
+        for p in sheet_parts(bd):
+            sh.add("cause_part", part_text(p, label, self.ticker, self.facts.flip_is),
                    ticker=self.ticker, names=[p.label.lower()], sources=src(p.code, "q_cur"))
         for g in self.gathered:
             if g["tool"] == "note" and g["items"] and g["verified"]:
@@ -261,15 +297,15 @@ class CauseAgent:
                                key=lambda i: -abs(i[1] - i[2]))[:3]
                 for lab, a, b in items:
                     line = self.labels.get(g["line"], g["title"]).strip()
-                    sh.add("note_item", f"Thuyết minh của dòng {line} (KQKD), {per} của {self.ticker}: {lab} {ty(a)}, "
-                                        f"cùng kỳ {ty(b)} ({'tăng' if a >= b else 'giảm'} {ty(a - b)})",
+                    sh.add("note_item", f"Thuyết minh của dòng {line} (KQKD), {per} của {self.ticker}: "
+                                        + item_text(lab, a, b),
                            ticker=self.ticker, names=[lab.lower()],
                            sources=[{"document_id": self.doc_id, "page": g["pages"][0] if g["pages"] else None,
                                      "label": f"Thuyết minh {g['number']}", "column": g["period"]}])
             elif g["tool"] == "letter":
                 for text, verdict, detail in g["reasons"][:4]:
                     from services.analyst.tools import words_only
-                    shown = text if verdict == "khớp BCTC" else words_only(text)
+                    shown = text if verdict == "số khớp BCTC" else words_only(text)
                     sh.add("reason", f"Nguyên nhân {self.ticker} nêu trong công văn giải trình ({verdict}): {shown}",
                            ticker=self.ticker, sources=[{"document_id": g["letter_id"], "page": None,
                                                          "label": "Công văn giải trình"}])

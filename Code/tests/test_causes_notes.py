@@ -35,3 +35,29 @@ def test_only_total_matches_is_reported_and_mismatch_rejected():
     bad = match_note(raw, 9, {"quarter": (D(99_000) * M, D(8_000) * M)}, M)
     assert bad.items == [] and "không bằng" in bad.note
     assert "không tìm thấy" in match_note(None, 9, {}, M).note
+
+
+def test_note_numbers_and_block_inside_multi_line_table():
+    from services.causes.notes import note_numbers
+    assert note_numbers("26, 28") == [26, 28] and note_numbers("24.1") == [24] and note_numbers(None) == []
+    raw = {"title": "CHI PHÍ BÁN HÀNG VÀ QUẢN LÝ", "pages": [40], "columns": ["6T/2026", "6T/2025"], "rows": [
+        {"label": "Chi phí bán hàng", "values": ["11.265", "9.106"], "is_total": False},
+        {"label": "Dịch vụ mua ngoài", "values": ["5.380", "4.479"], "is_total": False},
+        {"label": "Nhân viên", "values": ["3.908", "3.210"], "is_total": False},
+        {"label": "Khấu hao", "values": ["680", "957"], "is_total": False},
+        {"label": "Khác", "values": ["1.298", "460"], "is_total": False},
+        {"label": "Chi phí quản lý", "values": ["2.841", "2.416"], "is_total": False},
+        {"label": "Nhân viên", "values": ["2.760", "2.324"], "is_total": False},
+        {"label": "Khác", "values": ["81", "92"], "is_total": False}]}
+    nt = match_note(raw, 26, {"ytd": (-D(11_265) * M * 1000, -D(9_106) * M * 1000)}, M * 1000 * 5)
+    assert nt.verified and [lab for lab, *_ in nt.items] == ["Dịch vụ mua ngoài", "Nhân viên", "Khấu hao", "Khác"]
+    adm = match_note(raw, 26, {"ytd": (D(2_841) * M * 1000, D(2_416) * M * 1000)}, M * 1000 * 5)
+    assert adm.verified and len(adm.items) == 2
+
+
+def test_section_numbering_refs():
+    from services.causes.notes import note_refs, ref_text, roman_value
+    assert roman_value("VI.") == 6 and roman_value("IV") == 4 and roman_value("27.") is None
+    assert note_refs("VI.14") == [(6, 14)] and note_refs("26, 28") == [(None, 26), (None, 28)]
+    assert note_refs("VI.12.2") == [(6, 12)] and note_refs("V.4(c)") == [(5, 4)]
+    assert ref_text(6, 14) == "VI.14" and ref_text(None, 27) == "27"

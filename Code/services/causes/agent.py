@@ -18,7 +18,7 @@ from decimal import Decimal
 from services.analyst.guard import check_draft
 from services.analyst.sheet import FactSheet
 from services.causes.decompose import Breakdown, decompose_any, top_parts
-from services.causes.notes import Notes, match_note, note_number
+from services.causes.notes import Notes, match_note, note_refs, ref_text
 from services.extraction.rules import RULESETS
 from services.ingestion.registry import raw_data_dir
 from services.metrics.card import ty
@@ -58,7 +58,8 @@ cho người đọc phổ thông. Chỉ dựa vào bảng số dưới đây (s�
 Cách viết:
 - Câu đầu nói LNST thay đổi bao nhiêu; các câu sau nói các dòng đóng góp lớn nhất và, nếu có, khoản con trong thuyết minh
   hay nguyên nhân công ty nêu. Dòng làm LNST giảm cũng phải nhắc nếu lớn.
-- Số trong thuyết minh có thể là số lũy kế: viết rõ "lũy kế 9 tháng" (hoặc kỳ ghi trong dòng), không gán cho riêng quý.
+- Mỗi dòng bảng số đã ghi rõ kỳ (riêng quý hay lũy kế). Viết đúng kỳ của dòng đó; không gán số lũy kế cho riêng quý,
+  không rào đón về kỳ khi dòng đã ghi rõ.
 - Mỗi câu ghi trong "uses" mã các dòng bảng số câu dùng. Chỉ dùng con số có trong các dòng đã ghi, chép đúng như bảng
   (được làm tròn bớt). Không tự tính số mới. Từ tăng/giảm phải đúng như bảng.
 - Nguyên nhân ghi "theo công ty" thì viết rõ là theo công ty. Không khuyến nghị mua bán, không nói về giá cổ phiếu.
@@ -122,35 +123,41 @@ class CauseAgent:
 
     # ---------- công cụ ----------
 
-    def note_codes(self, code: str) -> list[tuple[str, int]]:
-        """(mã dòng KQKD, số thuyết minh) của dòng; dòng không in số thuyết minh thì của các dòng trong công thức."""
-        n = note_number(getattr(self.facts.rows.get(("IS", code)), "note", None))
-        if n:
-            return [(code, n)]
+    def note_codes(self, code: str) -> list[tuple[str, tuple[int | None, int]]]:
+        """(mã dòng KQKD, (phần, số mục) thuyết minh) của dòng; dòng không in số thuyết minh thì của các dòng trong công
+        thức."""
+        own = note_refs(getattr(self.facts.rows.get(("IS", code)), "note", None))
+        if own:
+            return [(code, n) for n in own]
         out = []
         for r in RULESETS.get(self.facts.template, RULESETS["TT200"]).rules:
             if r.statement == "IS" and r.lhs == code:
                 for _, c in r.rhs:
-                    k = note_number(getattr(self.facts.rows.get(("IS", c)), "note", None))
-                    if k and (c, k) not in out:
-                        out.append((c, k))
+                    for k in note_refs(getattr(self.facts.rows.get(("IS", c)), "note", None)):
+                        if (c, k) not in out:
+                            out.append((c, k))
                 break
         return out
 
     def read_note(self, code: str) -> list[dict]:
         out = []
-        for c, n in self.note_codes(code):
+        seen = {g["number"] for g in self.gathered if g["tool"] == "note"}
+        for c, ref in self.note_codes(code):
+            sec, n = ref
+            if ref_text(*ref) in seen:
+                continue                     # nhiều dòng dùng chung một thuyết minh (SSI: doanh thu hoạt động, mục 30)
+            seen.add(ref_text(*ref))
             nt = None
             same = [c] + [k for k in self.st.values if k != c and
-                          note_number(getattr(self.facts.rows.get(("IS", k)), "note", None)) == n]
+                          ref in note_refs(getattr(self.facts.rows.get(("IS", k)), "note", None))]
             for c2 in same:
                 v = self.st.values[c2]
-                nt = match_note(self.notes.table(n), n, {"quarter": (v.get("q_cur"), v.get("q_prev_year")),
+                nt = match_note(self.notes.table(n, sec), n, {"quarter": (v.get("q_cur"), v.get("q_prev_year")),
                                                          "ytd": (v.get("ytd_cur"), v.get("ytd_prev_year"))},
                                 self.st.multiplier * 5)
                 if nt.items:
                     break
-            out.append({"tool": "note", "line": c, "for": code, "number": n, "title": nt.title, "pages": nt.pages,
+            out.append({"tool": "note", "line": c, "for": code, "number": ref_text(*ref), "title": nt.title, "pages": nt.pages,
                         "period": nt.period, "verified": nt.verified, "note": nt.note,
                         "items": [[lab, str(a), str(b)] for lab, a, b in nt.items]})
         return out
@@ -195,7 +202,8 @@ class CauseAgent:
                            + (f"{len(g['items'])} khoản con, {'cộng khớp' if g['verified'] else g['note']}" if g["items"]
                               else g["note"]))
             else:
-                out.append(f"- công văn: {len(g['reasons'])} nguyên nhân dùng được" if g["reasons"] else f"- {g['note']}")
+                out.append(f"- công văn: {len(g['reasons'])} nguyên nhân dùng được" if g["reasons"]
+                           else f"- công văn: {g.get('note') or 'không có nguyên nhân dùng được'}")
         return "\n".join(out)
 
     def spent(self) -> float:
@@ -305,3 +313,41 @@ class CauseAgent:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
         return out
+
+
+def view(document_id: int) -> dict | None:
+    """Kết quả đã lưu cho thẻ KQKD: các câu kèm nguồn (trang BCTC hoặc thuyết minh) của các dòng bảng số câu dùng."""
+    path = raw_data_dir() / "causes" / f"{document_id}.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("status") != "done":
+        return None
+    facts = {f["id"]: f for f in data.get("sheet", [])}
+    out = []
+    for s in data.get("sentences", []):
+        sources = []
+        for u in s.get("uses", []):
+            for src in facts.get(u, {}).get("sources", []):
+                key = (src.get("document_id"), src.get("page"), src.get("label"))
+                if src.get("page") and key not in [(x["document_id"], x["page"], x["label"]) for x in sources]:
+                    sources.append({"document_id": src["document_id"], "page": src["page"], "label": src.get("label", "")})
+        out.append({"text": s["text"], "sources": sources})
+    return {"sentences": out}
+
+
+def after_extraction(conn, document_id: int, client) -> str | None:
+    """Bộ canh gọi sau khi đọc xong BCTC mới: chạy agent cho BCTC quý đã kiểm chứng hoặc đã duyệt. Trả về dòng báo quản
+    trị; lỗi không làm hỏng lượt canh."""
+    if client is None:
+        return None
+    row = conn.execute("SELECT status, doc_type FROM documents WHERE id = %s", (document_id,)).fetchone()
+    if row is None or row[0] not in ("verified", "approved") or row[1] != "fs_quarter":
+        return None
+    try:
+        r = CauseAgent(conn, document_id, client).run()
+    except Exception as e:      # noqa: BLE001
+        return f"nguyên nhân biến động: LỖI {e}"
+    if r["status"] != "done":
+        return f"nguyên nhân biến động: không viết được ({r.get('note') or r['status']})"
+    return f"nguyên nhân biến động: {len(r['sentences'])} câu ({r['usd']:.4f} USD)"

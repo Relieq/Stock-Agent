@@ -79,8 +79,14 @@ def card_for(conn: psycopg.Connection, document_id: int) -> tuple[Card, dict] | 
             "source": SOURCE_NAMES.get(source, source), "first_at": first_at, "first_source": first_source,
             "gate": (s.get("gate_checks", 0) - s.get("gate_failed", 0), s.get("gate_checks", 0)),
             "manual_fixes": len(rec.get("manual_fixes", [])),
-            "explanation": explanation(conn, ticker, year, period, scope)}
+            "explanation": explanation(conn, ticker, year, period, scope), "causes": _causes(document_id)}
     return card, info
+
+
+def _causes(document_id: int) -> dict | None:
+    """Đoạn "vì sao lợi nhuận thay đổi" do agent tìm nguyên nhân viết sẵn (services/causes), nếu có."""
+    from services.causes.agent import view
+    return view(document_id)
 
 
 def explanation(conn: psycopg.Connection, ticker: str, year: int, period: str, scope: str) -> dict | None:

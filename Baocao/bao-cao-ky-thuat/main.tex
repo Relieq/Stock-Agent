@@ -1256,6 +1256,27 @@ Số liệu bị sửa giữa các BCTC & Hai BCTC cùng ngày (quý 2 và bán 
 động khác. Bấm vào mỗi số để mở trang BCTC gốc.}\label{fig:the}
 \end{figure}
 
+\subsection{Vì sao lợi nhuận thay đổi: agent tìm nguyên nhân}\label{sec:nguyennhan}
+Với mỗi BCTC quý đã kiểm chứng, bộ canh chạy thêm một agent nhỏ để viết vài câu giải thích vì sao LNST thay đổi so với
+cùng kỳ; đoạn này hiện trên thẻ ở mục \enquote{Vì sao lợi nhuận thay đổi}. Các bước:
+\begin{enumerate}
+  \item \textbf{Tách mức thay đổi bằng code.} Đi ngược các ràng buộc kế toán của mẫu BCTC từ dòng LNST xuống các dòng
+        thành phần (lợi nhuận gộp, thu nhập và chi phí tài chính, chi phí bán hàng, dự phòng, thuế, phần của cổ đông
+        không kiểm soát\ldots), ra phần đóng góp của từng dòng. Vì các ràng buộc đó đã đạt, tổng các phần đóng góp phải
+        bằng đúng mức thay đổi LNST; không bằng thì BCTC đó không được giải thích. Nhiều BCTC năm 2026 vẫn in mã dòng
+        theo mẫu cũ dù đã sang mẫu mới, nên khi không khớp hệ thống thử mã dòng của mẫu còn lại.
+  \item \textbf{Agent chọn việc.} Mỗi lượt, mô hình xem bảng phần đóng góp và những gì đã thu thập rồi chọn một việc:
+        đọc thuyết minh của một dòng, lấy nguyên nhân trong công văn giải trình (mục~\ref{sec:congvan}), hoặc dừng; tối đa
+        4 lượt và 0,03 USD mỗi BCTC.
+  \item \textbf{Đọc thuyết minh.} Số thuyết minh của dòng có sẵn trong KQKD đã đọc. Hệ thống tìm trang bằng cách cho mô
+        hình đọc tiêu đề mục trên vài trang và chia đôi khoảng trang theo số mục; BCTC đánh số lại từ đầu trong mỗi
+        phần (ví dụ \enquote{VI.14}) thì tìm đầu phần trước. Mô hình chép bảng của mục; code chỉ dùng các khoản con khi
+        chúng cộng đúng bằng dòng KQKD ở cả kỳ này và cùng kỳ, kể cả khi bảng gồm nhiều dòng KQKD (tìm khối có dòng
+        bằng dòng KQKD và các dòng kề cộng ra nó). Thuyết minh quý có thể chỉ in số lũy kế, nên mỗi dòng ghi rõ kỳ của số.
+  \item \textbf{Viết và kiểm.} Code dựng bảng số (mỗi dòng có nguồn tới trang BCTC hoặc trang thuyết minh); mô hình viết
+        2--5 câu; bộ kiểm tra số của agent báo cáo kiểm từng câu, câu sai được viết lại tối đa 2 lần rồi bỏ.
+\end{enumerate}
+
 \subsection{Nguyên nhân từ công văn giải trình}\label{sec:congvan}
 Khi lợi nhuận biến động mạnh, công ty gửi công văn giải trình nêu nguyên nhân, thường kèm con số: doanh thu tăng bao
 nhiêu phần trăm, chi phí lãi vay giảm bao nhiêu tỷ. Thẻ KQKD hiện các nguyên nhân này ngay dưới phần số chính. Mô hình
@@ -2056,6 +2077,7 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 
 \subsection{Đo độ đúng trên cả mùa BCTC quý 3/2026}\chualam
 \subsection{Đo thời gian từ lúc công bố tới lúc có thẻ trong mùa quý 3/2026}\chualam
+\subsection{Đo agent tìm nguyên nhân trên cả mùa quý 3/2026, lấy công văn giải trình làm đáp án}\chualam
 \subsection{Chỉ số tài chính trên thẻ KQKD: biên lợi nhuận gộp, ROE, NIM}\chualam
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam

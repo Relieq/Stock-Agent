@@ -22,6 +22,7 @@ from services.ingestion.registry import raw_data_dir
 HEAD_LONG_SIDE = 1100        # đọc tiêu đề mục: chữ in đậm, ảnh nhỏ là đủ
 TABLE_LONG_SIDE = 2000       # chép bảng: như bước chép báo cáo
 MAX_NOTE_PAGES = 3
+MAX_SECTION_SCAN = 40        # số trang tối đa đọc lùi từ cuối để tìm đầu một phần thuyết minh
 
 HEAD_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["headings"], "properties": {
     "headings": {"type": "array", "items": {"type": "object", "additionalProperties": False,
@@ -57,6 +58,47 @@ def note_number(text: str | None) -> int | None:
     text = re.sub(r"^\s*[IVXLC]+\s*[.\-]\s*", "", text.strip())
     m = re.match(r"\D*(\d+)", text)
     return int(m.group(1)) if m else None
+
+
+def note_numbers(text: str | None) -> list[int]:
+    """Mọi số mục trong ô thuyết minh của một dòng: "26, 28" -> [26, 28]; "24.1" -> [24]; "VI.25" -> [25]."""
+    out = []
+    for part in re.split(r"[,;&]|\s+và\s+", text or ""):
+        n = note_number(part)
+        if n is not None and n not in out:
+            out.append(n)
+    return out
+
+
+ROMAN = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
+
+
+def roman_value(text: str | None) -> int | None:
+    """"VI." -> 6; chuỗi không phải số La Mã -> None."""
+    m = re.fullmatch(r"\s*([IVXLC]+)\s*\.?\s*", text or "")
+    if not m:
+        return None
+    vals = [ROMAN[c] for c in m.group(1)]
+    return sum(-v if i + 1 < len(vals) and v < vals[i + 1] else v for i, v in enumerate(vals))
+
+
+def note_refs(text: str | None) -> list[tuple[int | None, int]]:
+    """(phần, số mục) trong ô thuyết minh của một dòng: "VI.14" -> [(6, 14)]; "26, 28" -> [(None, 26), (None, 28)].
+    Nhiều BCTC (VNM, STB, ACB, MBB, HDB, HPG: 18/97 BCTC quý) đánh số mục lại từ 1 trong mỗi phần."""
+    out = []
+    for part in re.split(r"[,;&]|\s+và\s+", text or ""):
+        m = re.match(r"\s*([IVXLC]+)\s*[.\-]\s*\d", part)
+        sec = roman_value(m.group(1)) if m else None
+        n = note_number(part)
+        if n is not None and (sec, n) not in out:
+            out.append((sec, n))
+    return out
+
+
+def ref_text(sec: int | None, n: int) -> str:
+    romans = {v: k for k, v in {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6, "VII": 7, "VIII": 8, "IX": 9,
+                               "X": 10}.items()}
+    return f"{romans.get(sec, sec)}.{n}" if sec else str(n)
 
 
 @dataclass
@@ -99,11 +141,42 @@ class Notes:
                                                 HEAD_SCHEMA, "notes_heading")
             self.cache["headings"][key] = [[h["number"], h["title"]] for h in data["headings"]]
             self._save()
-        return [(n, t) for raw, t in self.cache["headings"][key] if (n := note_number(raw)) is not None]
+        return [(n, t) for raw, t in self.cache["headings"][key]
+                if roman_value(raw) is None and (n := note_number(raw)) is not None]
 
-    def find(self, number: int) -> tuple[int, str] | None:
-        """(trang bắt đầu, tên mục) của mục `number`: chia đôi theo số mục trên các trang đã đọc."""
+    def romans(self, page: int) -> list[int]:
+        """Tiêu đề phần (I, II, ..., VI) bắt đầu trên trang."""
+        self.headings(page)
+        return [v for raw, _ in self.cache["headings"][str(page)] if (v := roman_value(raw)) is not None]
+
+    def section_range(self, section: int) -> tuple[int, int] | None:
+        """(trang đầu, trang cuối) của phần `section`: đọc lùi từ cuối tài liệu tới trang có tiêu đề phần đó (hoặc một
+        phần đứng trước nó); trang có tiêu đề phần đứng sau là giới hạn cuối. Lưu lại theo tài liệu."""
+        key = str(section)
+        cached = self.cache.setdefault("sections", {}).get(key)
+        if cached is not None:
+            return tuple(cached) if cached else None
+        hi, found = self.last_page, None
+        for page in range(self.last_page, max(self.first_page, self.last_page - MAX_SECTION_SCAN) - 1, -1):
+            rs = self.romans(page)
+            if any(r > section for r in rs):
+                hi = page - 1 if not any(r == section for r in rs) else page
+            if any(r <= section for r in rs):
+                found = (page, hi)
+                break
+        self.cache["sections"][key] = list(found) if found else []
+        self._save()
+        return found
+
+    def find(self, number: int, section: int | None = None) -> tuple[int, str] | None:
+        """(trang bắt đầu, tên mục) của mục `number` (trong phần `section` nếu BCTC đánh số theo phần): chia đôi theo
+        số mục trên các trang đã đọc."""
         lo, hi = self.first_page, self.last_page
+        if section is not None:
+            rng = self.section_range(section)
+            if rng is None:
+                return None
+            lo, hi = rng
         for _ in range(12):
             if lo > hi:
                 break
@@ -141,11 +214,11 @@ class Notes:
             pages.append(page)
         return pages
 
-    def table(self, number: int) -> dict | None:
+    def table(self, number: int, section: int | None = None) -> dict | None:
         """Bảng thô của mục (đã lưu, hoặc tìm trang rồi chép)."""
-        key = str(number)
+        key = ref_text(section, number)
         if key not in self.cache["tables"]:
-            found = self.find(number)
+            found = self.find(number, section)
             if found is None:
                 self.cache["tables"][key] = None
             else:
@@ -216,8 +289,50 @@ def match_note(raw: dict | None, number: int, pairs: dict[str, tuple[Decimal, De
                     if not nt.verified:
                         nt.note = "dòng tổng khớp KQKD nhưng các khoản con cộng không ra tổng (bảng có khoản lồng nhau)"
                     return nt
+    block = _find_block(rows, val, ncol, pairs, tolerance)
+    if block is not None:
+        period, scale, jc, jp, kids, anchor = block
+        nt.period, nt.verified = period, True
+        nt.items = [(r["label"], (val(r, jc) or Decimal(0)) * scale, (val(r, jp) or Decimal(0)) * scale) for r in kids]
+        nt.note = f"khối \"{anchor}\" trong bảng (bảng gồm nhiều dòng KQKD)"
+        return nt
     nt.note = "tổng các khoản không bằng dòng KQKD ở kỳ này và cùng kỳ"
     return nt
+
+
+MAX_BLOCK = 15
+
+
+def _find_block(rows, val, ncol, pairs, tolerance):
+    """Bảng gồm nhiều dòng KQKD (MWG quý 2/2026: một bảng có cả chi phí bán hàng và chi phí quản lý, mỗi khối có khoản
+    con riêng): tìm một dòng bằng dòng KQKD ở cả kỳ này và cùng kỳ, rồi các dòng liền dưới (dòng đầu khối) hoặc liền
+    trên (dòng tổng cuối khối) cộng ra đúng dòng đó ở cả hai cột. Trả về (kỳ, bậc đơn vị, cột kỳ này, cột cùng kỳ, các
+    dòng con, tên dòng neo) hoặc None."""
+    numeric = [r for r in rows if any(v is not None for v in r["values"])]
+    for period, (cur, prev) in pairs.items():
+        if cur is None or prev is None:
+            continue
+        for scale in SCALES:
+            for jc in range(ncol):
+                for jp in range(ncol):
+                    if jc == jp:
+                        continue
+                    near = lambda v, t, n: v is not None and abs(abs(v) * scale - abs(t)) <= max(tolerance, scale * n)  # noqa: E731
+                    for i, r in enumerate(numeric):
+                        if not (near(val(r, jc), cur, 2) and near(val(r, jp), prev, 2)):
+                            continue
+                        for step in (1, -1):
+                            sc = sp = Decimal(0)
+                            kids = []
+                            k = i + step
+                            while 0 <= k < len(numeric) and len(kids) < MAX_BLOCK:
+                                kids.append(numeric[k])
+                                sc += val(numeric[k], jc) or Decimal(0)
+                                sp += val(numeric[k], jp) or Decimal(0)
+                                if len(kids) > 1 and near(sc, cur, len(kids) + 1) and near(sp, prev, len(kids) + 1):
+                                    return period, scale, jc, jp, kids if step == 1 else kids[::-1], r["label"]
+                                k += step
+    return None
 
 
 def as_dict(nt: NoteTable) -> dict:

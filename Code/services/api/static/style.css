@@ -128,3 +128,5 @@ ul.plain { list-style:none; padding:0; } ul.plain li { padding:4px 0; border-bot
 .report .ai{margin-top:18px}
 .letter ul.reasons { margin:6px 0; padding-left:20px; }
 .letter ul.reasons li { margin:4px 0; }
+.causes ul.reasons { margin:6px 0; padding-left:20px; }
+.causes ul.reasons li { margin:6px 0; }

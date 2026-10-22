@@ -227,13 +227,13 @@ def test_decline_words_flip_the_comparison():
     g = growth_sheet()
     allowed = ("AAA", "BBB", "CCC")
     assert kinds("CCC giảm mạnh nhất nhóm.", ["S1"], g, allowed) == []
-    assert kinds("AAA giảm mạnh nhất nhóm.", ["S1"], g, allowed) == ["comparison"]
+    assert kinds("AAA giảm mạnh nhất nhóm.", ["S1"], g, allowed) == ["comparison", "direction"]   # AAA +10%: cũng không giảm
     assert kinds("CCC giảm nhanh hơn BBB.", ["S1"], g, allowed) == []
     assert kinds("BBB giảm nhanh hơn CCC.", ["S1"], g, allowed) == ["comparison"]
     assert kinds("BBB giảm ít hơn CCC.", ["S1"], g, allowed) == []
     assert kinds("CCC giảm ít hơn BBB.", ["S1"], g, allowed) == ["comparison"]
     # "giảm ít nhất" chưa rõ nghĩa trong bảng xếp theo tăng trưởng: chỉ cảnh báo
-    r = check_sentence("AAA giảm ít nhất nhóm.", ["S1"], g, set(allowed), KNOWN)
+    r = check_sentence("BBB giảm ít nhất nhóm.", ["S1"], g, set(allowed), KNOWN)      # BBB −5%: có giảm thật
     assert r.violations == [] and r.warnings
 
 
@@ -622,3 +622,60 @@ def test_ratio_levels_in_percent_are_not_read_as_growth():
     assert check_sentence(t, ["S1"], s, {"VCB", "TCB"}, {"VCB", "TCB"}).violations == []
     t = t.replace("cao hơn", "thấp hơn")
     assert [v.kind for v in check_sentence(t, ["S1"], s, {"VCB", "TCB"}, {"VCB", "TCB"}).violations] == ["comparison"]
+
+
+def _bank_rank_sheet():
+    s = FactSheet()
+    s.add("metric", "LNST của cổ đông ngân hàng mẹ, LPB, quý 3/2026: 3.562 tỷ; cùng kỳ 2.762 tỷ; thay đổi +28,9% (tăng 800 tỷ)",
+          ticker="LPB", metric="npat_parent", direction="up", names=["lnst của cổ đông ngân hàng mẹ", "lnst"])
+    s.add("rank", "LNST của cổ đông ngân hàng mẹ, thay đổi so với cùng kỳ, quý 3/2026, các ngân hàng (3 mã có số): LPB xếp thứ 1 "
+          "trong 3; trung vị nhóm +23,7%; thứ tự: LPB +28,9%, TCB +23,7%, VPB +18,8%", ticker="LPB", metric="npat_parent",
+          measure="growth", order=["LPB", "TCB", "VPB"], names=["lnst của cổ đông ngân hàng mẹ", "lnst"])
+    s.add("rank", "LNST của cổ đông ngân hàng mẹ, xếp theo quy mô, quý 3/2026, các ngân hàng (3 mã có số): LPB xếp thứ 3 trong 3; "
+          "trung vị nhóm 7.943 tỷ; thứ tự: VPB 8.644 tỷ, TCB 7.943 tỷ, LPB 3.562 tỷ", ticker="LPB", metric="npat_parent",
+          measure="level", order=["VPB", "TCB", "LPB"], names=["lnst của cổ đông ngân hàng mẹ", "lnst"])
+    return s
+
+
+def test_comparison_with_the_group_median():
+    s, k = _bank_rank_sheet(), {"LPB", "TCB", "VPB"}
+    kinds = lambda t: [v.kind for v in check_sentence(t, ["S1", "S2", "S3"], s, {"LPB"}, k).violations]   # noqa: E731
+    assert kinds("LNST của cổ đông ngân hàng mẹ của LPB tăng 28,9%, cao hơn trung vị nhóm +23,7%.") == []
+    assert kinds("LNST của cổ đông ngân hàng mẹ của LPB tăng 28,9%, thấp hơn trung vị nhóm +23,7%.") == ["comparison"]
+    assert kinds("Về quy mô, LNST của cổ đông ngân hàng mẹ của LPB thấp hơn trung vị nhóm 7.943 tỷ.") == []
+    assert kinds("LPB tăng trưởng LNST của cổ đông ngân hàng mẹ thấp hơn mức trung vị nhóm.") == ["comparison"]
+
+
+def test_each_direction_word_is_checked_with_the_number_after_it():
+    s = FactSheet()
+    s.add("metric", "LNST của cổ đông công ty mẹ, FPT, quý 2/2026: 2.568 tỷ; cùng kỳ 2.257 tỷ; thay đổi +13,7% (tăng 310 tỷ)",
+          ticker="FPT", metric="npat_parent", direction="up", names=["lnst của cổ đông công ty mẹ", "lnst"])
+    s.add("metric", "Doanh thu thuần, FPT, quý 2/2026: 13.789 tỷ; cùng kỳ 16.625 tỷ; thay đổi −17,1% (giảm 2.836 tỷ)",
+          ticker="FPT", metric="revenue", direction="down", names=["doanh thu thuần", "doanh thu"])
+    kinds = lambda t: [v.kind for v in check_sentence(t, ["S1", "S2"], s, {"FPT"}, {"FPT"}).violations]   # noqa: E731
+    assert kinds("Doanh thu thuần của FPT giảm 17,1% nhưng LNST tăng 13,7%.") == []
+    assert kinds("LNST của FPT là 2.568 tỷ, giảm 13,7% (tăng 310 tỷ) so với cùng kỳ.") == ["direction"]
+    assert kinds("Doanh thu thuần của FPT tăng 17,1% và LNST tăng 13,7%.") == ["direction"]
+    assert kinds("Lãi quý 2/2026 của FPT giảm so với cùng kỳ.") == []     # hai dòng trái chiều: không kết luận
+
+
+def test_direction_must_agree_with_the_cited_reason_or_flag():
+    s = FactSheet()
+    s.add("reason", "Nguyên nhân SAB nêu trong công văn giải trình (đã đối chiếu, khớp BCTC): Chi phí bán hàng tăng.",
+          ticker="SAB")
+    s.add("flag", "Cờ cảnh báo của thẻ KQKD, VCB, quý 2/2026: Lợi nhuận tăng nhờ thu nhập khác.", ticker="VCB")
+    kinds = lambda t, u: [v.kind for v in check_sentence(t, u, s, {"SAB", "VCB"}, {"SAB", "VCB"}).violations]  # noqa: E731
+    assert kinds("Theo công ty, chi phí bán hàng của SAB tăng.", ["S1"]) == []
+    assert kinds("Theo công ty, chi phí bán hàng của SAB giảm.", ["S1"]) == ["direction"]
+    assert kinds("Lợi nhuận của VCB giảm nhờ thu nhập khác.", ["S2"]) == ["direction"]
+
+
+def test_superlative_clause_still_checks_its_direction_word():
+    s = FactSheet()
+    s.add("metric", "Thu nhập lãi thuần, VPB, quý 3/2026: 18.158 tỷ; cùng kỳ 15.061 tỷ; thay đổi +20,6% (tăng 3.097 tỷ)",
+          ticker="VPB", metric="nii", direction="up", names=["thu nhập lãi thuần"])
+    s.add("compare", "Thu nhập lãi thuần, xếp theo quy mô, quý 3/2026: VPB 18.158 tỷ, TCB 12.000 tỷ", metric="nii",
+          measure="level", order=["VPB", "TCB"], names=["thu nhập lãi thuần"])
+    kinds = lambda t: [v.kind for v in check_sentence(t, ["S1", "S2"], s, {"VPB"}, {"VPB", "TCB"}).violations]   # noqa: E731
+    assert kinds("Thu nhập lãi thuần của VPB đạt 18.158 tỷ, đứng đầu nhóm và tăng 20,6% so với cùng kỳ.") == []
+    assert kinds("Thu nhập lãi thuần của VPB đạt 18.158 tỷ, đứng đầu nhóm và giảm 20,6% so với cùng kỳ.") == ["direction"]

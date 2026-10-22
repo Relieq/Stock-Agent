@@ -518,8 +518,13 @@ def known_tickers(docs: list[dict], golden: list[dict]) -> set[str]:
 def cmd_inject(args) -> None:
     from services.analyst.guard import check_sentence
     from services.analyst.sheet import FactSheet
-    docs = [d for p in provider_dirs() for d in load_caches(p, "write").values() if d.get("status") == "done"]
-    known = known_tickers(docs, load_golden())
+    pairs = [(int(i), d) for p in provider_dirs() for i, d in load_caches(p, "write").items() if d.get("status") == "done"]
+    known = known_tickers([d for _, d in pairs], load_golden())
+    # nửa "dev" (câu số chẵn) dùng để tìm lỗi lọt và vá bộ kiểm tra; nửa "test" (câu số lẻ) chỉ để đo lại, không xem lỗi lọt
+    docs = [d for i, d in pairs if args.half == "all" or (i % 2 == 0) == (args.half == "dev")]
+    show = set(args.show_missed.split(",")) if args.show_missed else set()
+    if show and args.half != "dev":
+        raise SystemExit("Chỉ xem lỗi lọt trên nửa dev, để nửa test còn là phép đo khách quan")
     caught, tried = Counter(), Counter()
     clean, flagged = 0, 0           # câu gốc (đã đạt) có bị bộ kiểm tra hiện tại bắt nhầm không
     for d in docs:
@@ -537,7 +542,10 @@ def cmd_inject(args) -> None:
                     tried[kind] += 1
                     r = check_sentence(bad, s["uses"], sheet, allowed, known)
                     caught[kind] += bool(r.violations)
-    print(f"cấy lỗi vào câu đã đạt ({len(docs)} báo cáo xong, mã lạ lấy từ {len(known)} mã đã biết); số lần cấy, mỗi câu mỗi kiểu một lần:")
+                    if kind in show and not r.violations:
+                        print(f"[lọt {kind}] {bad}\n   gốc: {s['text']}\n   dòng: " +
+                              " | ".join(f"{u}: {sheet.get(u).text[:140]}" for u in s["uses"] if sheet.get(u)))
+    print(f"cấy lỗi vào câu đã đạt ({len(docs)} báo cáo xong, nửa {args.half}, mã lạ lấy từ {len(known)} mã đã biết); số lần cấy, mỗi câu mỗi kiểu một lần:")
     for kind in tried:
         print(f"  {kind}: bắt {caught[kind]}/{tried[kind]} ({caught[kind] / tried[kind] * 100:.1f}%)")
     print(f"  câu gốc bị bắt nhầm: {flagged}/{clean}")
@@ -551,7 +559,9 @@ def main() -> None:
         p = sub.add_parser(name)
         p.add_argument("--provider", required=True)
         p.add_argument("--limit", type=int)
-    sub.add_parser("inject")
+    inj = sub.add_parser("inject")
+    inj.add_argument("--half", choices=["all", "dev", "test"], default="all")
+    inj.add_argument("--show-missed", help="liệt kê lỗi lọt của các kiểu này, ví dụ direction,comparison (chỉ nửa dev)")
     sub.add_parser("summary")
     args = ap.parse_args()
     {"plan": cmd_plan, "write": cmd_write, "inject": cmd_inject, "summary": cmd_summary}[args.cmd](args)

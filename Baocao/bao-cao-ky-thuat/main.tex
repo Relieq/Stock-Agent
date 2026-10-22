@@ -1892,11 +1892,33 @@ số không có trong các dòng câu đã ghi (31 lỗi) và so sánh (18 lỗi
 
 Câu còn lại đã qua bộ kiểm tra, nhưng bộ kiểm tra không bắt được mọi lỗi. Để đo phần này, mỗi câu trong 116 báo cáo xong
 được cố ý làm sai theo từng kiểu (đổi số lệch 10\%, đảo tăng/giảm, đảo so sánh, đảo lãi/lỗ, đổi thứ hạng, chèn câu khuyến
-nghị, chèn mã lạ) rồi cho bộ kiểm tra xem lại. Bộ kiểm tra bắt được 790/793 lỗi đổi số, 91/92 lỗi đổi thứ hạng, 43/50 lỗi
-đảo lãi/lỗ, 559/630 lỗi đảo tăng/giảm (89\%), 182/233 lỗi đảo so sánh (78\%), và mọi câu khuyến nghị, mọi mã lạ (947/947 mỗi
-kiểu); không câu gốc nào trong 947 câu bị bắt nhầm. Như vậy số liệu trong lời văn gần như luôn đúng, còn từ chỉ chiều và
-so sánh vẫn có thể lọt khoảng một phần mười đến một phần năm lỗi; người đọc luôn bấm được vào từng số để xem dòng bảng số và
-trang BCTC gốc.
+nghị, chèn mã lạ) rồi cho bộ kiểm tra xem lại. Các báo cáo được chia đôi theo câu hỏi: nửa thứ nhất (56 báo cáo) dùng để tìm
+các kiểu lỗi bị lọt và sửa bộ kiểm tra; nửa thứ hai (60 báo cáo, 497 câu) để riêng, chỉ dùng để đo sau khi sửa xong.
+Bảng~\ref{tab:agent-guard} là kết quả trên nửa để riêng.
+
+\begin{table}[H]
+\centering\small
+\caption{Bộ kiểm tra số trên 497 câu của 60 báo cáo để riêng, mỗi câu bị làm sai theo từng kiểu (đếm theo lần làm sai)}\label{tab:agent-guard}
+\begin{tabularx}{\linewidth}{@{}Xr@{}}
+\toprule
+\textbf{Kiểu lỗi cố ý đưa vào} & \textbf{Bị bắt} \\ \midrule
+Đổi một con số lệch 10\% & 415/418 \\
+Đảo tăng/giảm & 311/320 (97\%) \\
+Đảo so sánh (cao hơn/thấp hơn, cao nhất/thấp nhất) & 113/122 (93\%) \\
+Đảo lãi/lỗ & 23/24 \\
+Đổi thứ hạng & 39/40 \\
+Chèn câu khuyến nghị & 497/497 \\
+Chèn mã chứng khoán lạ & 497/497 \\
+Câu gốc (đúng) bị bắt nhầm & 1/497 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Các mẫu số khác nhau vì mỗi kiểu chỉ áp dụng được cho câu có chỗ để làm sai (câu không có từ so sánh thì không đảo so sánh
+được). Những lỗi bộ kiểm tra hay để lọt trước khi sửa là: so một mã với trung vị nhóm, câu có cả tăng lẫn giảm trong một
+vế, hai từ so sánh trong một vế, câu nói ngược với chính nguyên nhân hay cờ cảnh báo câu dẫn. Như vậy số liệu trong lời văn
+gần như luôn đúng, còn từ chỉ chiều và so sánh vẫn có thể lọt vài phần trăm lỗi; người đọc luôn bấm được vào từng số để xem
+dòng bảng số và trang BCTC gốc.
 
 \section{So với trợ lý AI đa năng}\label{sec:evaltrolyl}
 Tám câu của bộ đo, đủ bốn loại câu hỏi và một câu xin khuyến nghị, được hỏi nguyên văn cho mô hình đa năng của hai hãng
@@ -1958,7 +1980,7 @@ Agent tạo báo cáo được đặt lên trên lớp này theo cùng nguyên t
 lại từng con số, từng từ tăng/giảm trong lời văn. Agent trả lời bốn loại câu hỏi, kể cả câu không nêu mã như
 \enquote{công ty nào có KQKD tốt nhất}. Trên 66 câu hỏi mẫu, agent hiểu đúng yêu cầu ở 65 câu với Claude Haiku 5.5 và 64
 câu với gpt-5.4-mini; trên 58 câu chạy trọn, cả hai nhà đều viết xong mọi báo cáo. Bộ kiểm tra bắt gần như mọi lỗi số
-liệu nhưng còn lọt khoảng một phần mười lỗi tăng/giảm và một phần năm lỗi so sánh, đó là việc cần làm tiếp. So với trợ lý
+liệu; trên phần câu để riêng, còn lọt khoảng 3\% lỗi tăng/giảm và 7\% lỗi so sánh. So với trợ lý
 AI đa năng có tìm web trên cùng 8 câu, agent không đưa số sai, số của kỳ khác hay lời khuyên mua bán, với chi phí thấp hơn
 nhiều.
 
@@ -1968,7 +1990,6 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Đo độ đúng trên cả mùa BCTC quý 3/2026}\chualam
 \subsection{Đo thời gian từ lúc công bố tới lúc có thẻ trong mùa quý 3/2026}\chualam
 \subsection{Chỉ số tài chính: biên lợi nhuận gộp, ROE, tăng trưởng lũy kế}\chualam
-\subsection{Bộ kiểm tra số của agent: giảm lỗi tăng/giảm và so sánh lọt qua}\chualam
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Đưa nguyên nhân biến động từ công văn giải trình lên thẻ}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam

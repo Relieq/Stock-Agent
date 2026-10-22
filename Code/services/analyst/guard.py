@@ -227,7 +227,7 @@ def with_tickers(text: str) -> str:
 
 # "giảm từ 107 tỷ lên 757 tỷ": từ chỉ chiều ngược với chính hai số trong câu
 _FROM_TO = re.compile(r"(?i)\b(tăng|giảm|sụt)\b[^.;:]{0,60}?\btừ\s+")
-_TO_WORD = re.compile(r"(?i)^\s*(?:lên|xuống|còn|đến|thành)\s+")
+_TO_WORD = re.compile(r"(?i)^\s*(?:đồng\s+)?(?:lên|xuống|còn|đến|thành)\s+")
 
 
 def _self_contradictions(text: str) -> list[str]:
@@ -278,6 +278,7 @@ def _profit_side(text: str, n: Num) -> str | None:
     return "loss" if word.group(1).lower() == "lỗ" else "profit"
 
 
+_LOSS_OF_TICKER = re.compile(r"(?i)\s+(?:(?:quý|q)\s*[1-4](?:\s*/\s*\d{4})?\s+|năm\s+\d{4}\s+)?của\s+(?-i:[A-Z]{3})(?!\w)")
 LOSS_EXIT = re.compile(r"\b(?:cắt|thoát|hết|khỏi|xóa|bù|tránh)\s+$")     # "cắt lỗ", "thoát lỗ": không nói có lỗ
 
 
@@ -291,6 +292,8 @@ def _loss_claim(text: str) -> bool:
         before = low[:m.start()]
         if NEGATED_VERB.search(before) or LOSS_EXIT.search(before):
             continue
+        if _LOSS_OF_TICKER.match(text, m.end()):        # "lỗ quý 2/2026 của MBB": kết quả của chính mã
+            return True
         if not _LOSS_OWNER.search(text[:m.start()]) or _LOSS_OTHER.match(text, m.end()):
             continue
         return True
@@ -310,8 +313,12 @@ def _flipped_item(text: str, facts: list[Fact]) -> str | None:
         if not words:
             continue
         tail = r"\W+".join(map(re.escape, words)) + r"(?!\w)"
-        if any(re.search(r"(?<![/\w])lãi\W+" + tail, r) and not re.search(r"(?<![/\w])lỗ\W+" + tail, r) for r in rows):
+        if any(re.search(r"(?<![/\w])lãi(?:\W+thuần)?\W+" + tail, r) and not re.search(r"(?<![/\w])lỗ\W+" + tail, r)
+               for r in rows):
             return text[m.start():m.end()] + " " + " ".join(words)
+        # "lỗ gộp" mà dòng ghi "Lợi nhuận gộp, ...: 52.338 tỷ" (số dương)
+        if any(re.search(r"^lợi nhuận\W+" + re.escape(words[0]) + r"(?!\w)[^:]*:\s*\d", r) for r in rows):
+            return text[m.start():m.end()] + " " + words[0]
     return None
 
 
@@ -517,6 +524,46 @@ def _directions_by_number(clause: str, facts: list[Fact], tickers: list[str]) ->
 
 
 RATIO_KEYS = {k for r in catalog.RATIOS.values() for k in r}
+MEDIAN = re.compile(r"trung vị")
+ALL_OF = re.compile(r"(?<!\w)(?:đều|cả hai|cả ba)(?!\w)")
+
+
+def _row_value(f: Fact, ticker: str) -> Num | None:
+    """Số của mã trong dòng xếp hạng ("VPB +66,7%", "VCB 14.542 tỷ")."""
+    m = re.search(rf"(?<!\w){ticker}\s+(?=[+−-]?\d)", f.text)
+    ns = numbers(f.text[m.end():m.end() + 30]) if m else []
+    return ns[0] if ns and ns[0].start == 0 else None
+
+
+def _row_median(f: Fact) -> Num | None:
+    m = re.search(r"trung vị nhóm\s+", f.text)
+    ns = numbers(f.text[m.end():m.end() + 30]) if m else []
+    return ns[0] if ns and ns[0].start == 0 else None
+
+
+def _median_problem(clause: str, low: str, facts: list[Fact], who: str, higher: bool) -> str | None:
+    """Vế "cao hơn/thấp hơn trung vị nhóm": chọn dòng xếp hạng có trung vị khớp số câu nêu (không nêu số thì dòng có tên
+    chỉ tiêu câu nhắc), rồi so số của mã với trung vị. Không tìm được dòng thì báo thiếu dòng."""
+    rows = [f for f in facts if f.order and who in f.order and _row_median(f) is not None]
+    at = MEDIAN.search(low)
+    said = [n for n in numbers(clause[at.end():]) if n.kind != "plain"][:1] if at else []
+    if said:
+        rows = [f for f in rows if matches(said[0], _row_median(f))] or rows
+    rows = _named(rows, low)
+    c = _cue(low[:at.start()]) if at else None      # "tăng trưởng ... cao hơn trung vị": dòng theo mức tăng
+    if c:
+        rows = [f for f in rows if f.measure == c] or rows
+    if not rows:
+        return f"không có dòng xếp hạng có trung vị nhóm cho {who}: {clause.strip()}"
+    for f in rows:
+        v, med = _row_value(f, who), _row_median(f)
+        if v is None or v.value == med.value:
+            return None
+        if (v.value > med.value) == higher:
+            return None
+    f = rows[0]
+    v, med = _row_value(f, who), _row_median(f)
+    return f"{clause.strip()} — dòng {f.id}: {who} {vn(v.value / v.scale)}, trung vị nhóm {vn(med.value / med.scale)}"
 _CHANGE = re.compile(r"thay đổi ([+−-]\d[\d.]*(?:,\d+)?)%")
 
 
@@ -535,6 +582,55 @@ def _two_metrics(low: str, facts: list[Fact], who: str | None) -> list[tuple[Fac
             found.append((min(pos), f, Decimal(m.group(1).replace("−", "-").replace(".", "").replace(",", "."))))
     found.sort(key=lambda x: x[0])
     return [(f, g) for _, f, g in found[:2]] if len(found) >= 2 else None
+
+
+def _paired_directions(clause: str, low: str, facts: list[Fact], tickers: list[str]) -> list[str]:
+    """Vế có cả "tăng" lẫn "giảm" ("giảm 13,7% (tăng 310 tỷ)", "MSN giảm 53,5% và LNST tăng 202,8%"): mỗi từ chỉ chiều
+    ghép với con số đứng ngay sau nó (không có từ chỉ chiều khác xen giữa), rồi so với chiều của dòng có số đó."""
+    words = sorted([*UP.finditer(low), *DOWN.finditer(low)], key=lambda m: m.start())
+    nums = numbers(clause)
+    out = []
+    for j, w in enumerate(words):
+        stop = words[j + 1].start() if j + 1 < len(words) else len(low)
+        n = next((x for x in nums if w.end() <= x.start < stop and x.start - w.end() <= 30), None)
+        if n is None or NEGATED_VERB.search(low[:w.start()]):
+            continue
+        up = w.re is UP
+        if LOSS_BEFORE.search(low[:w.start()]):
+            up = not up
+        near = [t for t in TICKER.findall(clause[:w.start()])][-1:] or tickers
+        dirs = {d for _, d in _directions_by_number(clause[n.start:n.end], facts, near)}
+        if len(dirs) == 1 and dirs != {"flat"} and (dirs == {"up"}) != up:
+            out.append(f"“{w.group(0)} {clause[n.start:n.end].strip()}” ngược chiều với bảng số: {clause.strip()}")
+    return out
+
+
+_AUX = {"đã", "vẫn", "cũng", "lại", "đều", "chỉ", "có", "bị", "tiếp", "tục", "mạnh", "nhẹ", "là", "thì", "đang"}
+
+
+def _against_cited_words(low: str, facts: list[Fact]) -> list[str]:
+    """Từ chỉ chiều ngược với chính nguyên nhân hay cờ câu dẫn: câu nói "chi phí bán hàng giảm" mà dòng nguyên nhân ghi
+    "Chi phí bán hàng tăng"; câu nói "lợi nhuận giảm nhờ thu nhập khác" mà cờ ghi "Lợi nhuận tăng nhờ thu nhập khác"."""
+    texts = [f.text.lower() for f in facts if f.kind in ("reason", "flag")]
+    if not texts:
+        return []
+    out = []
+    for w in [*UP.finditer(low), *DOWN.finditer(low)]:
+        if NEGATED_VERB.search(low[:w.start()]):
+            continue
+        words = re.findall(r"\w+", low[:w.start()])
+        while words and words[-1] in _AUX:
+            words.pop()
+        if len(words) >= 2 and words[-2] == "của":        # "chi phí bán hàng của SAB giảm"
+            del words[-2:]
+        if len(words) < 2:
+            continue
+        item = r"\s+".join(map(re.escape, words[-2:]))
+        same, other = (r"tăng", r"giảm") if w.re is UP else (r"giảm", r"tăng")
+        if any(re.search(rf"(?<!\w){item}\s+{other}(?!\w)", t) and not re.search(rf"(?<!\w){item}\s+{same}(?!\w)", t)
+               for t in texts):
+            out.append(f"dòng nguyên nhân/cờ câu dẫn ghi “{' '.join(words[-2:])} {other}”")
+    return out
 
 
 def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, sheet: FactSheet | None = None) -> None:
@@ -561,6 +657,15 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
             return own
 
         comp_up, comp_down = COMP_UP.search(low), COMP_DOWN.search(low)
+        if (comp_up or comp_down) and MEDIAN.search(low):
+            # "cao hơn trung vị nhóm +23,7%": số của mã so với trung vị ghi trong dòng xếp hạng
+            who = tickers[0] if tickers else subject
+            if who:
+                problem = _median_problem(clause, low, facts, who, bool(comp_up and not comp_down))
+                if problem:
+                    bad("comparison", problem)
+                subject = who
+                continue
         if comp_up or comp_down:
             comp = comp_up or comp_down
             pair, carried = None, False
@@ -586,27 +691,53 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                     continue
             if pair:
                 a_t, b_t = pair
-                c = cue(carried)
-                first = bool(comp_up)           # vế đầu đứng trước vế sau trong thứ tự (lớn -> nhỏ)?
-                if declining and c == "growth":
-                    first = not first           # "giảm nhanh hơn" = tăng trưởng thấp hơn
                 rows = [f for f in facts if f.order and a_t in f.order and b_t in f.order]
-                if c is None:   # không rõ loại số liệu: theo dòng quy mô; không có dòng quy mô mới xét dòng tăng trưởng
-                    rows = _named(rows, low)
-                    cands = [f for f in rows if f.measure == "level"] or [f for f in rows if f.measure == "growth"]
-                else:
-                    cands = _named([f for f in rows if f.measure == c], low)
-                    if not cands and c == "growth":     # tỷ lệ (CIR, biên lợi nhuận) có mức tính bằng %, không phải mức tăng
-                        cands = [f for f in _named(rows, low) if f.measure == "level" and f.metric in RATIO_KEYS]
-                if not cands:
-                    bad("comparison", f"không có dòng so sánh {a_t} với {b_t}: {clause.strip()}"
-                                      + _hint(sheet, [a_t, b_t], c, low))
-                elif not any((f.order.index(a_t) < f.order.index(b_t)) == first for f in cands):
-                    bad("comparison", clause.strip())
+                # mỗi từ so sánh trong vế xét riêng, loại số liệu đọc từ đoạn ngay trước nó ("quy mô lớn hơn và tăng
+                # trưởng chậm hơn MCH"); vế chỉ có một từ so sánh thì đọc cả vế như trước
+                comps = sorted([*COMP_UP.finditer(low), *COMP_DOWN.finditer(low)], key=lambda m: m.start())
+                start = 0
+                for j, cm in enumerate(comps):
+                    local = _cue(low[start:cm.end()]) if len(comps) > 1 else None
+                    start = cm.end()
+                    if len(comps) > 1:      # "thấp hơn VHM và cao hơn VRE": mỗi từ so sánh với mã đứng ngay sau nó
+                        stop = comps[j + 1].start() if j + 1 < len(comps) else len(low)
+                        after = [t for t in TICKER.findall(clause[cm.end():stop])]
+                        lead = [t for t in TICKER.findall(clause[:comps[0].start()])] or ([subject] if subject else [])
+                        if after and lead and after[0] != lead[0]:
+                            a_t, b_t = lead[0], after[0]
+                            rows = [f for f in facts if f.order and a_t in f.order and b_t in f.order]
+                    c = local or cue(carried)
+                    first = cm.re is COMP_UP            # vế đầu đứng trước vế sau trong thứ tự (lớn -> nhỏ)?
+                    if declining and c == "growth":
+                        first = not first           # "giảm nhanh hơn" = tăng trưởng thấp hơn
+                    if c is None:   # không rõ loại số liệu: theo dòng quy mô; không có thì xét dòng tăng trưởng
+                        named_rows = _named(rows, low)
+                        cands = [f for f in named_rows if f.measure == "level"] or \
+                                [f for f in named_rows if f.measure == "growth"]
+                    else:
+                        cands = _named([f for f in rows if f.measure == c], low)
+                        if not cands and c == "growth":     # tỷ lệ (CIR, biên lợi nhuận) có mức tính bằng %
+                            cands = [f for f in _named(rows, low) if f.measure == "level" and f.metric in RATIO_KEYS]
+                    if not cands:
+                        bad("comparison", f"không có dòng so sánh {a_t} với {b_t}: {clause.strip()}"
+                                          + _hint(sheet, [a_t, b_t], c, low))
+                        break
+                    if not any((f.order.index(a_t) < f.order.index(b_t)) == first for f in cands):
+                        bad("comparison", clause.strip())
+                        break
                 subject = a_t if len(tickers) >= 2 or a_t == tickers[0] else subject
                 continue
-            as_dir = COMP_AS_DIR.search(low) if LAST_YEAR.search(low) and not up_m and not down_m else None
-            if as_dir:          # "thấp hơn cùng kỳ": kiểm như từ chỉ chiều ở dưới
+            as_dir = COMP_AS_DIR.search(low) if LAST_YEAR.search(low) else None
+            if as_dir and (up_m or down_m):
+                # "6,9%, thấp hơn mức 4,4% cùng kỳ và tăng 2,5 điểm %": phần so với cùng kỳ kiểm riêng theo chiều của dòng
+                dirs = {d for _, d in _directions_by_number(clause, facts, tickers)}
+                if not dirs:
+                    named, _ = _named_ids(facts, low)
+                    dirs = {f.direction for f in facts if f.direction and f.id in named
+                            and (not tickers or f.ticker in tickers)}
+                if len(dirs) == 1 and dirs != {"flat"} and (as_dir.group(1) is not None) != (dirs == {"up"}):
+                    bad("comparison", f"{clause.strip()} — bảng số ghi chiều {'tăng' if dirs == {'up'} else 'giảm'}")
+            elif as_dir:        # "thấp hơn cùng kỳ": kiểm như từ chỉ chiều ở dưới
                 up_m, down_m = (as_dir, None) if as_dir.group(1) else (None, as_dir)
             else:
                 out.warnings.append(f"không rõ hai vế so sánh: {clause.strip()}")
@@ -616,25 +747,45 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                 continue
             who = tickers[0] if tickers else subject
             if who:
-                c = cue(not tickers)
+                sup = top or bottom
+                # loại số liệu đọc tới hết vế nhỏ chứa từ xếp hạng ("đứng đầu nhóm và tăng 20,6%": "đứng đầu" là quy mô)
+                seg = low[:sup.end()] + low[sup.end():].split(" và ")[0]
+                c = _cue(seg)
+                if c is None and p_low and (not tickers or not p_tickers):
+                    c = _cue(p_low)
                 first = bool(top)
                 if declining and c == "growth":
                     if top and "đầu" not in top.group(0):      # "giảm mạnh nhất" = tăng trưởng thấp nhất
                         first = False
                     else:                                      # "giảm ít nhất", "dẫn đầu mức giảm": chưa rõ nghĩa
                         out.warnings.append(f"không rõ cực: {clause.strip()}")
-                        continue
+                        first = None                           # bỏ qua phần xếp hạng, vẫn kiểm từ chỉ chiều ở dưới
                 cands = _named([f for f in facts if f.order and who in f.order and (c is None or f.measure == c)], low)
-                if not cands:
+                if not cands and c == "growth":         # tỷ lệ có mức tính bằng %: "biên lợi nhuận ròng cao nhất ở 70,0%"
+                    cands = _named([f for f in facts if f.order and who in f.order and f.measure == "level"
+                                    and f.metric in RATIO_KEYS], low)
+                if first is None:
+                    pass
+                elif not cands:
                     bad("comparison", f"không có dòng xếp hạng cho {who}: {clause.strip()}"
                                       + _hint(sheet, [who], c, low, rank=True))
                 elif not any((f.order[0] if first else f.order[-1]) == who for f in cands):
                     bad("comparison", clause.strip())
-            continue
+            if tickers:         # "VRE có quy mô nhỏ nhất..., nhưng biên lợi nhuận ròng lại cao nhất": chủ ngữ mang sang
+                subject = tickers[0]
+            if not (UP.search(low) or DOWN.search(low)):
+                continue
+            # vế vừa xếp hạng vừa nói chiều ("đứng đầu nhóm và giảm 20,6%"): kiểm tiếp từ chỉ chiều ở dưới
         if tickers:
             subject = tickers[0]
+        for problem in _against_cited_words(low, facts):
+            bad("direction", f"{clause.strip()} — {problem}")
         if up_m and down_m:
-            out.warnings.append(f"vế vừa có tăng vừa có giảm: {clause.strip()}")
+            problems = _paired_directions(clause, low, facts, tickers)
+            for problem in problems:
+                bad("direction", problem)
+            if not problems:
+                out.warnings.append(f"vế vừa có tăng vừa có giảm: {clause.strip()}")
             continue
         if not up_m and not down_m:
             continue
@@ -663,7 +814,21 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                     if (f.ticker and f.ticker in tickers and (not any_name or f.id in named)) \
                             or (not tickers and f.id in named):
                         cands = with_dir
+                elif with_dir and not any_name and ALL_OF.search(low):
+                    cands = with_dir        # "đều thấp hơn cùng kỳ": mọi dòng có chiều câu ghi
+                elif with_dir and not any_name and tickers:
+                    own = [f for f in with_dir if f.ticker in tickers]
+                    if own and len({f.direction for f in own}) == 1:
+                        cands = own         # "lãi quý 2 của MBB giảm": mọi dòng có chiều của mã đều cùng chiều
             dirs = {f.direction for f in cands}
+        if not dirs:
+            # "VCB có mức giảm LNTT thấp nhất", "BID và CTG đều giảm lợi nhuận": dấu của mã trong dòng tốc độ thay đổi
+            who = tickers or ([subject] if subject else [])
+            rows = _named([f for f in facts if f.order and f.measure == "growth"], low)
+            signs = {("up" if v.value > 0 else "down" if v.value < 0 else "flat")
+                     for f in rows for t in who if t in f.order and (v := _row_value(f, t)) is not None}
+            if len(signs) == 1:
+                dirs = signs
         if not dirs and sheet is not None:
             # các dòng câu ghi không cho biết chiều: dò cả bảng số theo mã và tên chỉ tiêu; đúng một dòng thì kiểm theo nó
             who = tickers or ([subject] if subject else [])
@@ -675,6 +840,13 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                     bad("direction", f"{clause.strip()} — bảng số ghi chiều ngược ở dòng {f.id}; ghi dòng {f.id} "
                                      f"vào uses")
                 continue
+        if len(dirs) > 1:       # "doanh thu tăng 17,1% và LNST tăng 13,7%": ghép từng từ chỉ chiều với số của nó
+            problems = _paired_directions(clause, low, facts, tickers)
+            for problem in problems:
+                bad("direction", problem)
+            if not problems:
+                out.warnings.append(f"không rõ chiều: {clause.strip()}")
+            continue
         if len(dirs) != 1:
             out.warnings.append(f"không rõ chiều: {clause.strip()}")
             continue

@@ -65,7 +65,14 @@ KINDS = {
     "comparison": "so sánh (cao hơn/thấp hơn, cao nhất/thấp nhất) ngược với số liệu hoặc không có dòng so sánh",
     "trend": "nhận định nhiều quý (tăng/giảm liên tiếp, cao nhất/thấp nhất trong các quý, so với quý trước) ngược với "
              "số liệu hoặc không ghi dòng xu hướng",
+    "reason_label": "câu gắn nhãn đã kiểm/chưa kiểm cho nguyên nhân của công ty không đúng với nhãn trong bảng số",
 }
+
+# Nhãn của nguyên nhân trong công văn giải trình (dòng bảng số loại "reason"): câu nói "chưa kiểm" chỉ được dẫn nguyên
+# nhân chưa kiểm, câu nói "khớp BCTC/đã đối chiếu" chỉ được dẫn nguyên nhân đã khớp (MSN quý 3/2026: một câu gộp nguyên
+# nhân đã khớp với nguyên nhân chưa kiểm rồi ghi chung là "chưa kiểm chứng bằng số liệu")
+SAYS_UNCHECKED = re.compile(r"(?i)chưa\s+(?:được\s+)?(?:kiểm|đối chiếu|xác minh|xác nhận)")
+SAYS_CHECKED = re.compile(r"(?i)(?:đã|được)\s+(?:kiểm|đối chiếu|xác nhận)|khớp\s+(?:với\s+)?(?:số\s+liệu\s+)?BCTC")
 
 
 @dataclass
@@ -211,6 +218,18 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
     _check_ranks(named, facts, bad, sheet)
     for detail in _self_contradictions(text):
         bad("direction", detail)
+    reasons = [f for f in facts if f.kind == "reason"]
+    if reasons:
+        unchecked = [f.id for f in reasons if SAYS_UNCHECKED.search(f.text)]
+        checked = [f.id for f in reasons if f.id not in unchecked]
+        # Chỉ con số của nguyên nhân được kiểm; lời giải thích thì không. Câu nói "chưa kiểm" về lời giải thích mà không dùng
+        # số đã khớp là đúng; dùng chính số đã khớp rồi gọi là chưa kiểm thì sai
+        used = sorted({l.fact_id for l in out.links} & set(checked))
+        if SAYS_UNCHECKED.search(text) and used:
+            bad("reason_label", f"câu gọi là chưa kiểm nhưng dùng số đã khớp BCTC của nguyên nhân ({', '.join(used)}): "
+                                "tách câu")
+        elif SAYS_CHECKED.search(text) and unchecked:
+            bad("reason_label", f"câu nói đã kiểm/khớp nhưng dẫn nguyên nhân chưa kiểm ({', '.join(unchecked)})")
     # nói "lỗ" mà các dòng câu ghi không có khoản lỗ nào (số âm hoặc chữ "lỗ"); câu đã bị bắt sai chiều hoặc sai dấu
     # (số tiền sau "lỗ" đã kiểm ở trên) thì không báo thêm
     if facts and _loss_claim(text) and not any(loss for _, _, loss in allowed_nums) \

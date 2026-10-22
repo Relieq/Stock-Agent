@@ -18,3 +18,20 @@ def test_expense_printed_positive_or_negative_reads_as_size():
     neg = Part("b.opex", "Chi phí hoạt động", D(-5295) * B, D(-4493) * B, D(-802) * B, expense=True)
     assert "4.612 tỷ, cùng kỳ 3.357 tỷ (tăng 1.255 tỷ), làm LNST giảm 1.255 tỷ" in part_text(up, "quý 3/2026", "MSN")
     assert "5.295 tỷ, cùng kỳ 4.493 tỷ (tăng 802 tỷ), làm LNST giảm 802 tỷ" in part_text(neg, "quý 3/2026", "TCB")
+
+
+def test_guard_reason_label_only_flags_matched_numbers_called_unchecked():
+    from services.analyst.guard import check_sentence
+    from services.analyst.sheet import FactSheet
+    sh = FactSheet()
+    sh.add("reason", "Nguyên nhân MSN nêu trong công văn giải trình (khớp BCTC): Lãi công ty liên kết tăng 13%", ticker="MSN")
+    sh.add("reason", "Nguyên nhân MSN nêu trong công văn giải trình (theo công ty, chưa kiểm được bằng số): mảng vật liệu "
+                     "phục hồi", ticker="MSN")
+    bad = check_sentence("Theo công ty, lãi công ty liên kết tăng 13%, chưa kiểm chứng bằng số.", ["S1", "S2"], sh,
+                         {"MSN"}, {"MSN"})
+    assert [v.kind for v in bad.violations] == ["reason_label"]
+    ok_words = check_sentence("Theo công ty, mảng vật liệu phục hồi; lời giải thích này chưa kiểm được bằng số.", ["S1", "S2"],
+                              sh, {"MSN"}, {"MSN"})
+    assert not [v for v in ok_words.violations if v.kind == "reason_label"]
+    wrong = check_sentence("Mảng vật liệu phục hồi, đã đối chiếu khớp BCTC.", ["S2"], sh, {"MSN"}, {"MSN"})
+    assert [v.kind for v in wrong.violations] == ["reason_label"]

@@ -172,7 +172,10 @@ def compare_document(conn, doc_id: int, verbose: bool = False) -> Counter | None
     return compare_record(record, open_record_pdf(conn, record), doc_id, verbose)
 
 
-def _compare_statement(st, raw, truth, kinds, manual, sep, truth_sep, doc_id) -> tuple[Counter, list[str]]:
+def _compare_statement(st, raw, truth, kinds, manual, sep, truth_sep, doc_id,
+                       wrong: list | None = None) -> tuple[Counter, list[str]]:
+    """`wrong` (tùy chọn): nhận mọi ô đã chấm ở mức tự động, dạng (báo cáo, dòng đã đọc hoặc None nếu dòng đáp án bị bỏ
+    sót, cột, kết quả, trang, tên dòng đáp án hoặc None, số in trong đáp án hoặc None); không đổi cách đếm."""
     tally, msgs = Counter(), []
     used: set[tuple[int, int]] = set()
     last_y: dict[int, float] = {}         # dòng ghép được gần nhất trên mỗi trang: các dòng sau phải nằm dưới nó
@@ -225,6 +228,8 @@ def _compare_statement(st, raw, truth, kinds, manual, sep, truth_sep, doc_id) ->
                     continue
                 result = "đúng" if tv == v else ("thiếu" if v is None else "thừa" if tv is None else "sai")
                 tally[f"{level}: {result}"] += 1
+                if level == "tự động" and wrong is not None:
+                    wrong.append((st, i, kind, result, int(row["page"]), t.label, truth_raw))
                 if result != "đúng" and level == "tự động":
                     msgs.append(f"  [{doc_id}] {st} dòng {i} {row.get('code') or ''} {row.get('label', '')[:40]} {kind}: "
                           f"đọc {raw_value} / đáp án {truth_raw}")
@@ -242,13 +247,18 @@ def _compare_statement(st, raw, truth, kinds, manual, sep, truth_sep, doc_id) ->
                 tally["tự động: thiếu"] += n
                 tally["cuối cùng: thiếu"] += n
                 tally["dòng đáp án bị bỏ sót"] += 1
+                if wrong is not None:
+                    wrong.extend((st, None, kinds[ci], "thiếu", p, t.label, v) for ci, v in t.values.items()
+                                 if ci < len(kinds) and v.strip() not in DASH and parse_amount(v, truth_sep) not in (None, 0))
                 if True:
                     msgs.append(f"  [{doc_id}] {st} trang {p}: dòng đáp án không có dòng đọc tương ứng: {t.label[:50]} {t.values}")
     return tally, msgs
 
 
-def compare_record(record: dict, doc, doc_id, verbose: bool = False, truth_sep: str | None = None) -> Counter:
-    """So các ô của bản ghi trích xuất `record` với lớp chữ gốc của `doc` (file có chữ gốc cùng số trang)."""
+def compare_record(record: dict, doc, doc_id, verbose: bool = False, truth_sep: str | None = None,
+                   wrong: list | None = None) -> Counter:
+    """So các ô của bản ghi trích xuất `record` với lớp chữ gốc của `doc` (file có chữ gốc cùng số trang). `wrong`: xem
+    _compare_statement."""
     texts = page_texts(doc)
     sep = record.get("thousands_sep") or "."
     truth_sep = truth_sep or sep
@@ -265,10 +275,13 @@ def compare_record(record: dict, doc, doc_id, verbose: bool = False, truth_sep: 
         options = []
         for name, fn in (("hàng", line_rows), ("bảng", _table_rows)):
             truth = {pg: fn(doc[pg - 1], pg, len(kinds)) for pg in pages}
-            t, msgs = _compare_statement(st, raw, truth, kinds, manual, sep, truth_sep, doc_id)
-            options.append((t["dòng không ghép được"] + t["dòng đáp án bị bỏ sót"], name != "hàng", t, msgs))
-        _, _, t, msgs = min(options, key=lambda x: (x[0], x[1]))
+            w: list = []
+            t, msgs = _compare_statement(st, raw, truth, kinds, manual, sep, truth_sep, doc_id, w)
+            options.append((t["dòng không ghép được"] + t["dòng đáp án bị bỏ sót"], name != "hàng", t, msgs, w))
+        _, _, t, msgs, w = min(options, key=lambda x: (x[0], x[1]))
         tally.update(t)
+        if wrong is not None:
+            wrong.extend(w)
         if verbose:
             for msg in msgs:
                 print(msg)

@@ -232,6 +232,7 @@ class Notes:
         return self.cache["tables"][key]
 
 
+DEDUCTION = re.compile(r"(?i)giảm\s*trừ|chiết\s*khấu|trả\s*lại|giảm\s*giá|chi\s*phí|^\W*chi\s|lỗ|dự\s*phòng")
 SCALES = (Decimal(1), Decimal(10) ** 3, Decimal(10) ** 6, Decimal(10) ** 9)
 
 
@@ -258,7 +259,9 @@ def match_note(raw: dict | None, number: int, pairs: dict[str, tuple[Decimal, De
         vs = [val(r, j) or Decimal(0) for r in items]
         if any(val(r, j) is not None for r in items):
             yield "items", sum(vs, Decimal(0)), [1] * len(vs)
-            if len(vs) > 1:
+            # Khoản đầu trừ các khoản sau (doanh thu trừ giảm trừ in số dương) chỉ khi các khoản sau đúng là khoản trừ: VRE
+            # từng ghép trúng hai bảng chồng nhau theo cách này
+            if len(vs) > 1 and all(DEDUCTION.search(r["label"]) for r in items[1:]):
                 yield "items", vs[0] - sum((abs(v) for v in vs[1:]), Decimal(0)), [1] + [-1] * (len(vs) - 1)
         if totals and val(totals[-1], j) is not None:
             yield "total", val(totals[-1], j), None

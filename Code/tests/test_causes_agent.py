@@ -10,7 +10,7 @@ B = D(10) ** 9
 def test_income_line_turning_to_loss_says_loss():
     p = Part("b.ntrading", "Lãi thuần mua bán chứng khoán kinh doanh", D(-363) * B, D(1287) * B, D(-1650) * B)
     t = part_text(p, "quý 3/2026", "VPB")
-    assert "lỗ 363 tỷ, cùng kỳ 1.287 tỷ (giảm 1.650 tỷ), làm LNST giảm 1.650 tỷ" in t
+    assert "lỗ 363 tỷ, cùng kỳ lãi 1.287 tỷ (giảm 1.650 tỷ), làm LNST giảm 1.650 tỷ" in t
 
 
 def test_expense_printed_positive_or_negative_reads_as_size():
@@ -54,8 +54,15 @@ def test_note_items_and_parts_selection():
     gas = item_text("Các khoản dự phòng", -D(492) * B, -D(1634) * B, expense=True)
     assert "âm 492 tỷ, cùng kỳ âm 1.634 tỷ (tăng 1.142 tỷ), làm LNST giảm 1.142 tỷ" in gas
     # VRE: cả khối doanh thu in âm -> xoay chiều, doanh thu tăng làm LNST tăng
-    (lab, a, b), = orient_items([("Doanh thu cho thuê", -D(120) * B, -D(100) * B)])
+    (lab, a, b), = orient_items([("Doanh thu cho thuê", -D(120) * B, -D(100) * B)], natural=D(120) * B)
     assert item_text(lab, a, b, expense=False).endswith("(tăng 20,0 tỷ), làm LNST tăng 20,0 tỷ")
+    # Lỗ ngoại hối thật (dòng KQKD âm): giữ dấu, khoản chi tăng làm LNST giảm
+    fx = orient_items([("Thu từ ngoại hối", D(500) * B, D(400) * B), ("Chi về ngoại hối", -D(900) * B, -D(300) * B)],
+                      natural=-D(400) * B)
+    assert fx[1][1] == -D(900) * B
+    assert item_text(*fx[1], expense=False).endswith("làm LNST giảm 600 tỷ")
+    assert item_text("Giá vốn hàng hóa", D(700) * B, D(500) * B, True, "lợi nhuận gộp").endswith(
+        "làm lợi nhuận gộp giảm 200 tỷ")
     parts = [Part(str(i), "x", D(0), D(0), D(e) * B) for i, e in enumerate([19147, -10321, 18567, -8401, 650, 30])]
     bd = Breakdown("61", D(0), D(1), sorted(parts, key=lambda p: -abs(p.effect)))
     assert [p.code for p in sheet_parts(bd)] == ["0", "2", "1", "3"]

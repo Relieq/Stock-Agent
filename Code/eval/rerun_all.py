@@ -51,7 +51,7 @@ REPORT = {
     "uc_total": "1.550", "g8": "1.244", "g6": "306", "pct_1_4": "95,5%", "pct_1_3": "95,1%", "pct_8": "3,5%",
     "pct_6": "0,9%", "pct_7": "0,1%", "pct_4": "152 (0,4%)", "est_ok": "99,5%", "est_low": "98,7%", "est_wrong6": "10",
     "eps_second": "264/279", "offbs_second": "342/368",
-    "no_human": "97/119 (81,5%)", "approved": "4/119", "fixed_docs": "19/119", "fix_cells_avg": "8",
+    "no_human": "97/119 (81,5%)", "approved": "3/119", "fixed_docs": "19/119", "fix_cells_avg": "8",
     "fix_entries": "158", "fix_flagged": "80 lượt / 8 BCTC", "fix_later": "78 lượt / 12 BCTC", "fix_emptied": "6",
     "fix_both": "2", "fix_cells_docs": "18",
     "card_total": "1.460", "card_cell_ok": "1.339", "card_image": "5", "card_computed": "116", "card_single": "0",
@@ -269,6 +269,7 @@ def human_work(conn, docs) -> dict:
         t["BCTC"] += 1
         t["không cần người"] += not (fixes or codes or approved)
         t["duyệt tay"] += approved
+        t["chỉ duyệt, không sửa"] += approved and not (fixes or codes)
         t["sửa ít nhất một ô hoặc mã"] += bool(fixes or codes)
         t["duyệt tay và sửa"] += approved and bool(fixes or codes)
         t["lượt sửa số"] += len(fixes)
@@ -596,10 +597,10 @@ def main() -> None:
     S.h("3. BCTC cần người (tab:ketquachinh) và lượt sửa tay")
     nb = hw["BCTC"]
     S.n("no_human", "BCTC không cần người làm gì", f"{hw['không cần người']}/{nb} ({pct(hw['không cần người'], nb)})")
-    S.n("approved", "BCTC người chỉ xem ảnh rồi duyệt", f"{hw['duyệt tay']}/{nb}")
+    S.n("approved", "BCTC người chỉ xem ảnh rồi duyệt, không sửa ô nào", f"{hw['chỉ duyệt, không sửa']}/{nb}")
     S.n("fixed_docs", "BCTC người phải sửa ít nhất một ô (kể cả chỉ sửa mã)", f"{hw['sửa ít nhất một ô hoặc mã']}/{nb}")
-    S.p(f"- BCTC vừa duyệt tay vừa có sửa: {hw['duyệt tay và sửa']} (vì vậy ba dòng trên cộng ra "
-        f"{hw['không cần người'] + hw['duyệt tay'] + hw['sửa ít nhất một ô hoặc mã']}, không phải {nb})")
+    S.p(f"- BCTC vừa duyệt tay vừa có sửa: {hw['duyệt tay và sửa']} (tính ở dòng sửa); ba dòng trên cộng ra "
+        f"{hw['không cần người'] + hw['chỉ duyệt, không sửa'] + hw['sửa ít nhất một ô hoặc mã']}/{nb}")
     S.n("fix_cells_docs", "BCTC có sửa số (không tính BCTC chỉ sửa mã)", hw["BCTC có sửa số"])
     S.n("fix_cells_avg", "Ô sửa trung bình mỗi BCTC phải sửa",
         vn(tally[4] / hw["sửa ít nhất một ô hoặc mã"]) if hw["sửa ít nhất một ô hoặc mã"] else "?")

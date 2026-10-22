@@ -100,14 +100,21 @@ def part_text(p, label: str, ticker: str, flip: bool = False) -> str:
             f"làm LNST {'tăng' if p.effect >= 0 else 'giảm'} {ty(p.effect)}")
 
 
-def item_text(lab: str, a: Decimal, b: Decimal) -> str:
-    """Khoản con trong thuyết minh: hai kỳ cùng âm (bảng in khoản trừ trong ngoặc) thì so độ lớn; khác dấu thì ghi dấu
-    (VRE, BID, ACB: khoản in âm từng bị ghi "giảm" khi độ lớn tăng)."""
-    if a <= 0 and b <= 0:
-        x, y, show = -a, -b, ty
-    else:
-        x, y, show = a, b, (lambda v: ty(v) if v >= 0 else f"âm {ty(v)}")
-    return f"{lab} {show(x)}, cùng kỳ {show(y)} ({'tăng' if x >= y else 'giảm'} {ty(x - y)})"
+def item_text(lab: str, a: Decimal, b: Decimal, expense: bool) -> str:
+    """Khoản con trong thuyết minh của một dòng KQKD, đã xoay chiều theo bảng (orient_items). `expense`: dòng đó là khoản
+    trừ trong công thức LNST. Khoản âm là khoản đi ngược dòng của nó (hoàn nhập trong dòng chi phí, khoản trừ trong dòng
+    thu nhập). Ghi luôn tác động lên LNST để câu không phải tự suy (GAS quý 2: "các khoản dự phòng" (492) so với (1.634)
+    tỷ là hoàn nhập ít đi, tức chi phí tăng và LNST giảm, từng bị viết là "làm tăng lợi nhuận")."""
+    show = lambda v: ty(v) if v >= 0 else f"âm {ty(v)}"     # noqa: E731
+    effect = (b - a) if expense else (a - b)
+    return (f"{lab} {show(a)}, cùng kỳ {show(b)} ({'tăng' if a >= b else 'giảm'} {ty(a - b)}), "
+            f"làm LNST {'tăng' if effect >= 0 else 'giảm'} {ty(effect)}")
+
+
+def orient_items(items: list[tuple[str, Decimal, Decimal]]) -> list[tuple[str, Decimal, Decimal]]:
+    """Bảng in cả khối trong ngoặc (VRE: doanh thu; VPB: chi phí khác) thì đổi dấu cả khối để tổng dương."""
+    total = sum((a for _, a, _ in items), Decimal(0))
+    return [(lab, -a, -b) for lab, a, b in items] if total < 0 else items
 
 
 MAX_PARTS = 6
@@ -210,6 +217,20 @@ class CauseAgent:
                  "reasons": [[r.text, r.verdict, r.detail] for r in e["view"].reasons
                              if r.css != "bad"]}]
 
+    def line_is_expense(self, code: str) -> bool:
+        """Dòng là khoản trừ trong công thức LNST: theo kết quả tách nếu là dòng lá, không thì theo dấu của dòng trong
+        công thức của dòng cha (giá vốn trong lợi nhuận gộp)."""
+        bd = self.bd["quarter"]
+        part = next((p for p in (bd.parts if bd else []) if p.code == code), None)
+        if part is not None:
+            return part.expense
+        for r in RULESETS.get(self.facts.template, RULESETS["TT200"]).rules:
+            if r.statement == "IS":
+                for sign, c in r.rhs:
+                    if c == code:
+                        return sign < 0
+        return False
+
     # ---------- vòng agent ----------
 
     def _breakdown_text(self) -> str:
@@ -293,12 +314,13 @@ class CauseAgent:
         for g in self.gathered:
             if g["tool"] == "note" and g["items"] and g["verified"]:
                 per = _period_label(self.period, self.year, g["period"])
-                items = sorted(((lab, Decimal(a), Decimal(b)) for lab, a, b in g["items"]),
+                items = sorted(orient_items([(lab, Decimal(a), Decimal(b)) for lab, a, b in g["items"]]),
                                key=lambda i: -abs(i[1] - i[2]))[:3]
+                expense = self.line_is_expense(g["line"])
                 for lab, a, b in items:
                     line = self.labels.get(g["line"], g["title"]).strip()
                     sh.add("note_item", f"Thuyết minh của dòng {line} (KQKD), {per} của {self.ticker}: "
-                                        + item_text(lab, a, b),
+                                        + item_text(lab, a, b, expense),
                            ticker=self.ticker, names=[lab.lower()],
                            sources=[{"document_id": self.doc_id, "page": g["pages"][0] if g["pages"] else None,
                                      "label": f"Thuyết minh {g['number']}", "column": g["period"]}])

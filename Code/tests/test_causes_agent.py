@@ -49,8 +49,13 @@ def test_expense_reversal_and_tax_benefit_directions():
 def test_note_items_and_parts_selection():
     from services.causes.agent import item_text, sheet_parts
     from services.causes.decompose import Breakdown
-    assert item_text("Doanh thu", -D(120) * B, -D(100) * B).endswith("(tăng 20,0 tỷ)")
-    assert "âm 5,0 tỷ" in item_text("Khác", -D(5) * B, D(3) * B)
+    from services.causes.agent import orient_items
+    # GAS: hoàn nhập dự phòng (in âm) trong thuyết minh chi phí quản lý nhỏ đi -> chi phí tăng, LNST giảm
+    gas = item_text("Các khoản dự phòng", -D(492) * B, -D(1634) * B, expense=True)
+    assert "âm 492 tỷ, cùng kỳ âm 1.634 tỷ (tăng 1.142 tỷ), làm LNST giảm 1.142 tỷ" in gas
+    # VRE: cả khối doanh thu in âm -> xoay chiều, doanh thu tăng làm LNST tăng
+    (lab, a, b), = orient_items([("Doanh thu cho thuê", -D(120) * B, -D(100) * B)])
+    assert item_text(lab, a, b, expense=False).endswith("(tăng 20,0 tỷ), làm LNST tăng 20,0 tỷ")
     parts = [Part(str(i), "x", D(0), D(0), D(e) * B) for i, e in enumerate([19147, -10321, 18567, -8401, 650, 30])]
     bd = Breakdown("61", D(0), D(1), sorted(parts, key=lambda p: -abs(p.effect)))
     assert [p.code for p in sheet_parts(bd)] == ["0", "2", "1", "3"]

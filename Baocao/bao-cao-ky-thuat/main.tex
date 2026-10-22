@@ -807,7 +807,7 @@ vuông là điều kiện. Chỉ BCTC đã kiểm chứng hoặc đã duyệt ta
 \subsection{Luồng xử lý một BCTC mới}
 \begin{figure}[H]
 \centering
-\resizebox{\linewidth}{!}{\sffamily%
+\resizebox{!}{0.78\textheight}{\sffamily%
 \begin{sequencediagram}
   \renewcommand{\unitfactor}{0.7}
   \newthread{w}{:Bộ canh}
@@ -837,10 +837,17 @@ vuông là điều kiện. Chỉ BCTC đã kiểm chứng hoặc đã duyệt ta
       \begin{call}{p}{lưu lần đọc thứ hai}{d}{}\end{call}
     \end{call}
   \end{sdblock}
+  \begin{sdblock}{opt}{[còn ô lệch với BCTC kỳ khác]}
+    \begin{call}{w}{đọc lại ô lệch(id)}{p}{ô đã xác nhận}
+      \begin{call}{p}{đọc lại ô(ảnh nét hơn)}{m}{số đọc lại}\end{call}
+    \end{call}
+  \end{sdblock}
+  \begin{sdblock}{opt}{[có công văn giải trình chưa đọc]}
+    \begin{call}{w}{đọc công văn(ảnh)}{m}{nguyên nhân (JSON)}\end{call}
+  \end{sdblock}
   \mess{w}{thư báo quản trị}{e}
 \end{sequencediagram}}
-\caption{Biểu đồ tuần tự khi một BCTC mới xuất hiện (tài liệu mới gồm BCTC và công văn giải trình; công văn chỉ được
-tải về). Mũi tên liền đầu đặc là lời gọi, mũi tên đứt là giá trị trả về,
+\caption{Biểu đồ tuần tự khi một BCTC mới xuất hiện (tài liệu mới gồm BCTC và công văn giải trình). Mũi tên liền đầu đặc là lời gọi, mũi tên đứt là giá trị trả về,
 mũi tên đầu hở là thông điệp không chờ trả lời; khung \code{opt} là đoạn chỉ chạy khi điều kiện trong ngoặc vuông
 đúng.}\label{fig:tuantu}
 \end{figure}
@@ -881,8 +888,9 @@ kỳ, phạm vi (hợp nhất, riêng, duy nhất), trạng thái soát xét hay
 Bộ luật được kiểm thử trên toàn bộ tiêu đề thật của VN30 năm 2025--2026. Lần chạy đầu nhận dạng đúng 174/174 tài liệu.
 
 Bộ canh cũng lấy công văn giải trình KQKD (công ty phải gửi khi lợi nhuận biến động từ 10\% so với cùng kỳ hoặc khi
-số sau soát xét khác số tự lập) và lưu thành một loại tài liệu riêng, không đọc số; thẻ KQKD của kỳ đó dẫn tới công
-văn. Năm 2025--2026 có 93 công văn (không tính bản trùng) của 21/30 mã VN30.
+số sau soát xét khác số tự lập) và lưu thành một loại tài liệu riêng. Công văn không đi qua bước đọc bảng số; ở cuối
+mỗi lượt canh, mô hình đọc các công văn mới để lấy nguyên nhân hiện trên thẻ (mục~\ref{sec:congvan}). Tính đến
+19/10/2026 có 91 công văn năm 2025--2026 (không tính bản trùng) của 20/30 mã VN30.
 
 \subsection{Nguồn thứ hai: trang công bố thông tin của HOSE}
 Chỉ dựa vào Vietstock thì hệ thống phụ thuộc vào một trang đăng lại: Vietstock có lúc đăng tiêu đề BCTC mà link file
@@ -1243,6 +1251,25 @@ Số liệu bị sửa giữa các BCTC & Hai BCTC cùng ngày (quý 2 và bán 
 \caption{Thẻ KQKD của VCB quý 2/2026. LNST tăng 64,7\%, và cờ cho thấy gần một nửa mức tăng LNTT đến từ thu nhập hoạt
 động khác. Bấm vào mỗi số để mở trang BCTC gốc.}\label{fig:the}
 \end{figure}
+
+\subsection{Nguyên nhân từ công văn giải trình}\label{sec:congvan}
+Khi lợi nhuận biến động mạnh, công ty gửi công văn giải trình nêu nguyên nhân, thường kèm con số: doanh thu tăng bao
+nhiêu phần trăm, chi phí lãi vay giảm bao nhiêu tỷ. Thẻ KQKD hiện các nguyên nhân này ngay dưới phần số chính. Mô hình
+chỉ chép từng phần của công văn (BCTC hợp nhất hay riêng, riêng quý hay lũy kế, lợi nhuận kỳ này và cùng kỳ, \% thay
+đổi) và từng nguyên nhân (lời của công ty, khoản mục BCTC được nhắc tới, con số, số đó là mức thay đổi hay mức đạt
+được, nói về cả công ty hay một mảng). Code đối chiếu mọi con số với BCTC đã kiểm chứng cùng kỳ, cùng phạm vi, cho
+phép sai lệch bằng mức làm tròn công ty dùng, và gắn một trong bốn nhãn: \enquote{khớp BCTC}; \enquote{đúng chiều
+tăng/giảm} khi công ty chỉ nói tăng hay giảm; \enquote{theo công ty, chưa kiểm được bằng số} khi số thuộc một mảng
+hay một công ty con mà BCTC không tách, hoặc không phải mức thay đổi (kế hoạch, sản lượng); \enquote{lệch với BCTC}
+(kể cả khi chiều tăng/giảm ngược với BCTC).
+Nguyên nhân là lời của công ty: hệ thống chỉ kiểm con số, không đánh giá lời giải thích có đúng hay không.
+
+Mỗi công văn được đọc một lần khi bộ canh tải về (khoảng 0,002 USD) và lưu lại; trang thẻ chỉ dùng bản đã lưu và chạy
+lại phép đối chiếu mỗi lần hiện, nên luôn theo số BCTC mới nhất, kể cả sau khi người duyệt sửa tay.
+
+Trên 91 công văn tính đến 19/10/2026: 110/110 con số lợi nhuận và \% thay đổi công ty nêu ở câu chính khớp BCTC. Trong
+226 nguyên nhân, 128 khớp số, 4 khớp chiều tăng/giảm, 94 chưa kiểm được bằng số và không nguyên nhân nào lệch. 113
+phần công văn không đối chiếu được vì nói về BCTC riêng công ty mẹ, hoặc về kỳ chưa có BCTC đã kiểm chứng. Một phần công văn có thể có nhiều nguyên nhân, nên số phần và số nguyên nhân đếm theo hai đơn vị khác nhau.
 
 \subsection{Bảng xếp hạng mùa BCTC}
 Bảng xếp hạng các mã theo tăng trưởng LNST quý so với cùng kỳ, chỉ gồm thẻ đã kiểm chứng. Người dùng lọc được theo
@@ -2010,7 +2037,6 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Đo thời gian từ lúc công bố tới lúc có thẻ trong mùa quý 3/2026}\chualam
 \subsection{Chỉ số tài chính: biên lợi nhuận gộp, ROE, tăng trưởng lũy kế}\chualam
 \subsection{Mở rộng lên VN100}\chualam
-\subsection{Đưa nguyên nhân biến động từ công văn giải trình lên thẻ}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam
 \subsection{Xác suất đúng cho từng ô và bước kiểm chứng tự chọn công cụ theo lợi ích trên chi phí}\chualam
 \subsection{Mở rộng bộ đáp án và so với khóa trước trên bộ vnpdf}\chualam

@@ -32,7 +32,7 @@
   <td>{{ SCOPE.get(d.scope, d.scope) }}</td>
   <td><span class="badge {{ STATUS[d.status][1] }}">{{ STATUS[d.status][0] }}</span></td>
   <td>{{ d.gate if d.gate and d.gate != '0/0' else "–" }}</td>
-  <td>{% if d.cov %}{{ (100 * d.cov.checked) | round | int }}%{% if d.cov.conflict %} <span class="badge bad">{{ d.cov.conflict }} cần xem lại</span>{% endif %}
+  <td>{% if d.cov %}{{ (100 * d.cov.checked) | round | int }}%{% if d.cov.conflict %} <span class="badge bad">{{ d.cov.conflict }} cần xem ảnh</span>{% endif %}
       <div class="muted small">{{ "với " ~ d.cov.peers if d.cov.peers else "chưa có kỳ khác" }}</div>{% endif %}</td>
   <td class="num">{{ d.head.get('rev_q_cur') | ty }}</td><td class="num muted">{{ d.head.get('rev_q_prev_year') | ty }}</td>
   <td class="num">{{ d.head.get('npat_q_cur') | ty }}</td><td class="num muted">{{ d.head.get('npat_q_prev_year') | ty }}</td>

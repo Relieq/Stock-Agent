@@ -86,12 +86,16 @@ def card_for(conn: psycopg.Connection, document_id: int) -> tuple[Card, dict] | 
 def explanation(conn: psycopg.Connection, ticker: str, year: int, period: str, scope: str) -> dict | None:
     """Công văn giải trình kết quả kinh doanh của công ty cho cùng kỳ (ưu tiên cùng phạm vi BCTC), bản đăng sau cùng."""
     row = conn.execute(
-        """SELECT title_raw, source_url FROM documents
+        """SELECT title_raw, source_url, id FROM documents
            WHERE ticker = %s AND fiscal_year = %s AND fiscal_period = %s AND doc_type = 'explanation'
              AND owner_user_id IS NULL AND duplicate_of IS NULL
            ORDER BY (scope = %s) DESC, source_listed_at DESC NULLS LAST LIMIT 1""",
         (ticker, year, period, scope)).fetchone()
-    return {"title": row[0].strip(), "url": row[1]} if row else None
+    if row is None:
+        return None
+    from services.metrics.letters import letter_view
+    return {"title": row[0].strip(), "url": row[1], "id": row[2],
+            "view": letter_view(conn, row[2], ticker, year, period, scope)}
 
 
 def quarter_document(conn: psycopg.Connection, ticker: str, year: int, period: str) -> int | None:

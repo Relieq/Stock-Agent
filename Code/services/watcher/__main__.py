@@ -33,6 +33,7 @@ from services.ingestion.hose import HoseClient
 from services.ingestion.registry import discover, discover_hose, download_pending, raw_data_dir
 from services.ingestion.vietstock import VietstockClient
 from services.llm import VisionClient
+from services.metrics.letters import read_pending
 from services.alerts import notify_watchers
 from services.notify import notify_admin
 from services.ondemand import process_queue
@@ -162,7 +163,7 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             "SELECT ticker FROM companies WHERE tracked AND exchange = 'HOSE' ORDER BY ticker")]
         hstats = discover_hose(conn, HoseClient(ids_path=raw_data_dir() / "hose_ids.json"), hose_tickers, year)
         conn.commit()
-        # Công văn giải trình kết quả kinh doanh: chỉ tải về (cùng lượt tải bên dưới) và báo, chưa đọc nội dung
+        # Công văn giải trình kết quả kinh doanh: tải về ở lượt tải bên dưới, đọc ở cuối lượt (read_pending)
         new_explanations = [f"{t}: {title.strip()} (công văn giải trình, đã lưu)" for t, title in conn.execute(
             "SELECT ticker, title_raw FROM documents WHERE doc_type = 'explanation' AND discovered_at >= %s"
             " ORDER BY ticker", (started,))]
@@ -215,6 +216,9 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             lines += resume_waiting(conn)
         except Exception as e:      # noqa: BLE001 - lỗi chạy tiếp báo cáo không làm hỏng lượt canh
             lines.append(f"LỖI chạy tiếp báo cáo: {e}")
+        # Công văn giải trình vừa tải: đọc một lần để thẻ hiện nguyên nhân kèm kết quả đối chiếu với BCTC
+        if vision is not None:
+            lines += read_pending(conn, vision)
         conn.commit()
         lines += new_explanations
     stamp = datetime.now(VN_TZ).strftime("%d/%m %H:%M")

@@ -72,8 +72,22 @@
   </section>
 
   {% if card.not_evaluated %}<p class="small muted">Chưa xét được: {{ card.not_evaluated | join('; ') }}</p>{% endif %}
-  {% if info.explanation %}<p class="small">Công ty có công văn giải trình kết quả kinh doanh kỳ này:
-    <a href="{{ info.explanation.url }}" target="_blank" rel="noopener">{{ info.explanation.title }}</a> (văn bản của công ty, hệ thống chưa đọc).</p>{% endif %}
+  {% if info.explanation %}{% set lv = info.explanation.view %}
+  <section class="letter">
+    <h2>Công ty giải thích <span class="muted small">(công văn giải trình; hệ thống đối chiếu từng con số với BCTC đã kiểm chứng)</span></h2>
+    {% if lv.reasons or lv.headline %}
+    {% if lv.period_kind and lv.period_kind != "quarter" %}<p class="small muted">Công văn chỉ giải thích số {{ {"ytd": "lũy kế", "half_year": "6 tháng", "year": "cả năm"}.get(lv.period_kind, lv.period_kind) }}.</p>{% endif %}
+    {% if lv.headline %}<p class="small">Số liệu công ty nêu:
+      {% for h in lv.headline %}<span class="badge {{ h.css }}">{{ h.text }}{% if h.verdict %}: {{ h.verdict }}{% endif %}</span>{% if h.detail %} <span class="muted">({{ h.detail }})</span>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+    {% if lv.reasons %}<ul class="reasons">{% for r in lv.reasons %}
+      <li>{{ r.text }} <span class="badge {{ r.css }}">{{ r.verdict }}</span>{% if r.detail %} <span class="small muted">{{ r.detail }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% else %}<p class="small muted">Công văn không nêu nguyên nhân cụ thể.</p>{% endif %}
+    {% elif not lv.read %}<p class="small muted">Hệ thống chưa đọc công văn này.</p>
+    {% elif lv.only_separate %}<p class="small muted">Theo bản đọc của hệ thống, công văn chỉ giải thích số của BCTC riêng công ty mẹ; thẻ này là BCTC hợp nhất nên không đối chiếu.</p>
+    {% else %}<p class="small muted">Công văn không có phần dùng được cho BCTC này.</p>{% endif %}
+    <p class="small">Văn bản gốc: <a href="{{ info.explanation.url }}" target="_blank" rel="noopener">{{ info.explanation.title }}</a>.
+      Nguyên nhân là lời của công ty; hệ thống chỉ kiểm con số, không đánh giá lời giải thích.</p>
+  </section>{% endif %}
   <p class="small"><a href="/tai-lieu/{{ doc_id }}">Xem toàn bộ số đã đọc và các phép kiểm tra</a> ·
     {% if info.published %}<a href="/tai-lieu/{{ doc_id }}/excel">Tải Excel (cả ba báo cáo)</a> · {% endif %}<a href="{{ info.source_url }}" target="_blank" rel="noopener">Nguồn Vietstock</a></p>
 {% endif %}

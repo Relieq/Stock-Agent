@@ -153,7 +153,7 @@ def _first(f: Facts, key: str, cols: tuple[str, ...], hidden: set[tuple[str, str
     return Value(None)
 
 
-def _load(conn, ticker: str, year: int, period: str, basis: str, with_flags: bool):
+def _load(conn, ticker: str, year: int, period: str, basis: str, with_flags: bool, extra: tuple[str, ...] = ()):
     """(số của mã, lý do không có): lý do là "document" (chưa có BCTC), "record" (chưa có kết quả đọc) hoặc "template"
     (mẫu BCTC chưa hỗ trợ, như bảo hiểm)."""
     found = _find(conn, ticker, year, period)
@@ -172,7 +172,7 @@ def _load(conn, ticker: str, year: int, period: str, basis: str, with_flags: boo
     hidden = {k for k, v in (ev.status.items() if ev else []) if v["status"] in HIDDEN}
     cur_cols, prev_cols = columns(doc_type, doc_period, basis)
     values = {}
-    for key in catalog.METRICS[kind]:
+    for key in list(catalog.METRICS[kind]) + list(extra):      # extra: chỉ tiêu chuẩn ngoài danh mục (phép đo)
         cur, prev = _first(f, key, cur_cols, hidden), _first(f, key, prev_cols, hidden)
         values[key] = Pair(cur.value, prev.value, [asdict(s) for s in (cur.source, prev.source) if s is not None])
     flags: list[tuple[str, str]] = []
@@ -184,8 +184,9 @@ def _load(conn, ticker: str, year: int, period: str, basis: str, with_flags: boo
     return TickerData(ticker, kind, label(year, period, basis), values, flags, doc_id), None
 
 
-def load_ticker(conn, ticker: str, year: int, period: str, basis: str, with_flags: bool = True) -> TickerData | None:
-    return _load(conn, ticker, year, period, basis, with_flags)[0]
+def load_ticker(conn, ticker: str, year: int, period: str, basis: str, with_flags: bool = True,
+                extra: tuple[str, ...] = ()) -> TickerData | None:
+    return _load(conn, ticker, year, period, basis, with_flags, extra)[0]
 
 
 def load_group(conn, kind: str, year: int, period: str, basis: str, with_flags: bool = False) -> Group:

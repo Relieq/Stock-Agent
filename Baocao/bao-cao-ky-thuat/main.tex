@@ -199,7 +199,8 @@ nhiều mã cùng kỳ, một mã so với cùng kỳ, vị trí của một mã
 dụ \enquote{công ty nào có KQKD tốt nhất hiện nay, tại sao?}). Agent tự lập kế hoạch, lấy số, viết báo cáo kèm bảng và
 biểu đồ; mọi con số và từ tăng/giảm, cao hơn/thấp hơn trong lời văn được code kiểm lại với bảng số trước khi người đọc
 thấy. Trên 66 câu hỏi mẫu (có 6 câu do người dùng thử viết), agent \textbf{hiểu đúng yêu cầu ở 65 câu} với Claude Haiku
-5.5 và 64 câu với gpt-5.4-mini.
+5.5 và 64 câu với gpt-5.4-mini, và viết xong đủ 58/58 báo cáo ở cả hai nhà. Trên 8 câu hỏi chung, trợ lý AI đa năng có tìm
+web đưa ra 4 con số sai và 30 con số của kỳ khác với kỳ được hỏi, trong khi agent không có số nào như vậy.
 \end{abstract}
 
 \chapter*{Danh mục thuật ngữ và viết tắt}
@@ -1864,6 +1865,78 @@ câu dặn: câu hỏi chung chung không nêu công ty thì không phải câu 
 lần chạy trước và sau lần chỉnh thứ hai, số câu sai của mỗi nhà chênh nhiều nhất một câu nhưng câu sai đổi chỗ, vì mô hình không
 trả lời giống hệt nhau mỗi lần; chênh lệch một, hai câu giữa hai nhà nằm trong mức dao động này.
 
+\section{Agent tạo báo cáo: viết lời và kiểm số}\label{sec:evalagentviet}
+Phép đo chạy trọn agent (bảng số, viết, kiểm, viết lại) trên 58 câu của bộ đo có mã thuộc danh sách theo dõi và kỳ đã có
+trong kho, với kế hoạch đúng lấy từ đáp án để hai nhà cung cấp viết trên cùng một bảng số. Bốn câu hỏi quý 3/2026 của các
+công ty chưa công bố được đo trên bản dời sang quý 2/2026. Số liệu là BCTC đã kiểm chứng tính đến 22/10/2026.
+
+\begin{table}[H]
+\centering\small
+\caption{Agent viết lời và kiểm số trên 58 câu hỏi (đếm theo báo cáo và theo câu văn)}\label{tab:agent-write}
+\begin{tabularx}{\linewidth}{@{}Xrr@{}}
+\toprule
+& \textbf{Claude Haiku 5.5} & \textbf{gpt-5.4-mini} \\ \midrule
+Báo cáo xong, đủ số & 58/58 & 58/58 \\
+Câu văn sai ở lần viết đầu & 23/588 (3,9\%) & 39/408 (9,6\%) \\
+Câu văn còn sai sau 2 lần viết lại, bị bỏ & 12 & 31 \\
+Câu văn trong báo cáo cuối & 562 & 385 \\
+Chi phí viết mỗi báo cáo (USD) & 0,0035 & 0,0078 \\
+Thời gian viết mỗi báo cáo (giây) & 22 & 8 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Hai cột đếm theo câu văn nên mẫu số khác nhau: Claude Haiku 5.5 viết dài hơn (trung bình khoảng 10 câu mỗi báo cáo so với
+7). Lỗi ở lần viết đầu của Claude Haiku 5.5 chủ yếu là so sánh không có dòng so sánh tương ứng (22 lỗi); của gpt-5.4-mini là
+số không có trong các dòng câu đã ghi (31 lỗi) và so sánh (18 lỗi).
+
+Câu còn lại đã qua bộ kiểm tra, nhưng bộ kiểm tra không bắt được mọi lỗi. Để đo phần này, mỗi câu trong 116 báo cáo xong
+được cố ý làm sai theo từng kiểu (đổi số lệch 10\%, đảo tăng/giảm, đảo so sánh, đảo lãi/lỗ, đổi thứ hạng, chèn câu khuyến
+nghị, chèn mã lạ) rồi cho bộ kiểm tra xem lại. Bộ kiểm tra bắt được 790/793 lỗi đổi số, 91/92 lỗi đổi thứ hạng, 43/50 lỗi
+đảo lãi/lỗ, 559/630 lỗi đảo tăng/giảm (89\%), 182/233 lỗi đảo so sánh (78\%), và mọi câu khuyến nghị, mọi mã lạ (947/947 mỗi
+kiểu); không câu gốc nào trong 947 câu bị bắt nhầm. Như vậy số liệu trong lời văn gần như luôn đúng, còn từ chỉ chiều và
+so sánh vẫn có thể lọt khoảng một phần mười đến một phần năm lỗi; người đọc luôn bấm được vào từng số để xem dòng bảng số và
+trang BCTC gốc.
+
+\section{So với trợ lý AI đa năng}\label{sec:evaltrolyl}
+Tám câu của bộ đo, đủ bốn loại câu hỏi và một câu xin khuyến nghị, được hỏi nguyên văn cho mô hình đa năng của hai hãng
+cùng hạng giá (Claude Sonnet 5.5 và gpt-5.4), cùng bật tìm web, cùng lời dặn ngắn (trả lời bằng đoạn văn, nêu số liệu cụ thể,
+hôm nay là 21/10/2026). Code chấm từng số tiền và \% trong câu trả lời: số được thử với mọi mã và mọi chỉ tiêu nhắc trong
+cùng câu, rồi so với số đã kiểm chứng. \enquote{Đúng} là khớp kỳ được hỏi (kỳ này, cùng kỳ, mức hoặc \% thay đổi);
+\enquote{khác kỳ} là khớp số của kỳ hay cách so khác (lũy kế thay vì riêng quý, so với quý trước); \enquote{sai} là không
+khớp cặp mã--chỉ tiêu nào trong câu; \enquote{không kiểm được} là số của khoản ngoài danh mục (tổng tài sản, dư nợ, tỷ lệ
+hoàn thành kế hoạch\ldots) hoặc của công ty ngoài danh sách theo dõi. Cùng bộ chấm chạy trên báo cáo của agent cho cùng 8
+câu để kiểm chính bộ chấm: không số nào của agent bị chấm \enquote{sai} hay \enquote{khác kỳ}.
+
+\begin{table}[H]
+\centering\small
+\caption{Trợ lý AI đa năng có tìm web và agent Soi trên cùng 8 câu hỏi (đếm theo con số)}\label{tab:agent-general}
+\begin{tabularx}{\linewidth}{@{}Xrrrr@{}}
+\toprule
+& \textbf{Claude Sonnet 5.5} & \textbf{gpt-5.4} & \multicolumn{2}{c}{\textbf{Agent Soi viết bằng}} \\
+& \textbf{có tìm web} & \textbf{có tìm web} & \textbf{Haiku 5.5} & \textbf{gpt-5.4-mini} \\ \midrule
+Con số trong câu trả lời & 109 & 68 & 186 & 136 \\
+\quad đúng & 48 & 11 & 146 & 117 \\
+\quad của kỳ khác & 19 & 11 & 0 & 0 \\
+\quad sai & 1 & 3 & 0 & 0 \\
+\quad không kiểm được & 41 & 43 & 40 & 19 \\
+Trả lời có khuyên mua bán & 1 & 1 & 0 & 0 \\
+Chi phí cho 8 câu (USD) & 1,32 & 0,54 & 0,02 & 0,08 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Trợ lý đa năng tìm được số đúng ở nhiều chỗ, nhưng có ba vấn đề mà người dùng khó tự nhận ra. Thứ nhất, nhiều số là của kỳ
+khác với kỳ được hỏi (19/109 và 11/68), ví dụ trả lời lũy kế 6 tháng khi được hỏi quý 2, hay mức tăng so với quý trước khi
+câu hỏi là so với cùng kỳ. Thứ hai, có số sai hẳn: gpt-5.4 tự trừ hai con số để suy ra LNTT quý 2/2026 của VCB
+\enquote{khoảng 12,8 nghìn tỷ} trong khi BCTC ghi 17.420 tỷ, và ghi LNTT 6 tháng của TCB là 22.842 tỷ, tăng 33,5\% (BCTC:
+18.540 tỷ, tăng 22,5\%; 33,5\% là mức tăng của VCB); Claude Sonnet 5.5 ghi tổng thu nhập hoạt động của VCB quý 2/2026 tăng
+18,8\% so với cùng kỳ trong khi mức đúng là 47,6\%. Thứ ba, với câu xin khuyến nghị, cả hai trợ lý đều gợi ý mua (mua chia
+nhiều đợt, chờ giá điều chỉnh). Agent chỉ nói số có trong bảng số, mỗi số dẫn về trang BCTC gốc, và không đưa lời khuyên mua
+bán. Trợ lý có tìm web tốn 0,54--1,32 USD cho 8 câu, chủ yếu do nội dung trang web được đưa vào mô hình; agent tốn
+0,02--0,08 USD (chưa tính chi phí đọc BCTC, vốn làm một lần khi BCTC được công bố và dùng chung cho mọi câu hỏi).
+Đây là phép so trên 8 câu, đủ để thấy các kiểu lỗi chứ chưa đủ để nêu tỷ lệ lỗi chung của trợ lý đa năng.
+
 % ============================================================================
 % CHƯƠNG 6: KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
 % ============================================================================
@@ -1884,7 +1957,10 @@ lệch đều có lời giải thích từ chính BCTC.
 Agent tạo báo cáo được đặt lên trên lớp này theo cùng nguyên tắc: mô hình hiểu câu hỏi và viết câu, code tính số và kiểm
 lại từng con số, từng từ tăng/giảm trong lời văn. Agent trả lời bốn loại câu hỏi, kể cả câu không nêu mã như
 \enquote{công ty nào có KQKD tốt nhất}. Trên 66 câu hỏi mẫu, agent hiểu đúng yêu cầu ở 65 câu với Claude Haiku 5.5 và 64
-câu với gpt-5.4-mini.
+câu với gpt-5.4-mini; trên 58 câu chạy trọn, cả hai nhà đều viết xong mọi báo cáo. Bộ kiểm tra bắt gần như mọi lỗi số
+liệu nhưng còn lọt khoảng một phần mười lỗi tăng/giảm và một phần năm lỗi so sánh, đó là việc cần làm tiếp. So với trợ lý
+AI đa năng có tìm web trên cùng 8 câu, agent không đưa số sai, số của kỳ khác hay lời khuyên mua bán, với chi phí thấp hơn
+nhiều.
 
 \section{Hướng phát triển}
 Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện. Mỗi mục sẽ được viết đầy đủ khi hoàn thành.
@@ -1892,8 +1968,7 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Đo độ đúng trên cả mùa BCTC quý 3/2026}\chualam
 \subsection{Đo thời gian từ lúc công bố tới lúc có thẻ trong mùa quý 3/2026}\chualam
 \subsection{Chỉ số tài chính: biên lợi nhuận gộp, ROE, tăng trưởng lũy kế}\chualam
-\subsection{Đo phần viết của agent và bộ kiểm tra số trên cả bộ câu, so hai nhà cung cấp}\chualam
-\subsection{Phép thử so với trợ lý AI đa năng}\chualam
+\subsection{Bộ kiểm tra số của agent: giảm lỗi tăng/giảm và so sánh lọt qua}\chualam
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Đưa nguyên nhân biến động từ công văn giải trình lên thẻ}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam

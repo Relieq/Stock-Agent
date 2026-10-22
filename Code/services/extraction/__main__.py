@@ -129,7 +129,7 @@ def cmd_evidence(args) -> None:
             checked = cells - n["none"] - n["restated"] - n["second"] - n["second_differs"]
             peers = ", ".join(f"{p}" for _, p, _ in ev.peers) or "không có kỳ liền kề"
             print(f"[{doc_id}] {ticker}: {cells} ô, đã kiểm {checked} ({checked / cells:.0%}); khớp giữa các kỳ "
-                  f"{n['period'] + n['both']}; khác giữa hai BCTC {n['differs']}; cần xem lại {n['conflict']}; "
+                  f"{n['period'] + n['both']}; khác giữa hai BCTC {n['differs']}; cần xem ảnh {n['conflict']}; "
                   f"trình bày lại {n['restated']}; chưa kiểm nhưng hai lần đọc trùng {n['second']}, khác "
                   f"{n['second_differs']} (đối chiếu: {peers})")
             for m in ev.missing:
@@ -297,7 +297,7 @@ def main(argv: list[str] | None = None) -> None:
     e.add_argument("--all", action="store_true", help="In cả các lệch do trình bày lại")
     e.set_defaults(func=cmd_evidence)
 
-    v = sub.add_parser("verify", help="Đọc lại riêng các ô lệch cần xem lại giữa hai BCTC, trên cả hai bản")
+    v = sub.add_parser("verify", help="Đọc lại riêng các ô lệch cần xem ảnh giữa hai BCTC, trên cả hai bản")
     v.add_argument("--doc-id", type=int, nargs="+")
     v.add_argument("--year", type=int)
     v.add_argument("--period")

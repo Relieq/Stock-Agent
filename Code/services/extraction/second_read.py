@@ -115,4 +115,4 @@ def after_extraction(conn, document_id: int, client: VisionClient) -> str | None
     ev = document_evidence(conn, document_id)
     n = sum(s["status"] == "second_differs" for s in ev.status.values()) if ev else 0
     return (f"đọc lần hai {len(second['raw'])} báo cáo ({second['usd']:.3f} USD): "
-            + (f"{n} ô hai lần đọc khác nhau, cần xem lại" if n else "không ô nào khác"))
+            + (f"{n} ô hai lần đọc khác nhau, cần xem ảnh" if n else "không ô nào khác"))

@@ -8,7 +8,7 @@ phải đã được người đối chiếu với ảnh gốc; chỉ nhóm "s�
   2 đọc lại riêng ô (định vị ô sai, đối chiếu kỳ, đọc lại) rồi mới khớp
   3 thuộc báo cáo phải chép lại trang rồi mới khớp
   4 sửa tay sau khi đối chiếu ảnh gốc
-  5 cần xem lại: phép cộng hoặc BCTC kỳ khác chỉ ra nghi sai, chưa xử lý
+  5 cần xem ảnh: phép cộng hoặc BCTC kỳ khác chỉ ra nghi sai, chưa xử lý
   6 chưa kiểm được: không nằm trong phép kiểm nào (kể cả ô khác BCTC kỳ khác mà không có phép cộng nào xác nhận)
   7 lệch do chính BCTC: phép kiểm vẫn lệch nhưng người đã đối chiếu ảnh và duyệt BCTC (in sai trong bản công bố)
   8 chưa có phép kiểm nhưng người đọc thứ hai (mô hình khác hãng, services/extraction/second_read.py) đọc ra cùng số;
@@ -30,7 +30,7 @@ from services.extraction.pipeline import _check_cached, _load_record
 
 NAMES = {1: "đúng ngay lần đọc đầu, có ràng buộc xác nhận", 2: "đọc lại riêng ô rồi mới khớp",
          3: "thuộc báo cáo phải chép lại trang", 4: "sửa tay sau khi đối chiếu ảnh",
-         5: "cần xem lại (nghi sai, chưa xử lý)", 6: "chưa kiểm được",
+         5: "cần xem ảnh (nghi sai, chưa xử lý)", 6: "chưa kiểm được",
          7: "lệch do chính BCTC (đã đối chiếu ảnh, duyệt tay)",
          8: "chưa có phép kiểm, hai lần đọc độc lập trùng nhau",
          9: "hai lần đọc khác nhau, người đối chiếu ảnh xác nhận lần đọc đầu đúng"}
@@ -93,7 +93,7 @@ def classify(conn, document_id: int) -> list[tuple[int, str, int, str, str, str]
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--list-review", action="store_true", help="liệt kê các ô nhóm 5 (cần xem lại)")
+    ap.add_argument("--list-review", action="store_true", help="liệt kê các ô nhóm 5 (cần xem ảnh)")
     ap.add_argument("--listed-before", help="chỉ tính BCTC Vietstock đăng trước ngày này (YYYY-MM-DD), để số liệu báo cáo giữ đúng phạm vi đã ghi")
     args = ap.parse_args()
     tally, by_template, review = Counter(), Counter(), []
@@ -118,7 +118,7 @@ def main() -> None:
     print("Chưa kiểm được (nhóm 6 và 8) theo mẫu:", dict(by_template))
     if args.list_review:
         for r in review:
-            print("  cần xem lại:", r)
+            print("  cần xem ảnh:", r)
 
 
 if __name__ == "__main__":

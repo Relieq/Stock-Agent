@@ -119,6 +119,31 @@ def cell_reasons(evidence, template: str | None) -> dict[tuple[str, str, str], l
     return out
 
 
+PERIOD_WORDS = {"is_quarter": "số quý = lũy kế kỳ này − lũy kế kỳ trước",
+                "bs_begin": "số đầu năm so với BCTC kỳ trước",
+                "same_date": "số cùng ngày ở BCTC khác",
+                "year_start": "số đầu năm so với số cuối năm trước"}
+
+
+def _short(label: str, n: int = 45) -> str:
+    return label if len(label) <= n else label[:n - 1].rstrip() + "…"
+
+
+def evidence_words(e: dict, template: str | None, labels: dict[str, str]) -> dict[str, list[str]]:
+    """Phép kiểm của một ô viết bằng tên dòng thay cho mã ràng buộc nội bộ (chú thích khi rê chuột vào ô)."""
+    def rule(rid: str) -> str:
+        rs = RULESETS.get(template) if template else None
+        for r in rs.rules if rs else []:
+            if r.id == rid:
+                name = lambda c: _short(labels.get(c, c))    # noqa: E731
+                terms = " ".join(("+ " if s > 0 else "− ") + name(c) for s, c in r.rhs).removeprefix("+ ")
+                return f"{name(r.lhs)} = {terms}"
+        return _formula(template, rid)[0]
+    period = lambda ds: list(dict.fromkeys(PERIOD_WORDS.get(d.split(":")[0], d) for d in ds))    # noqa: E731
+    return {"sum": [rule(x) if not x.startswith("Q1") else x for x in e.get("sum", [])],
+            "period": period(e.get("period", [])), "differs": period(e.get("differs", []))}
+
+
 def cell_label(e: dict) -> str:
     return CONFLICT_LABELS.get(e.get("reason"), STATUS_LABELS["conflict"]) if e["status"] == "conflict" \
         else STATUS_LABELS[e["status"]]
@@ -181,6 +206,7 @@ def detail(record: dict, evidence=None) -> dict:
                     other_docs.setdefault((st, key, col), set()).update(x for x, *_ in pc.cells if x != d)
     for st in extracted:
         keys = evidence.cells.item_keys.get(st.statement, []) if evidence else []
+        labels = {it.code: it.label for it in st.items if it.code}
         rows = []
         for i, it in enumerate(st.items):
             key = keys[i] if i < len(keys) else None
@@ -188,6 +214,7 @@ def detail(record: dict, evidence=None) -> dict:
                   if key and (st.statement, key, col) in evidence.status} if evidence else {}
             for col, e in ev.items():
                 e["label"], e["why"] = cell_label(e), reasons.get((st.statement, key, col), [])
+                e["words"] = evidence_words(e, template, labels)
                 if e["status"] == "second_differs":
                     e["why"] = [f"Lần đọc thứ hai (nhà cung cấp mô hình khác) ra {e.get('second_printed')}"]
                 if e["status"] in ("conflict", "second_differs"):

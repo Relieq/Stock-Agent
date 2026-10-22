@@ -271,8 +271,8 @@ nguồn. Mỗi mục tiêu cụ thể ứng với một đóng góp ở mục~\r
 
 \subsection{Đóng góp}\label{sec:donggop}
 \begin{enumerate}
-  \item \textbf{Trích xuất đủ các cột} của từng báo cáo. Hệ thống khóa trước~\cite{prevcohort} chỉ lưu một giá trị cho
-        mỗi chỉ tiêu.
+  \item \textbf{Trích xuất đủ các cột} của từng báo cáo (quý này, cùng kỳ, lũy kế, đầu năm), thay vì một giá trị cho mỗi chỉ tiêu như
+        hệ thống mã nguồn mở Stock Report Agent~\cite{prevcohort}.
   \item \textbf{Bộ ràng buộc kế toán khai báo theo từng mẫu} TT200, TT99, TCTD và CTCK. Mẫu được nhận dạng từ chính nội
         dung BCTC, không suy ra từ năm.
   \item \textbf{Bộ máy tự định vị và tự sửa ô đọc sai} dựa trên ràng buộc (mục~\ref{sec:loi}). Hệ thống chỉ đọc lại đúng
@@ -287,7 +287,7 @@ nguồn. Mỗi mục tiêu cụ thể ứng với một đóng góp ở mục~\r
 
 \section{Cấu trúc báo cáo}
 Chương~\ref{chap:nen} trình bày kiến thức nền về BCTC, ràng buộc kế toán và công nghệ sử dụng.
-Chương~\ref{chap:lienquan} điểm lại hệ thống của khóa trước và các sản phẩm liên quan. Chương~\ref{chap:thietke} mô tả
+Chương~\ref{chap:lienquan} điểm lại các phương pháp trích xuất số từ BCTC và các sản phẩm liên quan. Chương~\ref{chap:thietke} mô tả
 thiết kế và cài đặt, trong đó có công nghệ lõi tự định vị và tự sửa ô đọc sai. Chương~\ref{chap:danhgia} trình bày kết
 quả đo. Chương~\ref{chap:ketluan} kết luận và liệt kê việc dự kiến làm tiếp.
 
@@ -470,28 +470,81 @@ Kiểm thử & pytest, 339 bài kiểm thử; dữ liệu mẫu là tiêu đề 
 % ============================================================================
 \chapter{Các sản phẩm và nghiên cứu liên quan}\label{chap:lienquan}
 
-\section{Hệ thống của khóa trước}
-Đề tài kế thừa hệ thống \emph{Stock Report Agent} của khóa trước~\cite{prevcohort} (giấy phép MIT). Hệ thống đó dùng
-LangGraph gồm các bước hiểu yêu cầu, lấy link BCTC từ Vietstock~\cite{vietstock}, OCR kết hợp Tesseract và Surya
-(\enquote{Hybrid OCR}), rồi trích xuất bằng mô hình ngôn ngữ. Trên 401 trang BCTC, Hybrid OCR đạt Number F1 khoảng 85\%,
-mỗi báo cáo mất khoảng 5 phút. Bảng~\ref{tab:sosanh} so sánh hai hệ thống.
+\section{Các phương pháp trích xuất số từ BCTC}\label{sec:phuongphap}
+Bài toán là lấy ra đúng từng ô số (dòng nào, cột nào, giá trị bao nhiêu) của ba báo cáo chính từ file PDF. Khó khăn nằm
+ở dữ liệu: phần lớn BCTC là bản scan, có file độ phân giải thấp hoặc trang bị xoay; số viết theo hai kiểu dấu phân cách
+hàng nghìn, số âm để trong ngoặc, dấu gạch nghĩa là không có số; tên chỉ tiêu dài và xuống dòng; bảng có bốn đến sáu cột
+số xen với cột mã số và cột thuyết minh. Sai một chữ ở tên chỉ tiêu ít hại; sai một chữ số, mất dấu âm hay đặt đúng số
+vào sai dòng mới làm hỏng số liệu. Có năm họ phương pháp chính, mỗi họ có điểm mạnh, điểm yếu riêng. Các điểm yếu nêu
+dưới đây là điều được dự đoán từ cách mỗi họ làm việc; mức độ thật trên BCTC Việt Nam cần đo trên cùng một bộ đáp án.
+
+\subsection{Dùng lớp chữ có sẵn trong file}
+Khi công ty xuất BCTC thẳng từ Excel, Word hoặc phần mềm kế toán, file PDF chứa sẵn chữ và vị trí của chữ. Gom chữ thành
+hàng theo vị trí dọc và xếp số vào cột theo mép phải là có bảng đúng tuyệt đối, miễn phí và rất nhanh. Nhưng cách này gần
+như không dùng được với BCTC Việt Nam: trong 119 BCTC của đề tài chỉ 5 file có chữ gốc; nhiều file có lớp chữ do máy nhận
+dạng từ ảnh tạo ra, sai chính tả và tách vỡ số, nên phải đánh giá chất lượng lớp chữ chứ không chỉ xem có hay không. Soi
+dùng chính loại file hiếm này làm đáp án để đo độ đúng (mục~\ref{sec:dapan}).
+
+\subsection{Nhận dạng ký tự (OCR) rồi dựng bảng bằng luật}
+Phần mềm OCR như Tesseract, PaddleOCR hay VietOCR tìm các dòng chữ trên ảnh và nhận dạng từng dòng, kèm vị trí và điểm tin
+cậy; luật gom hàng, gom cột rồi dựng lại bảng. Ưu điểm: miễn phí, chạy trên máy cá nhân, kết quả lặp lại được, có điểm
+tin cậy cho từng từ. Nhược điểm dự đoán trên BCTC scan: dấu tiếng Việt nhỏ dễ mất khi ảnh mờ; với số thì dễ nhầm dấu chấm
+và dấu phẩy, mất dấu ngoặc, nhầm các chữ số có nét gần nhau ở ảnh độ phân giải thấp; luật dựng bảng dễ vỡ khi tên chỉ tiêu
+xuống dòng, bảng không kẻ ô hoặc trang bị xoay.
+
+\subsection{OCR kết hợp mô hình ngôn ngữ đọc văn bản}
+Văn bản OCR được đưa cho một mô hình ngôn ngữ để sắp thành bảng có cấu trúc. Mô hình xử lý tốt phần bố cục: ghép tên chỉ
+tiêu bị xuống dòng, nhận ra cột nào là quý này, cột nào là lũy kế; đọc văn bản cũng rẻ hơn đọc ảnh. Nhưng mô hình không
+nhìn thấy ảnh nên không sửa được chữ số mà OCR đã đọc sai, và có thể tự ý \enquote{sửa} số cho hợp lý. Hệ thống mã nguồn
+mở Stock Report Agent~\cite{prevcohort} là một cách hiện thực của họ này: chuyển PDF thành văn bản bằng Tesseract tiếng
+Việt qua một bộ chuyển đổi tài liệu, đọc lại các ô số có độ tin cậy thấp bằng một mô hình OCR thứ hai (Surya), rồi dùng mô
+hình ngôn ngữ tách ba báo cáo. Theo báo cáo của tác giả, trên 401 trang BCTC cách OCR lai này đạt Number F1 85,3\% và đọc
+một BCTC mất khoảng 5 phút trên máy có GPU. Thước đo Number F1 đếm các số trùng nhau trên cả trang, không xét số nằm ở dòng
+nào, cột nào, nên chưa cho biết tỷ lệ ô đúng.
+
+\subsection{Mô hình nhận dạng cấu trúc bảng và bộ chuyển đổi tài liệu}
+Các công cụ như Docling, Marker, MinerU dùng một mô hình tìm vùng bảng và một mô hình đoán lưới hàng, cột, rồi điền chữ do
+OCR đọc vào từng ô. Ưu điểm là giữ được cấu trúc bảng tổng quát và chạy trên máy cá nhân. Nhược điểm dự đoán: dữ liệu
+huấn luyện bảng công bố chủ yếu không phải BCTC Việt Nam (ví dụ bộ PubTables-1M của Table Transformer lấy từ bài báo khoa
+học); với bảng không kẻ ô của ngân hàng, cột số có thể bị gộp hoặc tách sai, cột mã số và thuyết minh lẫn vào cột số;
+chất lượng chữ Việt phụ thuộc phần OCR bên dưới; cần GPU để chạy nhanh.
+
+\subsection{Mô hình ngôn ngữ đọc ảnh chép thẳng}
+Mô hình đa phương thức nhận ảnh trang và chép từng ô thành dữ liệu có cấu trúc trong một bước. Cách này xử lý được bảng
+nhiều cột, tên xuống dòng và chữ có dấu bằng một cách chung cho mọi mẫu biểu, không cần GPU tại chỗ. Nhược điểm: không có
+điểm tin cậy cho từng ô, đôi khi chép lệch dòng hoặc đọc nhầm số, kết quả giữa các lần chạy không giống hệt nhau, và tốn
+tiền theo số ảnh gửi đi. Soi theo cách này nhưng giới hạn vai trò của mô hình: mô hình chỉ chép nguyên văn; code hiểu số,
+đơn vị, dấu; độ tin cậy đến từ ràng buộc kế toán và từ việc đọc lại đúng các ô bị nghi.
+
+\subsection{Phép kiểm kế toán dùng được cho mọi phương pháp}
+Các họ trên khác nhau ở cách đọc, nhưng đầu ra cuối cùng đều là một bảng số, nên phép kiểm kế toán (tổng các khoản bằng
+dòng tổng, tài sản bằng nguồn vốn, số đầu năm khớp BCTC kỳ trước) áp được cho tất cả. Vì vậy so sánh gồm hai câu hỏi: mỗi
+cách đọc đúng bao nhiêu ô, và phép kiểm phát hiện được bao nhiêu phần lỗi của từng cách. Bảng~\ref{tab:phuongphap} tóm tắt
+các họ phương pháp.
 
 \begin{table}[H]
 \centering\small
-\caption{So sánh với hệ thống của khóa trước}\label{tab:sosanh}
-\begin{tabularx}{\linewidth}{@{}lXX@{}}
+\caption{Các họ phương pháp trích xuất số từ BCTC (điểm yếu là dự đoán, chưa đo trên cùng bộ đáp án)}\label{tab:phuongphap}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{2.7cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{2.4cm}@{}}
 \toprule
-& \textbf{Khóa trước} & \textbf{Soi} \\ \midrule
-Khi nào đọc & Khi người dùng hỏi (khoảng 5 phút mỗi báo cáo, cần GPU) & Ngay khi BCTC được công bố; người dùng xem
-kết quả có sẵn \\
-Số cột & Một giá trị cho mỗi chỉ tiêu & Đủ các cột cùng kỳ, lũy kế, đầu năm \\
-Đọc số & Hybrid OCR, Number F1 $\approx$ 85\% & Mô hình thị giác chép nguyên văn; code phân tích số \\
-Kiểm tra & Không & Ràng buộc kế toán theo mẫu, tự định vị và sửa ô sai \\
-Mẫu biểu & Một mẫu & TT200, TT99, TCTD, CTCK \\
-Đầu ra & Bảng số trong giao diện chat & Thẻ KQKD, cờ cảnh báo, xếp hạng, lịch, ảnh chia sẻ \\
+\textbf{Phương pháp} & \textbf{Điểm mạnh} & \textbf{Điểm yếu với BCTC scan} & \textbf{Chi phí, phần cứng} \\ \midrule
+Lớp chữ có sẵn & Đúng tuyệt đối khi là chữ gốc; rất nhanh & Chỉ 5/119 BCTC có chữ gốc; lớp chữ do máy nhận dạng có thể sai
+& Miễn phí, CPU \\
+OCR + luật dựng bảng & Miễn phí, lặp lại được, có điểm tin cậy & Mất dấu, nhầm chấm/phẩy, mất ngoặc âm; vỡ bảng khi tên
+xuống dòng, bảng không kẻ, trang xoay & Miễn phí, CPU \\
+OCR + mô hình đọc văn bản & Sửa được bố cục; rẻ hơn đọc ảnh & Không sửa được chữ số OCR đọc sai; có thể tự ý sửa số
+& Rẻ; OCR nhanh hơn nếu có GPU \\
+Mô hình cấu trúc bảng, bộ chuyển đổi tài liệu & Giữ cấu trúc bảng tổng quát; chạy cục bộ & Gộp/tách cột sai ở bảng không
+kẻ; chữ Việt phụ thuộc OCR & Miễn phí; nên có GPU \\
+Mô hình đọc ảnh chép thẳng (Soi) & Một cách cho mọi mẫu biểu; bảng nhiều cột, chữ có dấu & Không có điểm tin cậy; đôi khi
+chép lệch dòng; tốn tiền theo ảnh & Trả theo lượt gọi \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+Ngoài cách đọc số, Soi khác hệ thống Stock Report Agent nêu ở trên (đọc khi người dùng hỏi) ở chỗ đọc sẵn khi BCTC được công bố, lấy đủ các cột (quý
+này, cùng kỳ, lũy kế, đầu năm) thay vì một giá trị mỗi chỉ tiêu, hỗ trợ bốn mẫu biểu (TT200, TT99, ngân hàng, công ty
+chứng khoán) và kiểm từng ô bằng ràng buộc kế toán.
 
 \section{Nền tảng dữ liệu tài chính trong nước}
 Các cổng thông tin như Vietstock, CafeF cung cấp BCTC dạng PDF, số liệu tổng hợp, biểu đồ và tin tức. Số liệu tổng hợp
@@ -882,7 +935,8 @@ Một số điểm thiết kế:
 
 \section{Thu thập tài liệu}
 \subsection{Lấy danh sách và nhận dạng tiêu đề}
-Bộ canh gọi API danh sách tài liệu của Vietstock (logic kế thừa từ khóa trước) cho các mã đang theo dõi. Từ tiêu đề tiếng
+Bộ canh gọi API danh sách tài liệu của Vietstock (logic dựa trên mã nguồn mở Stock Report Agent~\cite{prevcohort},
+giấy phép MIT) cho các mã đang theo dõi. Từ tiêu đề tiếng
 Việt, bộ luật nhận dạng xác định bộ khóa: mã, loại báo cáo (quý, bán niên, năm),
 kỳ, phạm vi (hợp nhất, riêng, duy nhất), trạng thái soát xét hay kiểm toán, và có phải bản điều chỉnh hay không.
 Bộ luật được kiểm thử trên toàn bộ tiêu đề thật của VN30 năm 2025--2026. Lần chạy đầu nhận dạng đúng 174/174 tài liệu.
@@ -1770,9 +1824,11 @@ Chép lại trang còn lệch & 2,7 & 10.110 & 5.658 & 0,033 \\
 Trên 29 BCTC này, trung vị là 0,084 USD và 90\% số BCTC tốn dưới 0,173 USD; trung bình ở ngân hàng 0,096 USD, ở doanh
 nghiệp thường 0,136 USD. 90 BCTC các kỳ còn lại tốn trung bình 0,108 USD, trung vị 0,083 USD. Trung vị thấp hơn trung
 bình vì một số BCTC khó tốn gấp 2--3 lần: phải chép lại nhiều trang, hoặc chính BCTC in lệch nên hệ thống đọc lại nhiều
-lần trước khi chuyển duyệt tay. So với hệ thống của khóa trước (272.054 token vào mỗi báo cáo, 0,04 USD), Soi dùng ít
-token vào hơn khoảng 4,7 lần nhưng tốn hơn, vì đọc ảnh đắt hơn đọc văn bản OCR và vì Soi đọc lại để kiểm chứng; đổi lại,
-Soi không cần GPU và mỗi số đều đã được kiểm chứng.
+lần trước khi chuyển duyệt tay. Để hình dung, một hệ thống theo cách OCR rồi cho mô hình ngôn ngữ đọc văn bản
+(Stock Report Agent~\cite{prevcohort}) gửi 272.054 token vào mỗi báo cáo và tốn 0,04 USD với Gemini 2.5 Flash Lite, vì cả
+văn bản OCR được gửi cho nhiều bước. Soi gửi trung bình 60.803 token vào mỗi BCTC, ít hơn khoảng 4,5 lần, nhưng tốn hơn vì
+đọc ảnh đắt hơn đọc văn bản và vì Soi đọc lại để kiểm chứng. Hai con số dùng hai mô hình khác nhau trên hai bộ BCTC khác
+nhau nên chỉ cho thấy cỡ chi phí, không phải phép so sánh cùng điều kiện.
 
 Mỗi mã, mỗi kỳ Soi chỉ đọc một BCTC dùng cho thẻ (ưu tiên hợp nhất). Với 0,10--0,12 USD mỗi BCTC, chi phí gọi mô hình
 khi vận hành vào khoảng 3--3,5 USD mỗi mùa quý cho VN30 và 10--12 USD cho VN100, chưa gồm đọc theo yêu cầu người dùng
@@ -2082,7 +2138,7 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam
 \subsection{Xác suất đúng cho từng ô và bước kiểm chứng tự chọn công cụ theo lợi ích trên chi phí}\chualam
-\subsection{Mở rộng bộ đáp án và so với khóa trước trên bộ vnpdf}\chualam
+\subsection{Mở rộng bộ đáp án và so sánh các phương pháp trích xuất trên cùng bộ đáp án}\chualam
 \subsection{Sàng lọc doanh nghiệp tăng trưởng và kiểm định lịch sử (backtest)}\chualam
 \subsection{Radar sự kiện công bố thông tin và bản tin sáng theo danh mục}\chualam
 \subsection{Kênh phân phối: Facebook, Zalo, MCP}\chualam

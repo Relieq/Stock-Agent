@@ -13,7 +13,7 @@
 | 28/09 – 11/10 | Dựng CSDL, module thu thập và trích xuất BCTC (bản đầu) |
 | 12/10 – 08/11 | Chạy thật trong mùa BCTC quý 3 (VN30, gồm 13 ngân hàng); sau mùa đối chiếu với nguồn ngoài. Song song từ 21/10: bắt đầu agent tạo báo cáo theo yêu cầu (bộ kiểm tra số trong văn bản sinh ra, các công cụ lấy số đã kiểm chứng) |
 | 09/11 – 29/11 | Phát hiện bất thường trong KQKD, agent tìm nguyên nhân trong thuyết minh và công văn giải trình (bản đầu); mở rộng lên VN100 |
-| 30/11 – 20/12 | Đánh giá độ chính xác trên bộ dữ liệu vàng, so với hệ thống khóa trước; triển khai lên máy chủ cho người dùng thử |
+| 30/11 – 20/12 | Đánh giá độ chính xác trên bộ dữ liệu vàng, so sánh các phương pháp trích xuất (lớp chữ có sẵn, OCR rồi ghép bảng, OCR rồi cho mô hình ngôn ngữ ghép, mô hình đọc ảnh) trên cùng bộ đáp án; triển khai lên máy chủ cho người dùng thử |
 | 21/12 – 31/12 | Hoàn thiện báo cáo final, slide và video demo; kết thúc Project III |
 
 Mùa BCTC quý 4/2026 (tháng 1/2027) chuyển sang giai đoạn ĐATN.

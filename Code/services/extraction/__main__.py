@@ -250,10 +250,19 @@ def cmd_approve(args) -> None:
 
 
 def cmd_cost(args) -> None:
-    """Chi phí gọi mô hình đã ghi trong các bản ghi trích xuất (services/costs.py). Mỗi tài liệu chỉ giữ bản ghi mới
-    nhất, nên các lần chạy bị ghi đè không được tính; bản ghi cũ chưa có số liệu theo bước."""
-    from services.costs import report
+    """Chi phí gọi mô hình (services/costs.py): sổ chi phí từ ngày chốt, trước đó lấy từ bản ghi trích xuất (chỉ giữ lần
+    đọc mới nhất). `--freeze`: chốt số trước lúc này và bắt đầu tính theo sổ (một lần)."""
+    from services.costs import add_reports, freeze_baseline, report
+    from services.db import connect
+    if args.freeze:
+        with connect() as conn:
+            print(freeze_baseline(conn))
     rep = report()
+    if not rep.ledger_since:
+        with connect() as conn:
+            add_reports(rep, conn)
+    else:
+        print(f"Tính theo sổ chi phí từ {rep.ledger_since}; trước đó theo bản chốt")
     t = rep.total
     print(f"{len(rep.docs)} bản ghi; {t.calls} lần gọi, {t.input_tokens:,} token vào, {t.output_tokens:,} token ra, "
           f"khoảng {t.usd:.2f} USD")
@@ -331,7 +340,8 @@ def main(argv: list[str] | None = None) -> None:
     a.add_argument("--note", required=True, help="Vì sao chỗ lệch còn lại không phải do đọc sai")
     a.set_defaults(func=cmd_approve)
 
-    c = sub.add_parser("cost", help="Chi phí gọi mô hình theo bước, từ các bản ghi đã lưu")
+    c = sub.add_parser("cost", help="Chi phí gọi mô hình theo bước (sổ chi phí, trước ngày chốt thì từ bản ghi)")
+    c.add_argument("--freeze", action="store_true", help="chốt số trước lúc này, từ nay tính theo sổ chi phí (một lần)")
     c.set_defaults(func=cmd_cost)
 
     args = p.parse_args(argv)

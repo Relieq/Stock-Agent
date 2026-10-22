@@ -1205,12 +1205,16 @@ dài bất thường. Đầu ra luôn theo khuôn JSON cố định nên mô hì
 
 \subsection{Đo và giới hạn chi phí}
 \begin{itemize}
-  \item Mỗi lần gọi được ghi số token vào, ra và thời gian \textbf{theo từng bước}; trang \enquote{Chi phí} dành cho
-        quản trị viên hiện chi phí tháng này so với trần, theo ngày, theo bước, theo người yêu cầu và các BCTC tốn nhiều
-        nhất (Bảng~\ref{tab:chiphi} lấy từ cùng nguồn số liệu). Trang tài liệu hiện số token đã dùng cho BCTC đó.
+  \item Mỗi lần gọi được ghi số token vào, ra, thời gian và chi phí \textbf{theo từng bước}, vào bản ghi của BCTC và
+        vào một \textbf{sổ chi phí} chỉ ghi thêm. Bản ghi của BCTC chỉ giữ lần đọc mới nhất, nên lần đọc bị ghi đè không
+        còn dấu vết; từ 22/10/2026 tổng chi phí theo ngày, tháng, bước lấy từ sổ, gồm cả lần đọc lại, công văn, báo cáo
+        của agent và các lần chạy đo. Trang \enquote{Chi phí} dành cho quản trị viên hiện chi phí tháng này so với trần,
+        theo ngày, theo bước, theo người yêu cầu và các BCTC tốn nhiều nhất (Bảng~\ref{tab:chiphi} lấy chi phí từng BCTC
+        từ bản ghi). Trang tài liệu hiện số token đã dùng cho BCTC đó.
   \item Mỗi người dùng có \textbf{hạn mức yêu cầu mới mỗi ngày}; yêu cầu trả ngay từ kho không tính vào hạn mức.
-  \item Tổng chi phí gọi mô hình mỗi tháng không vượt \textbf{trần tháng} (mặc định 5 USD); vượt thì yêu cầu mới nằm chờ
-        sang tháng sau, giao diện báo cho người dùng biết.
+  \item Chi phí đọc theo yêu cầu người dùng và báo cáo của agent mỗi tháng không vượt \textbf{trần tháng} (mặc định
+        5 USD); vượt thì yêu cầu mới nằm chờ sang tháng sau, giao diện báo cho người dùng biết. Đọc theo lịch cho các mã
+        đang theo dõi không tính vào trần.
 \end{itemize}
 
 \section{Thẻ KQKD và giao diện}

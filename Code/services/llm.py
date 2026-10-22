@@ -125,6 +125,27 @@ def config() -> LLMConfig:
     return _provider_config(provider, model)
 
 
+def ledger_path():
+    """Sổ chi phí; biến LLM_LEDGER đổi chỗ ghi (kiểm thử ghi vào thư mục tạm, không lẫn vào sổ thật)."""
+    from pathlib import Path
+    from services.ingestion.registry import raw_data_dir
+    return Path(os.environ["LLM_LEDGER"]) if os.environ.get("LLM_LEDGER") else raw_data_dir() / "llm_calls.jsonl"
+
+
+def log_call(step: str, provider: str, model: str | None, ti: int, to: int, usd: float, seconds: float) -> None:
+    """Ghi một dòng vào sổ chi phí (Data/raw/llm_calls.jsonl): mỗi lần gọi mô hình một dòng, chỉ ghi thêm. Bản ghi đọc
+    BCTC chỉ giữ lần đọc mới nhất nên không đủ để tính tổng chi phí; sổ này thì giữ mọi lần gọi, kể cả chạy đo và báo
+    cáo của agent. Lỗi ghi sổ không làm hỏng lần gọi."""
+    line = json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "step": step, "provider": provider, "model": model,
+                       "input_tokens": ti, "output_tokens": to, "usd": round(usd, 6), "seconds": round(seconds, 2),
+                       "pid": os.getpid()}, ensure_ascii=False)
+    try:
+        with open(ledger_path(), "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError as e:
+        print(f"[llm] không ghi được sổ chi phí: {e}", file=sys.stderr)
+
+
 @dataclass
 class Usage:
     calls: int = 0
@@ -387,6 +408,7 @@ class VisionClient:
                 u.input_tokens += ti
                 u.output_tokens += to
                 u.usd += usd
+            log_call(name, self._configs[i].provider, self._configs[i].model, ti, to, usd, time.monotonic() - started)
             return data
         raise last or RuntimeError("Không có nhà cung cấp nào trả lời được")
 

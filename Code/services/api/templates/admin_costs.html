@@ -35,8 +35,11 @@
 </tbody></table>
 {% else %}<p class="muted small">Chưa lần nào phải chuyển nhà cung cấp.</p>{% endif %}
 {% endif %}
-<p class="muted small">Tính từ số token đã ghi trong từng bản ghi đọc BCTC, theo bảng giá trong <code>services/llm.py</code>.
-  Mỗi BCTC tính vào ngày bắt đầu đọc, kể cả các lần đọc lại về sau. Đơn vị: USD.</p>
+<p class="muted small">Tính theo số token của từng lần gọi mô hình và bảng giá trong <code>services/llm.py</code>. Đơn vị: USD.
+  {% if rep.ledger_since %}Từ {{ rep.ledger_since[8:10] }}/{{ rep.ledger_since[5:7] }}/{{ rep.ledger_since[:4] }}: mọi lần gọi đều được ghi sổ (cả đọc lại, đọc lần hai, công văn, báo cáo agent, chạy đo).
+  Trước đó: lấy từ bản ghi đọc BCTC, mỗi BCTC chỉ giữ lần đọc mới nhất nên thấp hơn thực tế.
+  {% else %}Mỗi BCTC tính vào ngày bắt đầu đọc; mỗi BCTC chỉ giữ lần đọc mới nhất nên thấp hơn thực tế.{% endif %}
+  Bảng theo BCTC luôn lấy từ bản ghi đọc BCTC.</p>
 
 <h2>Tháng {{ rep.month[5:] }}/{{ rep.month[:4] }}</h2>
 <p><b>{{ "%.2f" | format(rep.this_month.usd) }} USD</b> tổng · {{ rep.this_month.calls }} lần gọi mô hình</p>

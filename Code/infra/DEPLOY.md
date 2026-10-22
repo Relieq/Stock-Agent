@@ -25,7 +25,7 @@ git clone https://github.com/Relieq/Stock-Agent.git && cd Stock-Agent/Code
 
 Chép từ máy phát triển sang `Stock-Agent/Data/raw/` (khoảng 2,4 GB): `vietstock/`, `hose/` (PDF, cần để hiện ảnh trang
 gốc), `extracted/` (kết quả đọc, gồm ô sửa tay), `explanations/`, `second_read/`, `uploads/`, `settings.json`,
-`hose_ids.json`. Không cần `born_digital/`, `trial/`, `tmp/`.
+`hose_ids.json`, `llm_calls.jsonl` và `llm_cost_baseline.json` (sổ chi phí). Không cần `born_digital/`, `trial/`, `tmp/`.
 
 CSDL: lấy bản sao lưu mới nhất `soi-db-<ngày>.sql.gz` trong `Data/backup` của máy phát triển, rồi trên máy chủ:
 

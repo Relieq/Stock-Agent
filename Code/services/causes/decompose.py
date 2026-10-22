@@ -36,6 +36,7 @@ class Part:
     prev: Decimal
     effect: Decimal              # đóng góp vào mức thay đổi LNST (đồng), có dấu
     share: Decimal = Decimal(0)  # effect / |mức thay đổi LNST|
+    expense: bool = False        # dòng là khoản trừ trong công thức LNST (chi phí, thuế), dù BCTC in dương hay âm
 
 
 @dataclass
@@ -73,15 +74,20 @@ def _rule_for(template: str, code: str, values: dict) -> tuple | None:
     return best[1] if best else None
 
 
-def _expand(template: str, code: str, sign: int, values: dict, flip: bool, out: dict, depth: int = 0) -> bool:
-    """Cộng (mã lá -> dấu) vào `out`. False nếu gặp dòng không tách được mà cũng không phải lá."""
+def _expand(template: str, code: str, sign: int, values: dict, flip: bool, out: dict, depth: int = 0,
+            raw: int = 1, kinds: dict | None = None) -> bool:
+    """Cộng (mã lá -> dấu) vào `out`; `kinds`: mã lá -> dấu theo công thức (âm là khoản trừ), không phụ thuộc cách in.
+    False nếu gặp dòng không tách được mà cũng không phải lá."""
+    kinds = {} if kinds is None else kinds
     if code in LEAVES[template] or depth > 6:
         out[code] = out.get(code, 0) + sign
+        kinds[code] = raw
         return True
     r = _rule_for(template, code, values)
     if r is None:
         if code in values:
             out[code] = out.get(code, 0) + sign    # dòng tổng không có công thức: coi như lá
+            kinds[code] = raw
             return True
         return False
     ok = True
@@ -90,7 +96,7 @@ def _expand(template: str, code: str, sign: int, values: dict, flip: bool, out: 
             continue                                 # số hạng không in trên BCTC (bằng 0)
         # Chi phí in số âm thì đã mang dấu: cộng thẳng (như phép kiểm ràng buộc)
         eff = (1 if flip and c not in r.abs_codes else s) * sign
-        ok &= _expand(template, c, eff, values, flip, out, depth + 1)
+        ok &= _expand(template, c, eff, values, flip, out, depth + 1, raw * s, kinds)
     return ok
 
 
@@ -110,21 +116,22 @@ def decompose(template: str, values: dict[str, dict[str, Decimal]], labels: dict
     if cur is None or prev is None:
         return None
     signs: dict[str, int] = {}
-    if not _expand(template, npat, 1, values, flip, signs):
+    kinds: dict[str, int] = {}
+    if not _expand(template, npat, 1, values, flip, signs, kinds=kinds):
         return Breakdown(target, cur, prev, ok=False, note="có dòng tổng không tách được theo ràng buộc của mẫu")
     parts = []
     for code, sign in signs.items():
         if sign == 0:
             continue
         a, b = get(code, cur_col) or Decimal(0), get(code, prev_col) or Decimal(0)
-        parts.append(Part(code, labels.get(code, code), a, b, sign * (a - b)))
+        parts.append(Part(code, labels.get(code, code), a, b, sign * (a - b), expense=kinds.get(code, 1) < 0))
     if target == parent:
         # Phần công ty mẹ = LNST − phần không kiểm soát (tính từ hai dòng đã đọc, không phụ thuộc dấu in)
         mi_cur = get(npat, cur_col) - cur if get(npat, cur_col) is not None else None
         mi_prev = get(npat, prev_col) - prev if get(npat, prev_col) is not None else None
         if mi_cur is not None and mi_prev is not None:
             parts.append(Part(MINORITY, "Phần lợi nhuận của cổ đông không kiểm soát", mi_cur, mi_prev,
-                              -(mi_cur - mi_prev)))
+                              -(mi_cur - mi_prev), expense=True))
     bd = Breakdown(target, cur, prev, parts)
     bd.residual = bd.change - sum((p.effect for p in parts), Decimal(0))
     bd.ok = abs(bd.residual) <= tolerance

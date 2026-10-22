@@ -26,6 +26,8 @@ def test_expenses_printed_negative_are_added():
     assert bd.ok and bd.target == "60"
     eff = {p.code: p.effect for p in bd.parts}
     assert eff["25"] == -20 and eff["51"] == -16 and eff["20"] == 100
+    kind = {p.code: p.expense for p in bd.parts}
+    assert kind["25"] and kind["51"] and not kind["20"]           # in số âm vẫn nhận ra là khoản trừ
 
 
 def test_bank_breakdown_and_mismatch_is_reported():

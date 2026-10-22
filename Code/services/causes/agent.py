@@ -1,0 +1,307 @@
+"""Agent tìm nguyên nhân biến động LNST của một BCTC đã kiểm chứng (Baocao/dinh-huong/agent-nguyen-nhan.md mục 3.3-3.5).
+
+1. Code tách mức thay đổi LNST theo dòng KQKD (decompose.py), cả riêng quý và lũy kế.
+2. Vòng agent, tối đa MAX_STEPS lượt, dừng sớm khi chi phí chạm MAX_USD: mỗi lượt mô hình xem bảng tách và những gì đã
+   thu thập, chọn một việc: đọc thuyết minh của một dòng (notes.py, chỉ dùng khoản con cộng đúng), lấy nguyên nhân công
+   ty nêu trong công văn giải trình (đã đối chiếu BCTC), hoặc dừng.
+3. Code dựng bảng số (mỗi dòng có nguồn), mô hình viết 2-5 câu, bộ kiểm tra số của agent báo cáo kiểm từng câu; câu sai
+   được viết lại tối đa 2 lần rồi bỏ.
+
+Kết quả lưu ở Data/raw/causes/<id tài liệu>.json.
+"""
+
+from __future__ import annotations
+
+import json
+from decimal import Decimal
+
+from services.analyst.guard import check_draft
+from services.analyst.sheet import FactSheet
+from services.causes.decompose import Breakdown, decompose_any, top_parts
+from services.causes.notes import Notes, match_note, note_number
+from services.extraction.rules import RULESETS
+from services.ingestion.registry import raw_data_dir
+from services.metrics.card import ty
+
+MAX_STEPS = 4
+MAX_USD = 0.03
+REWRITES = 2
+PERIOD_WORDS = {"quarter": "quý {q}/{y}", "ytd": "lũy kế {m} tháng năm {y}"}
+MONTHS = {"Q1": 3, "Q2": 6, "Q3": 9, "Q4": 12}
+
+STEP_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["action", "line", "why"], "properties": {
+    "action": {"type": "string", "enum": ["note", "letter", "done"]},
+    "line": {"type": "string"}, "why": {"type": "string"}}}
+STEP_PROMPT = """Bạn giúp tìm nguyên nhân LNST của {ticker} {period} thay đổi so với cùng kỳ. Code đã tách mức thay đổi theo
+từng dòng của KQKD (số đã kiểm chứng, đơn vị tỷ đồng; đóng góp dương là làm LNST tăng):
+{breakdown}
+
+Đã thu thập:
+{gathered}
+
+Chọn MỘT việc tiếp theo để giải thích các dòng đóng góp lớn nhất:
+- "note": đọc thuyết minh của một dòng (line = mã dòng trong bảng trên, chỉ dòng có ghi "có thuyết minh"); thuyết minh
+  tách dòng đó thành các khoản con (ví dụ thu nhập lãi từ cho vay, từ tiền gửi).
+- "letter": lấy nguyên nhân công ty nêu trong công văn giải trình (chỉ khi bảng ghi "có công văn"; line để trống).
+- "done": đã đủ để giải thích, hoặc không còn việc gì đáng làm.
+Không chọn lại việc đã làm. why: một câu ngắn vì sao."""
+
+WRITE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["sentences"], "properties": {
+    "sentences": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                             "required": ["text", "uses"],
+                                             "properties": {"text": {"type": "string"},
+                                                            "uses": {"type": "array", "items": {"type": "string"}}}}}}}
+WRITE_PROMPT = """Viết 2 đến 5 câu tiếng Việt giải thích vì sao LNST {target} của {ticker} {period} thay đổi so với cùng kỳ,
+cho người đọc phổ thông. Chỉ dựa vào bảng số dưới đây (số do code tính từ BCTC đã kiểm chứng; mỗi dòng có mã S...):
+{sheet}
+
+Cách viết:
+- Câu đầu nói LNST thay đổi bao nhiêu; các câu sau nói các dòng đóng góp lớn nhất và, nếu có, khoản con trong thuyết minh
+  hay nguyên nhân công ty nêu. Dòng làm LNST giảm cũng phải nhắc nếu lớn.
+- Số trong thuyết minh có thể là số lũy kế: viết rõ "lũy kế 9 tháng" (hoặc kỳ ghi trong dòng), không gán cho riêng quý.
+- Mỗi câu ghi trong "uses" mã các dòng bảng số câu dùng. Chỉ dùng con số có trong các dòng đã ghi, chép đúng như bảng
+  (được làm tròn bớt). Không tự tính số mới. Từ tăng/giảm phải đúng như bảng.
+- Nguyên nhân ghi "theo công ty" thì viết rõ là theo công ty. Không khuyến nghị mua bán, không nói về giá cổ phiếu.
+- Không nhắc mã dòng (S1...) hay mã chỉ tiêu trong câu.
+{feedback}"""
+
+
+def _signed_ty(v: Decimal) -> str:
+    return ("+" if v >= 0 else "−") + ty(v)
+
+
+def _period_label(period: str, year: int, kind: str) -> str:
+    return PERIOD_WORDS[kind].format(q=period[1], y=year, m=MONTHS.get(period, 12))
+
+
+def part_text(p, label: str, ticker: str) -> str:
+    """Dòng bảng số cho một dòng KQKD đóng góp vào mức thay đổi LNST. Dòng thu nhập âm là
+    lỗ: ghi chữ "lỗ" vì số in ra bỏ dấu (VPB quý 3: mua bán chứng khoán kinh doanh lỗ 363 tỷ, từng bị viết thành "chỉ còn
+    363 tỷ"). Dòng chi phí: độ lớn và chiều thay đổi của độ lớn."""
+    income = not p.expense
+    show = (lambda v: f"lỗ {ty(v)}" if v < 0 else ty(v)) if income else ty
+    size = (lambda v: v) if income else abs
+    word = "tăng" if size(p.cur) >= size(p.prev) else "giảm"
+    return (f"{p.label} {label} của {ticker}: {show(p.cur)}, cùng kỳ {show(p.prev)} ({word} "
+            f"{ty(size(p.cur) - size(p.prev))}), làm LNST {'tăng' if p.effect >= 0 else 'giảm'} {ty(p.effect)}")
+
+
+class CauseAgent:
+    def __init__(self, conn, document_id: int, client, facts=None, record=None, notes: Notes | None = None,
+                 known: set[str] | None = None):
+        from services.extraction.pipeline import _load_record
+        from services.metrics.card import Facts
+        self.conn, self.doc_id, self.client = conn, document_id, client
+        self.record = record or _load_record(conn, document_id)
+        self.facts = facts or Facts(document_id, self.record)
+        row = conn.execute("SELECT ticker, fiscal_year, fiscal_period, scope FROM documents WHERE id = %s",
+                           (document_id,)).fetchone()
+        self.ticker, self.year, self.period, self.scope = row
+        self.st = self.facts.statements["IS"]
+        self.labels = {k: (self.facts.rows[("IS", k)].label if ("IS", k) in self.facts.rows else k)
+                       for k in self.st.values}
+        tol = self.st.multiplier * 20
+        self.bd = {kind: decompose_any(self.facts.template or "", self.st.values, self.labels, self.facts.flip_is, kind,
+                                       tol) for kind in ("quarter", "ytd")}
+        self.notes = notes if notes is not None else self._notes()
+        self.known = known if known is not None else {t for (t,) in conn.execute("SELECT ticker FROM companies")}
+        self.gathered: list[dict] = []
+        self.steps: list[dict] = []
+        self.start_usd = client.usage.usd if client is not None else 0.0
+
+    def _notes(self) -> Notes | None:
+        from services.extraction.sources import candidates, open_pdf
+        key = self.conn.execute("SELECT storage_key FROM document_files WHERE document_id = %s ORDER BY downloaded_at DESC"
+                                " LIMIT 1", (self.doc_id,)).fetchone()
+        cand = next((c for c in self.record.get("candidates", []) if c["name"] == self.record.get("chosen")), None)
+        if key is None or cand is None:
+            return None
+        pdf = next((open_pdf(c) for c in candidates(raw_data_dir() / key[0]) if c.name == self.record["chosen"]), None)
+        first = max(p for ps in cand["statement_pages"].values() for p in ps) + 1
+        return Notes(self.doc_id, pdf, first, self.client) if pdf is not None else None
+
+    # ---------- công cụ ----------
+
+    def note_codes(self, code: str) -> list[tuple[str, int]]:
+        """(mã dòng KQKD, số thuyết minh) của dòng; dòng không in số thuyết minh thì của các dòng trong công thức."""
+        n = note_number(getattr(self.facts.rows.get(("IS", code)), "note", None))
+        if n:
+            return [(code, n)]
+        out = []
+        for r in RULESETS.get(self.facts.template, RULESETS["TT200"]).rules:
+            if r.statement == "IS" and r.lhs == code:
+                for _, c in r.rhs:
+                    k = note_number(getattr(self.facts.rows.get(("IS", c)), "note", None))
+                    if k and (c, k) not in out:
+                        out.append((c, k))
+                break
+        return out
+
+    def read_note(self, code: str) -> list[dict]:
+        out = []
+        for c, n in self.note_codes(code):
+            nt = None
+            same = [c] + [k for k in self.st.values if k != c and
+                          note_number(getattr(self.facts.rows.get(("IS", k)), "note", None)) == n]
+            for c2 in same:
+                v = self.st.values[c2]
+                nt = match_note(self.notes.table(n), n, {"quarter": (v.get("q_cur"), v.get("q_prev_year")),
+                                                         "ytd": (v.get("ytd_cur"), v.get("ytd_prev_year"))},
+                                self.st.multiplier * 5)
+                if nt.items:
+                    break
+            out.append({"tool": "note", "line": c, "for": code, "number": n, "title": nt.title, "pages": nt.pages,
+                        "period": nt.period, "verified": nt.verified, "note": nt.note,
+                        "items": [[lab, str(a), str(b)] for lab, a, b in nt.items]})
+        return out
+
+    def read_letter(self) -> list[dict]:
+        from services.metrics.service import explanation
+        e = explanation(self.conn, self.ticker, self.year, self.period, self.scope)
+        if e is None or not e["view"].read:
+            return [{"tool": "letter", "reasons": [], "note": "không có công văn đã đọc"}]
+        return [{"tool": "letter", "letter_id": e["id"], "period_kind": e["view"].period_kind,
+                 "reasons": [[r.text, r.verdict, r.detail] for r in e["view"].reasons
+                             if r.css != "bad"]}]
+
+    # ---------- vòng agent ----------
+
+    def _breakdown_text(self) -> str:
+        lines = []
+        for kind, bd in self.bd.items():
+            if bd is None or not bd.ok:
+                continue
+            lines.append(f"{_period_label(self.period, self.year, kind)}: LNST {ty(bd.prev)} -> {ty(bd.cur)} "
+                         f"({_signed_ty(bd.change)})")
+            for p in bd.parts[:8]:
+                has = "có thuyết minh" if self.note_codes(p.code) else "không có thuyết minh"
+                lines.append(f"  [{p.code}] {p.label}: đóng góp {_signed_ty(p.effect)} ({has})")
+        if self.letter_available():
+            lines.append("Có công văn giải trình của công ty cho kỳ này.")
+        return "\n".join(lines)
+
+    def letter_available(self) -> bool:
+        from services.metrics.service import explanation
+        return explanation(self.conn, self.ticker, self.year, self.period, self.scope) is not None
+
+    def _gathered_text(self) -> str:
+        if not self.gathered:
+            return "(chưa có)"
+        out = []
+        for g in self.gathered:
+            if g["tool"] == "note":
+                part = f" (thuộc dòng {g['for']})" if g.get("for") and g["for"] != g["line"] else ""
+                out.append(f"- đã đọc thuyết minh {g['number']} của dòng {g['line']}{part}: "
+                           + (f"{len(g['items'])} khoản con, {'cộng khớp' if g['verified'] else g['note']}" if g["items"]
+                              else g["note"]))
+            else:
+                out.append(f"- công văn: {len(g['reasons'])} nguyên nhân dùng được" if g["reasons"] else f"- {g['note']}")
+        return "\n".join(out)
+
+    def spent(self) -> float:
+        return self.client.usage.usd - self.start_usd
+
+    def investigate(self) -> None:
+        bd = self.bd["quarter"]
+        if bd is None or not bd.ok:
+            return
+        done: set[tuple[str, str]] = set()
+        for _ in range(MAX_STEPS):
+            if self.spent() >= MAX_USD:
+                self.steps.append({"action": "stop", "why": "chạm trần chi phí"})
+                break
+            step = self.client.json_from_images(
+                STEP_PROMPT.format(ticker=self.ticker, period=_period_label(self.period, self.year, "quarter"),
+                                   breakdown=self._breakdown_text(), gathered=self._gathered_text()),
+                [], STEP_SCHEMA, "cause_step")
+            self.steps.append(step)
+            key = (step["action"], step["line"] if step["action"] == "note" else "")
+            if step["action"] == "done" or key in done:
+                break
+            done.add(key)
+            if step["action"] == "note" and self.notes is not None and self.note_codes(step["line"]):
+                self.gathered += self.read_note(step["line"])
+            elif step["action"] == "letter":
+                self.gathered += self.read_letter()
+            else:
+                break
+
+    # ---------- bảng số và lời ----------
+
+    def sheet(self) -> FactSheet:
+        sh = FactSheet()
+        bd = self.bd["quarter"]
+        label = _period_label(self.period, self.year, "quarter")
+        src = lambda code, col: [{"document_id": self.doc_id, "page": getattr(self.facts.rows.get(("IS", code)), "page",
+                                                                            None), "label": self.labels.get(code, code),
+                                 "column": col}]   # noqa: E731
+        target = "của cổ đông công ty mẹ" if bd.target in ("61", "b.npat_parent", "201") else ""
+        sh.add("metric", f"LNST {target} {label} của {self.ticker}: {ty(bd.cur)}, cùng kỳ {ty(bd.prev)}, "
+                         f"{'tăng' if bd.change >= 0 else 'giảm'} {ty(bd.change)}".replace("  ", " "),
+               ticker=self.ticker, metric="npat_parent", direction="up" if bd.change >= 0 else "down",
+               sources=src(bd.target, "q_cur"))
+        for p in top_parts(bd, limit=3) + [p for p in bd.parts[:5] if p.effect * bd.change < 0][:2]:
+            sh.add("cause_part", part_text(p, label, self.ticker),
+                   ticker=self.ticker, names=[p.label.lower()], sources=src(p.code, "q_cur"))
+        for g in self.gathered:
+            if g["tool"] == "note" and g["items"] and g["verified"]:
+                per = _period_label(self.period, self.year, g["period"])
+                items = sorted(((lab, Decimal(a), Decimal(b)) for lab, a, b in g["items"]),
+                               key=lambda i: -abs(i[1] - i[2]))[:3]
+                for lab, a, b in items:
+                    sh.add("note_item", f"Thuyết minh {g['title'].lower()}, {per} của {self.ticker}: {lab} {ty(a)}, "
+                                        f"cùng kỳ {ty(b)} ({'tăng' if a >= b else 'giảm'} {ty(a - b)})",
+                           ticker=self.ticker, names=[lab.lower()],
+                           sources=[{"document_id": self.doc_id, "page": g["pages"][0] if g["pages"] else None,
+                                     "label": f"Thuyết minh {g['number']}", "column": g["period"]}])
+            elif g["tool"] == "letter":
+                for text, verdict, detail in g["reasons"][:4]:
+                    from services.analyst.tools import words_only
+                    shown = text if verdict == "khớp BCTC" else words_only(text)
+                    sh.add("reason", f"Nguyên nhân {self.ticker} nêu trong công văn giải trình ({verdict}): {shown}",
+                           ticker=self.ticker, sources=[{"document_id": g["letter_id"], "page": None,
+                                                         "label": "Công văn giải trình"}])
+        return sh
+
+    def write(self, sh: FactSheet) -> tuple[list[dict], list[str]]:
+        bd = self.bd["quarter"]
+        target = "của cổ đông công ty mẹ" if bd.target in ("61", "b.npat_parent", "201") else ""
+        feedback: list[str] = []
+        kept, dropped = [], []
+        for attempt in range(REWRITES + 1):
+            fb = ("Bản trước có các câu sai, viết lại cả đoạn và sửa đúng các câu này:\n" + "\n".join(f"- {l}" for l in feedback)
+                  if feedback else "")
+            draft = self.client.json_from_images(
+                WRITE_PROMPT.format(target=target, ticker=self.ticker, period=_period_label(self.period, self.year,
+                                                                                           "quarter"),
+                                    sheet=sh.prompt_text(), feedback=fb), [], WRITE_SCHEMA, "cause_write")
+            sentences = draft["sentences"]
+            violations, _, _ = check_draft({"sections": [{"heading": "", "sentences": sentences}]}, sh, {self.ticker},
+                                           self.known)
+            bad = {v.sentence for v in violations}
+            if not bad or attempt == REWRITES:
+                kept = [s for i, s in enumerate(sentences) if i not in bad]
+                dropped = [f"{sentences[v.sentence]['text']} — {v.kind}: {v.detail}" for v in violations]
+                break
+            feedback = [f"“{sentences[v.sentence]['text']}”: {v.kind} — {v.detail}" for v in violations]
+        return kept, dropped
+
+    def run(self) -> dict:
+        bd = self.bd["quarter"]
+        out = {"document_id": self.doc_id, "ticker": self.ticker, "period": self.period, "year": self.year}
+        if bd is None or not bd.ok:
+            out["status"] = "not_explained"
+            out["note"] = bd.note if bd else "mẫu BCTC chưa hỗ trợ hoặc thiếu số hai kỳ"
+        else:
+            self.investigate()
+            sh = self.sheet()
+            kept, dropped = self.write(sh)
+            out.update(status="done" if kept else "failed", sentences=kept, dropped=dropped, sheet=sh.to_json(),
+                       steps=self.steps, gathered=self.gathered,
+                       explained=str(sum((p.effect for p in top_parts(bd, limit=3)), Decimal(0))),
+                       change=str(bd.change))
+        out["usd"] = round(self.spent(), 5) if self.client is not None else 0.0
+        path = raw_data_dir() / "causes" / f"{self.doc_id}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+        return out

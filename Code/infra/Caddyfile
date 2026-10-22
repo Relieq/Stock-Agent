@@ -1,0 +1,5 @@
+# Caddy tự xin và gia hạn chứng chỉ HTTPS cho tên miền (biến SITE_DOMAIN), chuyển yêu cầu tới web.
+{$SITE_DOMAIN} {
+	encode gzip
+	reverse_proxy web:8765
+}

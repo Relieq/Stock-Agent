@@ -1,0 +1,48 @@
+# Chạy trên máy chủ, chồng lên docker-compose.yml (xem infra/DEPLOY.md):
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d
+# Khác máy phát triển: mật khẩu CSDL lấy từ biến DB_PASSWORD (infra/.env), CSDL và web không mở cổng ra ngoài, Caddy
+# nhận HTTPS cho tên miền SITE_DOMAIN và tự xin chứng chỉ, không hiện link đăng nhập trên trang.
+
+x-db-url: &db-url postgresql://soi:${DB_PASSWORD:?đặt DB_PASSWORD trong infra/.env}@db:5432/soi
+
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports: !reset []
+
+  web:
+    environment:
+      DATABASE_URL: *db-url
+      DEV_LOGIN_LINK: "0"
+    ports: !reset []
+
+  watcher:
+    environment:
+      DATABASE_URL: *db-url
+
+  app:
+    environment:
+      DATABASE_URL: *db-url
+
+  backup:
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+
+  caddy:
+    image: caddy:2.8.4
+    container_name: soi-caddy
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?đặt SITE_DOMAIN trong infra/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - web
+    restart: always
+
+volumes:
+  caddy-data:

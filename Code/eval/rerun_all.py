@@ -93,8 +93,8 @@ class Steps:
         self.raw = out / "raw"
         self.raw.mkdir(parents=True, exist_ok=True)
         self.log: list[tuple[str, str, float, int, str]] = []      # tên, lệnh, giây, mã thoát, ghi chú
-        # PYTHONHASHSEED cố định: phép cấy lỗi duyệt tập hợp nên thứ tự (và kết quả, lệch tới 1 điểm %) đổi theo từng lần
-        # chạy dù cùng --seed
+        # PYTHONHASHSEED cố định cho chắc. Đã kiểm 22/10/2026: phép cấy lỗi chạy 4 lần (cố định và không cố định hạt giống
+        # băm) cho kết quả giống hệt nhau; số chỉ đổi khi dữ liệu trong kho đổi (BCTC đọc lại, BCTC kỳ sau làm kỳ đối chiếu)
         self.env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONHASHSEED="0", **{k: "" for k in NO_KEYS})
 
     def run(self, name: str, argv: list[str], timeout: int = 3600) -> str:
@@ -480,7 +480,8 @@ def main() -> None:
         ("capture_recapture", ["eval/capture_recapture.py", *lb]),
         ("second_read_compare", ["eval/second_read.py", "compare", *lb]),
         ("repair", ["eval/repair.py", *lb]),
-        ("fault_injection", ["eval/fault_injection.py", *lb]),
+        ("fault_injection", ["eval/fault_injection.py", *lb,
+                             *(["--exclude-doc", *map(str, exclude)] if exclude else [])]),
         ("born_digital_measure", ["eval/born_digital.py", "measure", "--doc-id", *map(str, bd_ids)] if bd_ids else None),
         ("born_digital_degraded", ["eval/born_digital.py", "degraded", "--doc-id", *map(str, bd_ids)] if bd_ids else None),
         ("born_digital_files", ["eval/born_digital.py", "files", "--only", *bd_names] if bd_names else None),

@@ -28,6 +28,7 @@ from datetime import date, datetime, timedelta, timezone
 from services.db import connect
 from services.extraction.pipeline import extract_document
 from services.extraction.second_read import after_extraction
+from services.extraction.verify import after_extraction as verify_after_extraction
 from services.ingestion.hose import HoseClient
 from services.ingestion.registry import discover, discover_hose, download_pending, raw_data_dir
 from services.ingestion.vietstock import VietstockClient
@@ -196,6 +197,9 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             conn.commit()
             # Sau khi đã báo người theo dõi: ô không phép kiểm nào phủ được nhà cung cấp còn lại đọc lần hai
             second = after_extraction(conn, doc_id, vision)
+            # Ô lệch với BCTC kỳ khác: đọc lại ngay ở ảnh nét hơn trên cả hai bản
+            rechecked = verify_after_extraction(conn, doc_id, vision)
+            second = "; ".join(x for x in (second, rechecked) if x) or None
             lines.append(
                 f"{ticker}: {title} -> {rec['status']} ({s['gate_checks'] - s['gate_failed']}/{s['gate_checks']} ràng buộc"
                 f" bắt buộc đạt); công bố {listed_at.astimezone(VN_TZ):%d/%m %H:%M} (Vietstock hoặc HOSE, nguồn sớm hơn)"

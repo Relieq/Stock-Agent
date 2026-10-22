@@ -317,7 +317,7 @@ def review_fix(request: Request, doc_id: int, statement: str = Form(...), row: i
 @router.post("/duyet/{doc_id}/dung-nhu-anh")
 def review_confirm(request: Request, doc_id: int, statement: str = Form(...), key: str = Form(...),
                    column: str = Form(...)):
-    """Ô hai lần đọc khác nhau: người duyệt đã xem ảnh, lần đọc đầu đúng."""
+    """Ô cần xem ảnh: người duyệt đã xem ảnh, số đã đọc đúng như in."""
     user = require_admin(request)
     with connect() as conn:
         confirm_reading(conn, doc_id, statement, key, column, user.email)

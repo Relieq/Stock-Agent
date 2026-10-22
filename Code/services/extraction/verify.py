@@ -71,6 +71,25 @@ def _row_index(c, record: dict, st: str, key: str, col: str) -> int | None:
     return i
 
 
+def after_extraction(conn: psycopg.Connection, document_id: int, client: VisionClient) -> str | None:
+    """Bộ canh, sau khi đọc xong một BCTC: đọc lại ngay các ô lệch "cần xem ảnh" với BCTC kỳ khác (ở cả hai bản) để
+    không phải chờ người chạy lệnh. Lỗi ở đây không làm hỏng kết quả đã lưu. Trả về một dòng cho thư báo quản trị."""
+    if client is None:
+        return None
+    try:
+        todo = cells_to_verify(conn, [document_id])
+        if not todo:
+            return None
+        added = [e for doc_id, cells in todo.items() for e in verify_document(conn, doc_id, cells, client)]
+        conn.commit()
+    except Exception as e:  # lỗi mạng, hết tiền...
+        conn.rollback()
+        return f"đọc lại ô lệch giữa các kỳ lỗi ({e})"
+    same = sum(1 for e in added if e["same"])
+    return (f"đọc lại {len(added)} ô lệch giữa các kỳ: {same} ô vẫn như cũ (hai BCTC in khác nhau), "
+            f"{len(added) - same} ô ra số khác")
+
+
 def verify_document(conn: psycopg.Connection, document_id: int, cells: set[Cell], client: VisionClient) -> list[dict]:
     """Đọc lại từng ô ở ảnh nét hơn, mỗi trang một lần gọi. Trả về các dòng ghi nhận đã thêm vào bản ghi."""
     record = _load_record(conn, document_id)
@@ -198,19 +217,33 @@ def apply_manual_fix(conn: psycopg.Connection, document_id: int, statement: str,
 
 
 def confirm_reading(conn: psycopg.Connection, document_id: int, statement: str, key: str, column: str, by: str,
-                    note: str = "") -> dict:
-    """Người duyệt đối chiếu ảnh gốc một ô "hai lần đọc khác nhau" và thấy lần đọc đầu đúng: ghi lại để ô thôi ở trạng
-    thái cần xem lại, không sửa số nên không tính là ô sửa tay. Xác nhận gắn với số lúc đó; ô đổi số thì hết hiệu lực."""
-    record = _load_record(conn, document_id)
-    cells = cells_of(document_id, "", record)
-    value = cells.row(statement, key).get(column)
-    if value is None:
-        raise ValueError(f"Không có ô {statement} {key} {column}")
-    entry = {"statement": statement, "key": key, "column": column, "value": str(value), "by": by, "note": note,
-             "at": datetime.now(timezone.utc).isoformat()}
-    record.setdefault("image_confirmed", []).append(entry)
-    _finalize(conn, record)
-    return entry
+                    note: str = "") -> list[dict]:
+    """Người duyệt đối chiếu ảnh gốc một ô cần xem ảnh và thấy số đã đọc đúng như in: ghi lại để ô thôi ở trạng thái
+    cần xem, không sửa số nên không tính là ô sửa tay. Xác nhận gắn với số lúc đó; ô đổi số thì hết hiệu lực.
+
+    Ô lệch với BCTC kỳ khác: người duyệt xem ảnh cả hai bản (trang web đưa link), nên xác nhận mọi ô của chỗ lệch đó ở
+    cả hai BCTC; chỗ lệch thành "hai BCTC in khác nhau"."""
+    targets = {(document_id, statement, key, column)}
+    ev = document_evidence(conn, document_id)
+    for pc in ev.period_checks if ev else []:
+        if pc.suspect_misread and (document_id, statement, key, column) in pc.cells:
+            targets.update(pc.cells)
+    entries = []
+    for doc_id in sorted({t[0] for t in targets}, key=lambda d: d != document_id):
+        record = _load_record(conn, doc_id)
+        cells = cells_of(doc_id, "", record)
+        for _, st, k, col in sorted(t for t in targets if t[0] == doc_id):
+            value = cells.row(st, k).get(col)
+            if value is None:
+                if doc_id == document_id and (st, k, col) == (statement, key, column):
+                    raise ValueError(f"Không có ô {statement} {key} {column}")
+                continue
+            entry = {"statement": st, "key": k, "column": col, "value": str(value), "by": by, "note": note,
+                     "at": datetime.now(timezone.utc).isoformat()}
+            record.setdefault("image_confirmed", []).append(entry)
+            entries.append({**entry, "document_id": doc_id})
+        _finalize(conn, record)
+    return entries
 
 
 def approve_document(conn: psycopg.Connection, document_id: int, user_id: int | None, by: str, note: str = "") -> str:

@@ -998,9 +998,24 @@ phương án làm số ràng buộc đạt nhiều nhất mà không làm mất 
 \subsection{Duyệt tay}\label{sec:duyettay}
 BCTC còn lệch sau mọi bậc leo thang được đưa vào hàng duyệt. Hình~\ref{fig:duyettay} chia việc theo hai làn: quản trị
 viên và hệ thống. Người duyệt sửa được một ô số hoặc mã số của một dòng, kể cả ở BCTC đã xuất bản; hệ thống kiểm lại
-ràng buộc, còn lệch thì BCTC trở về hàng duyệt. Với ô chưa có phép kiểm mà hai lần đọc khác nhau, người duyệt xem ảnh
-rồi xác nhận \enquote{đúng như ảnh}; việc này không tính là sửa tay. Chỉ các ô sửa tay mới được dùng làm dữ liệu vàng
-để đánh giá bước định vị ô sai (mục~\ref{sec:evalrepair}).
+ràng buộc, còn lệch thì BCTC trở về hàng duyệt. Chỉ các ô sửa tay mới được dùng làm dữ liệu vàng để đánh giá bước định
+vị ô sai (mục~\ref{sec:evalrepair}).
+
+Ở BCTC đã xuất bản, một số ô vẫn cần người xem ảnh mà không chặn BCTC. Trang tài liệu gom chúng vào khung \enquote{Ô cần
+xem ảnh} (Hình~\ref{fig:webxemanh}) và ghi rõ lý do của từng ô, kèm con số: phép cộng không khớp; lệch với BCTC kỳ khác;
+hoặc hai lần đọc ra hai số. Lệch với BCTC kỳ khác có thể do đọc sai ở một bên, hoặc do chính công ty in hai bản khác
+nhau. Vì vậy khung này đưa thêm link sang BCTC kia để người duyệt xem ảnh cả hai bản. Nếu số đã đọc đúng như in, người
+duyệt bấm \enquote{đúng như ảnh}. Xác nhận được ghi ở mọi ô của chỗ lệch, trên cả hai BCTC, và gắn với con số lúc đó; ô
+bị sửa sang số khác thì xác nhận hết hiệu lực. Bấm xác nhận không tính là sửa tay. Sau đó ô chuyển sang \enquote{hai
+BCTC in khác nhau}, hoặc \enquote{người duyệt đã đối chiếu ảnh}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{web-xem-anh.png}
+\caption{Khung \enquote{Ô cần xem ảnh} ở BCTC quý 3/2026 của MSN. Dòng \enquote{chi phí đi vay} cột năm trước không
+khớp phép \enquote{quý bằng lũy kế trừ lũy kế quý trước}. Ảnh gốc cho thấy mỗi bản đều được đọc đúng: công ty đổi
+cách tính dòng này giữa BCTC quý 2 và BCTC bán niên.}\label{fig:webxemanh}
+\end{figure}
 
 \begin{figure}[H]
 \centering
@@ -1036,10 +1051,14 @@ rồi xác nhận \enquote{đúng như ảnh}; việc này không tính là sử
 \subsection{Bằng chứng cho từng ô}\label{sec:bangchung}
 Sau khi kiểm chứng, mỗi ô số được xếp vào một loại bằng chứng: khớp cả phép cộng lẫn giữa các kỳ; chỉ khớp giữa các kỳ;
 chỉ khớp phép cộng; hai BCTC in khác nhau (doanh nghiệp hoặc kiểm toán sửa số); khác kỳ trước do trình bày lại; cần xem
-lại; hoặc chưa kiểm được. Ô chưa kiểm được còn được so với lần đọc thứ hai và tách thành hai lần đọc trùng nhau hoặc
+ảnh; hoặc chưa kiểm được. Ô chưa kiểm được còn được so với lần đọc thứ hai và tách thành hai lần đọc trùng nhau hoặc
 khác nhau. Lần đọc thứ hai là bước cuối của quy trình, chạy sau khi đã báo tin cho người theo dõi để không làm chậm
-thông báo: nhà cung cấp mô hình còn lại chỉ chép lại những báo cáo còn ô chưa có phép kiểm nào xác nhận. Giao diện tô
-màu từng ô theo loại bằng chứng (Hình~\ref{fig:webtailieu}).
+thông báo: nhà cung cấp mô hình còn lại chỉ chép lại những báo cáo còn ô chưa có phép kiểm nào xác nhận. Cùng lúc đó,
+các ô lệch với BCTC kỳ khác được đọc lại riêng ở ảnh nét hơn, trên cả hai bản. Đọc lại vẫn ra như cũ thì hai lần đọc độc
+lập trùng nhau, nên chỗ lệch được xếp là hai BCTC in khác nhau, không còn cần người xem. Khi đối chiếu quý 3 với quý
+trước, lũy kế 6 tháng được lấy từ BCTC quý 2 hoặc BCTC bán niên; khớp với một trong hai bản là đạt. Lý do là bản bán niên
+đã soát xét có thể đổi số hoặc cách tính một dòng so với bản quý 2. Giao diện tô màu từng ô theo loại bằng chứng
+(Hình~\ref{fig:webtailieu}).
 
 \begin{figure}[H]
 \centering
@@ -1333,7 +1352,7 @@ có điều kiện (điều kiện trong ngoặc vuông); chấm đen là điể
 \end{figure}
 
 \subsection{Bảng số và bộ kiểm tra số}
-Code dựng bảng số từ BCTC đã kiểm chứng; ô \enquote{cần xem lại} và số tính từ những ô đó không được đưa vào. Mỗi dòng
+Code dựng bảng số từ BCTC đã kiểm chứng; ô \enquote{cần xem ảnh} và số tính từ những ô đó không được đưa vào. Mỗi dòng
 (S1, S2,\ldots) ghi sẵn mọi con số được phép nói, kèm trang BCTC gốc: kỳ này, cùng kỳ, \% thay đổi, mức thay đổi; dòng
 so sánh ghi thứ tự các mã và chênh lệch; dòng xếp hạng ghi thứ hạng, trung vị nhóm. Mô hình không phải tự tính gì.
 Nguyên nhân lấy từ công văn giải trình chỉ giữ số khi số đó đã khớp BCTC.
@@ -1450,7 +1469,7 @@ tiếp được trình bày ở mục~\ref{sec:dapan}. Các dòng ước tính �
         người đọc thứ hai chỉ ra sau, chủ yếu là các khối dòng chép lệch một dòng nằm ngoài mọi phép cộng
         (mục~\ref{sec:nguoidoc2}). Hai nhóm cộng lại là 158 lượt sửa, nhiều hơn 152 ô vì 6 lượt sửa xóa số bị chép nhầm
         vào ô vốn để trống nên sau khi sửa không còn là ô số; 2 BCTC thuộc cả hai nhóm. Từ mùa quý 3/2026, lần đọc thứ
-        hai chạy tự động nên các chỗ như vậy được hệ thống tự đánh dấu \enquote{cần xem lại}.
+        hai chạy tự động nên các chỗ như vậy được hệ thống tự đánh dấu \enquote{cần xem ảnh}.
 \end{itemize}
 
 Con số 99,5\% đo công việc của người vận hành: trong tất cả số đã đọc, bao nhiêu không cần người sửa. Với
@@ -1653,7 +1672,7 @@ như ở mục~\ref{sec:dapan}.
 Từ mùa BCTC quý 3/2026, lần đọc thứ hai chạy tự động cho mọi BCTC mới (mục~\ref{sec:bangchung}). Trên 119 BCTC, các báo
 cáo còn ô chưa kiểm được chiếm 395 trong 837 trang báo cáo, nên bước này tốn chưa tới một nửa so với chép lại toàn bộ.
 Trong 1.550 ô chưa kiểm được, 1.244 ô có hai lần đọc trùng nhau, gồm 264/279 ô lãi trên cổ phiếu và 342/368 ô ngoài
-bảng của ngân hàng. Ô hai lần đọc khác nhau được tô màu \enquote{cần xem lại} và báo cho quản trị, nhưng \textbf{không}
+bảng của ngân hàng. Ô hai lần đọc khác nhau được tô màu \enquote{cần xem ảnh} và báo cho quản trị, nhưng \textbf{không}
 làm BCTC mất trạng thái đạt kiểm chứng: người đọc thứ hai không nhất thiết đọc tốt hơn, nên nếu chặn theo nó thì mỗi
 lỗi của chính nó sẽ giữ cả BCTC lại chờ duyệt.
 

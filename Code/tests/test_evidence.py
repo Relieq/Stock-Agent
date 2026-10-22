@@ -164,3 +164,40 @@ def test_reviewer_confirms_first_reading_from_the_image():
     assert cell_status(q3, [], second)[("IS", "eps", "ytd_cur")]["status"] == "image_ok"
     q3.eps = {("IS", "eps"): {"ytd_cur": D(2_328)}}          # số đổi sau khi xác nhận: xác nhận hết hiệu lực
     assert cell_status(q3, [], second)[("IS", "eps", "ytd_cur")]["status"] == "second_differs"
+
+
+def test_third_quarter_may_match_semiannual_instead_of_second_quarter():
+    # MSN 2026: quý 2 in "chi phí lãi vay", bán niên và quý 3 in "chi phí đi vay" (khoản rộng hơn)
+    q2 = _cells(2, "Q2", {("IS", "24"): {"q_cur": 1_487_221, "ytd_cur": 2_701_778}})
+    h1 = _cells(3, "H1", {("IS", "24"): {"q_cur": 2_912_273}})       # bán niên: mô hình gán cột là q_*
+    q3 = _cells(4, "Q3", {("IS", "24"): {"q_cur": 1_415_293, "ytd_cur": 4_327_566}})
+    [check] = compare_periods(q2, q3)
+    assert not check.passed
+    [check] = compare_periods(q2, q3, h1)
+    assert check.passed and check.cells[-1] == (3, "IS", "24", "q_cur")
+    assert cell_status(q3, [check])[("IS", "24", "q_cur")]["status"] == "period"
+    assert cell_status(q2, [check])[("IS", "24", "ytd_cur")]["status"] == "none"     # bản quý 2 không còn bị nghi
+
+
+def test_image_confirmation_resolves_both_kinds_of_conflict():
+    q2 = _cells(2, "Q2", {("IS", "24"): {"ytd_cur": 2_701_778}})
+    q3 = _cells(4, "Q3", {("IS", "24"): {"q_cur": 1_415_293, "ytd_cur": 4_327_566}})
+    [check] = compare_periods(q2, q3)
+    entry = cell_status(q3, [check])[("IS", "24", "q_cur")]
+    assert (entry["status"], entry["reason"]) == ("conflict", "period")
+    # người duyệt xem ảnh cả hai bản: mỗi bản in đúng như đã đọc
+    q3.image_confirmed = {("IS", "24", "q_cur"): D(1_415_293), ("IS", "24", "ytd_cur"): D(4_327_566)}
+    q2.image_confirmed = {("IS", "24", "ytd_cur"): D(2_701_778)}
+    [check] = compare_periods(q2, q3)
+    assert cell_status(q3, [check])[("IS", "24", "q_cur")]["status"] == "differs"
+    # xác nhận gắn với con số: ô bị sửa thành số khác thì lại cần xem
+    q3.values[("IS", "24")]["q_cur"] = D(1_415_000)
+    [check] = compare_periods(q2, q3)
+    assert cell_status(q3, [check])[("IS", "24", "q_cur")]["status"] == "conflict"
+
+    one = _cells(5, "Q2", {("IS", "10"): {"q_cur": 7}})
+    one.sum_conflicts = {("IS", "10", "q_cur"): ["IS_10"]}       # chính BCTC cộng lệch
+    entry = cell_status(one, [])[("IS", "10", "q_cur")]
+    assert (entry["status"], entry["reason"]) == ("conflict", "sum")
+    one.image_confirmed = {("IS", "10", "q_cur"): D(7)}
+    assert cell_status(one, [])[("IS", "10", "q_cur")]["status"] == "image_ok"

@@ -21,23 +21,25 @@
     {% if head %}<span>· Doanh thu quý: <b>{{ head.get('rev_q_cur') | ty }}</b> tỷ (cùng kỳ {{ head.get('rev_q_prev_year') | ty }})</span>
     <span>· LNST quý: <b>{{ head.get('npat_q_cur') | ty }}</b> tỷ (cùng kỳ {{ head.get('npat_q_prev_year') | ty }})</span>{% endif %}
   </div>
-  {% if d.evidence_counts %}{% set n = d.evidence_counts %}{% set total = n.values() | sum %}
+  {% if d.evidence_chips %}{% set total = d.evidence_chips | map(attribute=2) | sum %}
   <div class="small">Bằng chứng cho {{ total }} ô số
     (đối chiếu với: {% for _, p, rel in d.peers %}{{ p }}{% if not loop.last %}, {% endif %}{% else %}chưa có BCTC kỳ liền kề đã đọc{% endfor %}):
-    {% for k, v in n.items() if v %}<span class="ev-{{ k }} chip">{{ EVIDENCE[k] }} {{ v }} ({{ (100 * v / total) | round | int }}%)</span> {% endfor %}
+    {% for k, label, v in d.evidence_chips %}<span class="ev-{{ k }} chip">{{ label }} {{ v }} ({{ (100 * v / total) | round | int }}%)</span> {% endfor %}
   </div>{% endif %}
   {% if record.note %}<div class="warnbox">{{ record.note }}</div>{% endif %}
-  {% if d.second_differs %}<div class="warnbox"><b>Hai lần đọc khác nhau, cần xem lại</b> (ô chưa có phép kiểm; mở trang ảnh để đối chiếu):
-    <ul>{% for c in d.second_differs %}<li>{{ c.name }} · dòng {{ c.index }} "{{ c.label }}" · {{ c.column_name }}: lần đọc đầu
-      <b>{{ c.first }}</b>, lần đọc thứ hai {{ c.second }} (trang {{ c.page }})
+  {% if d.review %}<div class="warnbox"><b>Ô cần xem ảnh</b> ({{ d.review | length }} ô; bấm tên dòng để mở đúng trang):
+    <ul>{% for c in d.review %}<li><a href="#" class="goto" data-st="{{ c.statement }}" data-row="{{ c.index }}" data-page="{{ c.page }}">{{ c.name }} · "{{ c.label }}" · {{ c.column_name }}</a>:
+      <b>{{ c.value }}</b> (trang {{ c.page }}). <i>{{ c.kind }}.</i>
+      {% for w in c.why %}<div class="small">{{ w }}</div>{% endfor %}
+      {% if c.others %}<div class="small">Xem cả ảnh BCTC kia: {% for d_id, p in c.others %}<a href="/tai-lieu/{{ d_id }}" target="_blank">{{ p or "tài liệu " ~ d_id }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
       {% if admin %}<form method="post" action="/duyet/{{ doc.id }}/dung-nhu-anh" class="inline">
         <input type="hidden" name="statement" value="{{ c.statement }}"><input type="hidden" name="key" value="{{ c.key }}">
         <input type="hidden" name="column" value="{{ c.column }}">
-        <button title="Đã xem ảnh gốc: số của lần đọc đầu đúng như in">Đúng như ảnh</button></form>{% endif %}</li>{% endfor %}</ul>
-    {% if admin %}<span class="small muted">Nếu lần đọc đầu sai thì sửa ô ở khung "Sửa tay" bên dưới.</span>{% endif %}</div>{% endif %}
+        <button title="{% if c.others %}Đã xem ảnh cả hai BCTC: mỗi bản in đúng như đã đọc{% else %}Đã xem ảnh gốc: số đã đọc đúng như in{% endif %}">Đúng như ảnh</button></form>{% endif %}</li>{% endfor %}</ul>
+    {% if admin %}<span class="small muted">Nếu số đã đọc sai thì sửa ô ở khung "Sửa tay" bên dưới.</span>{% endif %}</div>{% endif %}
   {% if d.missing %}<div class="warnbox"><b>Có thể thiếu dòng, cần xem lại</b> (phép cộng không bắt được việc thiếu cả một dòng):
     <ul>{% for t in d.missing %}<li>{{ t }}</li>{% endfor %}</ul></div>{% endif %}
-  {% if record.stt_code_swapped or record.codes_inferred or record.cf_positional or record.labels_repaired or record.extensions or d.rereads %}
+  {% if record.stt_code_swapped or record.codes_inferred or record.cf_positional or record.labels_repaired or (record.extensions or []) | selectattr("kept") | list or d.rereads %}
   <div class="infobox"><b>Hệ thống đã tự sửa</b> (ràng buộc kế toán xác nhận phương án sửa; nên đối chiếu ảnh):
     <ul>
     {% if record.stt_code_swapped %}<li>Mô hình chép đảo cột mã số và số thứ tự ở {{ record.stt_code_swapped | join(', ') }} (báo cáo@trang): đã đảo lại.</li>{% endif %}
@@ -88,9 +90,9 @@
       <span class="ev-sum">khớp cộng tổng</span> <span class="ev-none">chưa kiểm được</span>
       <span class="ev-restated">khác kỳ trước do trình bày lại</span> <span class="ev-differs">hai BCTC in khác nhau (công ty/kiểm toán sửa số)</span>
       <span class="ev-second">chưa có phép kiểm, hai lần đọc trùng nhau</span>
-      <span class="ev-second_differs">chưa có phép kiểm, hai lần đọc khác nhau</span>
-      <span class="ev-image_ok">hai lần đọc khác nhau, đã đối chiếu ảnh: lần đầu đúng</span>
-      <span class="ev-conflict">cần xem lại</span></p>
+      <span class="ev-image_ok">người duyệt đã đối chiếu ảnh: in đúng như vậy</span>
+      <span class="ev-second_differs">hai lần đọc ra hai số, cần xem ảnh</span>
+      <span class="ev-conflict">phép cộng không khớp, hoặc lệch với BCTC kỳ khác: cần xem ảnh</span></p>
     <div class="fswrap"><table class="fs">
       <thead><tr>{% if admin %}<th title="Vị trí dòng, dùng khi sửa tay">#</th>{% endif %}<th>STT</th><th>Mã</th><th>Chỉ tiêu</th><th>TM</th>{% for k, name in t.columns %}<th class="num">{{ name }}</th>{% endfor %}<th>Tr.</th></tr></thead>
       <tbody>
@@ -98,7 +100,7 @@
       <tr data-page="{{ r.page or (t.pages[0] if t.pages else 1) }}" data-st="{{ t.statement }}" data-row="{{ r.index }}" data-code="{{ r.code or '' }}" {% if r.flagged %}class="flag"{% endif %}>
         {% if admin %}<td class="muted small">{{ r.index }}</td>{% endif %}<td>{{ r.stt or "" }}</td>{% if r.code and "." in r.code and r.code.split(".")[-1].isdigit() %}<td class="code muted" title="BCTC không in mã dòng này: mã đặt theo vị trí dưới dòng tổng để kiểm phép cộng">{{ r.code }}</td>{% elif r.code and r.code.startswith("b.") %}<td class="code muted" title="BCTC ngân hàng không in mã số: mã chuẩn do hệ thống gán theo tên dòng">{{ r.code }}</td>{% else %}<td class="code">{{ r.code or "" }}</td>{% endif %}<td class="lbl">{{ r.label }}</td><td>{{ r.note or "" }}</td>
         {% for k, name in t.columns %}{% set ev = r.evidence.get(k) %}<td data-col="{{ k }}" data-raw="{{ r.values.get(k) or '' }}" class="num{% if ev %} ev-{{ ev.status }}{% endif %}"
-          {% if ev %}title="{{ EVIDENCE[ev.status] }}{% if ev.sum %}&#10;Cộng tổng: {{ ev.sum | join(', ') }}{% endif %}{% if ev.period %}&#10;Giữa các kỳ: {{ ev.period | join(', ') }}{% endif %}{% if ev.differs %}&#10;Khác: {{ ev.differs | join(', ') }}{% endif %}{% if ev.conflict %}&#10;Cần xem lại: {{ ev.conflict | join(', ') }}{% endif %}{% if ev.second_printed %}&#10;Lần đọc thứ hai: {{ ev.second_printed }}{% endif %}"{% endif %}>{{ r.values.get(k) or "" }}</td>{% endfor %}
+          {% if ev %}title="{{ ev.label }}{% for w in ev.why %}&#10;{{ w }}{% endfor %}{% if ev.sum %}&#10;Cộng tổng: {{ ev.sum | join(', ') }}{% endif %}{% if ev.period %}&#10;Giữa các kỳ: {{ ev.period | join(', ') }}{% endif %}{% if ev.differs %}&#10;Khác: {{ ev.differs | join(', ') }}{% endif %}"{% endif %}>{{ r.values.get(k) or "" }}</td>{% endfor %}
         <td class="muted">{{ r.page or "" }}</td>
       </tr>
       {% endfor %}
@@ -212,6 +214,14 @@ document.querySelectorAll('tr[data-page]').forEach(tr => tr.onclick = () => {
   document.querySelectorAll('tr.sel').forEach(x => x.classList.remove('sel'));
   tr.classList.add('sel');
   if (+tr.dataset.page !== +no.value) show(tr.dataset.page);
+});
+{# Danh sách ô cần xem ảnh: mở đúng bảng, tô dòng và hiện đúng trang #}
+document.querySelectorAll('a.goto').forEach(a => a.onclick = ev => {
+  ev.preventDefault();
+  const b = document.querySelector('.tabs button[data-tab="' + a.dataset.st + '"]');
+  if (b) b.click();
+  const tr = document.querySelector('tr[data-st="' + a.dataset.st + '"][data-row="' + a.dataset.row + '"]');
+  if (tr) { tr.click(); tr.scrollIntoView({behavior: 'smooth', block: 'center'}); } else show(a.dataset.page);
 });
 const first = document.querySelector('.tab:not([hidden])');
 show(first && first.dataset.pages ? first.dataset.pages.split(',')[0] : 1);

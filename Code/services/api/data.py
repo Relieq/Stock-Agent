@@ -13,7 +13,7 @@ from services.extraction.pipeline import _check, _read_text, _record_files, _rot
 from services.extraction.rules import BANK_INCOME_PARTS, RULESETS
 from services.extraction.sources import candidates, open_pdf, render_page
 from services.ingestion.registry import raw_data_dir
-from services.extraction.evidence import cells_of, document_evidence
+from services.extraction.evidence import CONFLICT_LABELS, STATUS_LABELS, cells_of, document_evidence
 from services.metrics.canonical import code_for
 
 COLUMNS = {
@@ -75,6 +75,71 @@ def _formula(template: str | None, rule_id: str) -> tuple[str, str | None, set[s
     return rule_id, None, set()
 
 
+def _printed(v: Decimal, mult: Decimal) -> str:
+    """Số theo đơn vị in trên BCTC, dấu chấm ngăn nghìn như bảng."""
+    p = v / mult
+    s = f"{abs(p):,.0f}" if p == p.to_integral() else f"{abs(p):,.2f}"
+    return ("−" if p < 0 else "") + s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _period_text(pc, mult: Decimal, period_of: dict[int, str]) -> str:
+    """Một chỗ lệch giữa hai BCTC, viết cho người duyệt, số theo đơn vị in của BCTC đang xem."""
+    later = period_of.get(pc.cells[0][0], "này")
+    other = period_of.get(pc.cells[-1][0], "kia")
+    f = lambda v: _printed(v, mult)        # noqa: E731
+    if pc.kind == "is_quarter" and pc.base is not None:
+        year = "năm trước" if pc.column == "q_prev_year" else "năm nay"
+        return (f"Cột {year}: số quý phải bằng lũy kế {later} trừ lũy kế {other}, tức {f(pc.base)} − "
+                f"{f(pc.base - pc.expected)} (BCTC {other}) = {f(pc.expected)}; BCTC {later} in {f(pc.later)}, "
+                f"lệch {f(pc.diff)}")
+    what = {"bs_begin": "Số đầu năm", "same_date": "Cùng ngày kết thúc kỳ",
+            "year_start": "Số đầu năm (bằng cuối năm trước)"}.get(pc.kind, pc.kind)
+    return f"{what}: BCTC {later} in {f(pc.later)}, BCTC {other} in {f(pc.expected)}, lệch {f(pc.diff)}"
+
+
+def cell_reasons(evidence, template: str | None) -> dict[tuple[str, str, str], list[str]]:
+    """Vì sao từng ô của tài liệu đang xem cần xem ảnh, bằng lời và có số."""
+    if evidence is None:
+        return {}
+    cells = evidence.cells
+    period_of = {cells.document_id: cells.period, **{d: p for d, p, _ in evidence.peers}}
+    out: dict[tuple[str, str, str], list[str]] = {}
+    for pc in evidence.period_checks:
+        if not pc.suspect_misread:
+            continue
+        text = _period_text(pc, cells.multiplier.get(pc.statement, Decimal(1)), period_of)
+        for d, st, key, col in pc.cells:
+            if d == cells.document_id:
+                out.setdefault((st, key, col), []).append(text)
+    for cell, rules in cells.sum_conflicts.items():
+        out.setdefault(cell, []).extend(f"Phép cộng không khớp: {_formula(template, r)[0]}" for r in rules)
+    for cell, e in evidence.status.items():
+        if "Q1: quý ≠ lũy kế" in e.get("conflict", []):
+            out.setdefault(cell, []).append("Quý 1: số quý phải bằng số lũy kế nhưng hai cột in khác nhau")
+    return out
+
+
+def cell_label(e: dict) -> str:
+    return CONFLICT_LABELS.get(e.get("reason"), STATUS_LABELS["conflict"]) if e["status"] == "conflict" \
+        else STATUS_LABELS[e["status"]]
+
+
+def evidence_chips(evidence) -> list[tuple[str, str, int]]:
+    """(lớp màu, nhãn, số ô) cho dòng tóm tắt; ô cần xem ảnh tách theo lý do."""
+    if evidence is None:
+        return []
+    out = []
+    for k, v in evidence.counts().items():
+        if k == "conflict":
+            for reason, label in CONFLICT_LABELS.items():
+                n = sum(1 for e in evidence.status.values() if e["status"] == "conflict" and e.get("reason") == reason)
+                if n:
+                    out.append(("conflict", label, n))
+        elif v:
+            out.append((k, STATUS_LABELS[k], v))
+    return out
+
+
 @dataclass
 class Row:
     stt: str | None
@@ -103,20 +168,35 @@ def detail(record: dict, evidence=None) -> dict:
 
     chosen = next(c for c in record["candidates"] if c["name"] == record["chosen"])
     tables = []
-    second_differs = []       # ô hai lần đọc khác nhau: người duyệt xem ảnh rồi bấm "đúng như ảnh" hoặc sửa tay
+    # Ô cần xem ảnh (phép cộng không khớp, lệch với BCTC kỳ khác, hai lần đọc ra hai số): người duyệt xem ảnh rồi bấm
+    # "đúng như ảnh" hoặc sửa tay
+    review = []
+    reasons = cell_reasons(evidence, template)
+    period_of = {d: p for d, p, _ in evidence.peers} if evidence else {}
+    other_docs: dict[tuple, set[int]] = {}
+    for pc in evidence.period_checks if evidence else []:
+        if pc.suspect_misread and any(d == evidence.cells.document_id for d, *_ in pc.cells):
+            for d, st, key, col in pc.cells:
+                if d == evidence.cells.document_id:
+                    other_docs.setdefault((st, key, col), set()).update(x for x, *_ in pc.cells if x != d)
     for st in extracted:
         keys = evidence.cells.item_keys.get(st.statement, []) if evidence else []
         rows = []
         for i, it in enumerate(st.items):
             key = keys[i] if i < len(keys) else None
-            ev = {col: evidence.status[(st.statement, key, col)] for col in it.values_raw
+            ev = {col: dict(evidence.status[(st.statement, key, col)]) for col in it.values_raw
                   if key and (st.statement, key, col) in evidence.status} if evidence else {}
             for col, e in ev.items():
+                e["label"], e["why"] = cell_label(e), reasons.get((st.statement, key, col), [])
                 if e["status"] == "second_differs":
-                    second_differs.append({"statement": st.statement, "name": STATEMENT_NAMES[st.statement],
-                                           "key": key, "column": col, "column_name": dict(COLUMNS[st.statement]).get(col, col),
-                                           "label": it.label, "first": it.values_raw.get(col),
-                                           "second": e.get("second_printed"), "page": it.page, "index": i})
+                    e["why"] = [f"Lần đọc thứ hai (nhà cung cấp mô hình khác) ra {e.get('second_printed')}"]
+                if e["status"] in ("conflict", "second_differs"):
+                    review.append({"statement": st.statement, "name": STATEMENT_NAMES[st.statement],
+                                   "key": key, "column": col, "column_name": dict(COLUMNS[st.statement]).get(col, col),
+                                   "label": it.label, "value": it.values_raw.get(col), "kind": e["label"],
+                                   "why": e["why"], "page": it.page, "index": i,
+                                   "others": [(d, period_of.get(d, "")) for d in sorted(other_docs.get(
+                                       (st.statement, key, col), ()))]})
             rows.append(Row(it.stt, it.code, it.label, it.note, it.page, it.values_raw,
                             bool(it.code) and it.code in flagged.get(st.statement, set()), ev, i))
         tables.append({"statement": st.statement, "name": STATEMENT_NAMES[st.statement], "unit": st.unit_raw,
@@ -132,14 +212,14 @@ def detail(record: dict, evidence=None) -> dict:
                                     "restated": pc.restated, "suspect": pc.suspect_misread,
                                     "verdict": ("BCTC ghi trình bày lại" if pc.restated else
                                                 "Cần xem lại" if pc.suspect_misread else
-                                                "Đọc lại vẫn vậy: hai BCTC in khác nhau" if pc.verified else
+                                                "Đọc lại hoặc đối chiếu ảnh vẫn vậy: hai BCTC in khác nhau" if pc.verified else
                                                 "Cộng tổng hai bên đều khớp: hai BCTC in khác nhau" if pc.consistent else
                                                 "Chênh lớn, không phải dạng đọc sai: nhiều khả năng soát xét sửa số")})
     return {"template": template, "sep": sep, "tables": tables, "checks": check_rows, "period_conflicts": period_rows,
             "evidence_counts": evidence.counts() if evidence else None,
             "peers": evidence.peers if evidence else [],
             "missing": [m.describe() for m in evidence.missing] if evidence else [],
-            "second_differs": second_differs,
+            "review": review, "evidence_chips": evidence_chips(evidence),
             "duplicate_codes": record.get("duplicate_codes") or {},
             "rereads": record.get("rereads", []), "reextracts": record.get("reextracts", []),
             "page_count": chosen["page_count"], "chosen": record["chosen"]}

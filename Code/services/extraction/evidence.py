@@ -60,6 +60,10 @@ class Cells:
     def row(self, st: str, key: str) -> dict[str, Decimal]:
         return self.values.get((st, key)) or self.eps.get((st, key), {})
 
+    def confirmed(self, cell: tuple[str, str, str]) -> bool:
+        """Ô đã có người xác nhận trên ảnh gốc là in đúng như số hiện có (ô đổi số thì xác nhận hết hiệu lực)."""
+        return cell in self.image_confirmed and self.image_confirmed[cell] == self.row(*cell[:2]).get(cell[2])
+
 
 def label_key(label: str) -> str:
     return "~" + fold(clean_label(label))
@@ -160,6 +164,7 @@ class PeriodCheck:
     consistent: bool = False
     # Mọi ô liên quan đã được đọc lại riêng ở ảnh nét hơn (verify.py) và vẫn ra như lần đầu: hai lần đọc trùng nhau
     verified: bool = False
+    base: Decimal | None = None   # KQKD quý: lũy kế kỳ này (expected = base - lũy kế kỳ trước), để viết lời giải thích
 
     @property
     def suspect_misread(self) -> bool:
@@ -203,16 +208,26 @@ def _mark_consistency(checks: list[PeriodCheck], *docs: Cells) -> list[PeriodChe
     by_id = {d.document_id: d for d in docs}
     for pc in checks:
         pc.consistent = all((st, key, col) in by_id[doc_id].sum_evidence for doc_id, st, key, col in pc.cells)
-        pc.verified = all((st, key, col) in by_id[doc_id].verified for doc_id, st, key, col in pc.cells)
+        # Đọc lại ở ảnh nét hơn vẫn ra như cũ, hoặc người duyệt đã xem ảnh cả hai BCTC: số in đúng như đã đọc
+        pc.verified = all((st, key, col) in by_id[doc_id].verified or by_id[doc_id].confirmed((st, key, col))
+                          for doc_id, st, key, col in pc.cells)
     return checks
 
 
-def compare_periods(earlier: Cells, later: Cells) -> list[PeriodCheck]:
-    """Đối chiếu hai BCTC quý liên tiếp trong cùng năm tài chính (earlier là quý trước của later)."""
+def compare_periods(earlier: Cells, later: Cells, half_year: Cells | None = None) -> list[PeriodCheck]:
+    """Đối chiếu hai BCTC quý liên tiếp trong cùng năm tài chính (earlier là quý trước của later).
+
+    `half_year`: BCTC bán niên khi earlier là quý 2. Bản soát xét có thể đổi số hoặc cách tính một dòng so với bản quý 2
+    (MSN 2026: quý 2 in "chi phí lãi vay", bán niên và quý 3 in "chi phí đi vay"), nên quý 3 khớp với lũy kế 6 tháng
+    của bản nào cũng được coi là đạt."""
     out: list[PeriodCheck] = []
 
     def tol(st: str) -> Decimal:
         return max(earlier.multiplier.get(st, Decimal(1)), later.multiplier.get(st, Decimal(1))) * 3
+
+    def matches(q: Decimal, ytd: Decimal, before: Decimal, st: str) -> bool:
+        return abs(q - (ytd - before)) <= tol(st) * 2 or \
+            abs(q - (ytd + before)) <= tol(st) * 2 and q * ytd >= 0 > ytd * before
 
     for (st, key), lv in later.values.items():
         ev = earlier.values.get((st, key))
@@ -229,13 +244,17 @@ def compare_periods(earlier: Cells, later: Cells) -> list[PeriodCheck]:
                 e_ytd_col = ytd if ytd in ev else (q if earlier.period == "Q1" and q in ev else None)
                 if q not in lv or ytd not in lv or e_ytd_col is None:
                     continue
-                expected = lv[ytd] - ev[e_ytd_col]
-                passed = abs(lv[q] - expected) <= tol(st) * 2 or                     abs(lv[q] - (lv[ytd] + ev[e_ytd_col])) <= tol(st) * 2 and lv[q] * lv[ytd] >= 0 > lv[ytd] * ev[e_ytd_col]
-                out.append(PeriodCheck("is_quarter", st, key, q, lv[q], expected, passed,
+                before, source = ev[e_ytd_col], (earlier, e_ytd_col)
+                passed = matches(lv[q], lv[ytd], before, st)
+                hv = half_year.values.get((st, key), {}) if half_year is not None else {}
+                h_col = next((c for c in (ytd, TWIN[ytd]) if c in hv), None)
+                if not passed and h_col is not None and matches(lv[q], lv[ytd], hv[h_col], st):
+                    before, source, passed = hv[h_col], (half_year, h_col), True
+                out.append(PeriodCheck("is_quarter", st, key, q, lv[q], lv[ytd] - before, passed,
                                        any((st, c) in s.restated for c in (q, ytd) for s in (earlier, later)),
                                        [(later.document_id, st, key, q), (later.document_id, st, key, ytd),
-                                        (earlier.document_id, st, key, e_ytd_col)]))
-    return _mark_consistency(out, earlier, later)
+                                        (source[0].document_id, st, key, source[1])], base=lv[ytd]))
+    return _mark_consistency(out, earlier, later, *([half_year] if half_year is not None else []))
 
 
 def compare_same_date(quarter: Cells, period_report: Cells) -> list[PeriodCheck]:
@@ -284,16 +303,21 @@ def compare_year_start(year_end: Cells, next_q1: Cells) -> list[PeriodCheck]:
 
 # Trạng thái một ô, từ mạnh đến yếu
 STATUS_LABELS = {
-    "conflict": "Cần xem lại",
+    "conflict": "Cần xem ảnh",
     "differs": "Hai BCTC in khác nhau (công ty hoặc kiểm toán đã sửa số)",
     "both": "Khớp cộng tổng và giữa các kỳ",
     "period": "Khớp giữa các kỳ",
     "sum": "Khớp cộng tổng",
     "restated": "Khác kỳ trước do trình bày lại",
     "second": "Chưa có phép kiểm; hai lần đọc độc lập trùng nhau",
-    "second_differs": "Chưa có phép kiểm; hai lần đọc khác nhau, cần xem lại",
-    "image_ok": "Hai lần đọc khác nhau; người duyệt đã đối chiếu ảnh, lần đọc đầu đúng",
+    "second_differs": "Hai lần đọc ra hai số, cần xem ảnh",
+    "image_ok": "Người duyệt đã đối chiếu ảnh: in đúng như vậy",
     "none": "Chưa kiểm được",
+}
+# Ô "conflict" theo lý do (entry["reason"]), để người duyệt biết phải tìm gì trên ảnh
+CONFLICT_LABELS = {
+    "sum": "Phép cộng không khớp: có thể đọc sai, cần xem ảnh",
+    "period": "Lệch với BCTC kỳ khác: đọc sai hoặc công ty in khác, cần xem ảnh",
 }
 
 # BCTC bán niên/năm chỉ in một cặp cột cả kỳ; mỗi lần chép có thể ghi vào q_* hoặc ytd_*
@@ -345,7 +369,9 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | 
             cell = (st, key, col)
             sums, bad_sum = cells.sum_evidence.get(cell, []), cells.sum_conflicts.get(cell, [])
             per, bad_per = period_ok.get(cell, []), period_bad.get(cell, [])
-            if bad_sum or bad_per:
+            if bad_sum and not bad_per and cells.confirmed(cell):
+                status = "image_ok"         # BCTC tự cộng lệch, người duyệt đã xem ảnh: số in đúng như vậy
+            elif bad_sum or bad_per:
                 status = "conflict"
             elif cell in period_differs:
                 status = "differs"
@@ -360,7 +386,7 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | 
             else:
                 status = "none"
             entry = {"status": status, "sum": sums, "period": per, "conflict": bad_sum + bad_per,
-                     "differs": period_differs.get(cell, [])}
+                     "differs": period_differs.get(cell, []), "reason": "sum" if bad_sum else "period" if bad_per else None}
             if status == "none" and second is not None:
                 b = second_value(cells, second, cell, doc_type)
                 if b is not None:
@@ -381,8 +407,10 @@ def cell_status(cells: Cells, period_checks: list[PeriodCheck], second: Cells | 
             if twin is not None:
                 if twin == a:
                     entry.update(status="sum", sum=["Q1: quý = lũy kế"])
+                elif cells.confirmed(cell):
+                    entry.update(status="image_ok")
                 else:
-                    entry.update(status="conflict", conflict=["Q1: quý ≠ lũy kế"])
+                    entry.update(status="conflict", conflict=["Q1: quý ≠ lũy kế"], reason="sum")
                 out[cell] = entry
                 continue
             b = second_value(cells, second, cell, doc_type) if second is not None else None
@@ -490,7 +518,8 @@ def neighbours(conn, document_id: int) -> list[tuple[int, str, str]]:
     Quan hệ: "earlier"/"later" = quý liền trước/liền sau; "report" = BCTC cả kỳ cùng ngày kết thúc với quý này
     (bán niên cho quý 2, năm cho quý 4); "quarter" = BCTC quý cùng ngày kết thúc với BCTC cả kỳ này;
     "prev_year_end"/"next_year_start" = quý 4 năm trước / quý 1 năm sau (cuối năm trước là đầu năm nay);
-    "prev_year_same" = BCTC cùng kỳ năm trước (chỉ dùng để tìm dòng thiếu, xem missing_rows).
+    "prev_year_same" = BCTC cùng kỳ năm trước (chỉ dùng để tìm dòng thiếu, xem missing_rows);
+    "half_year" = BCTC bán niên của quý 3 (lũy kế 6 tháng thay cho bản quý 2, xem compare_periods).
     Kỳ của BCTC khác năm được ghi kèm năm, ví dụ "Q4/2025".
     """
     row = conn.execute("SELECT ticker, scope, fiscal_year, fiscal_period, doc_type FROM documents WHERE id = %s",
@@ -504,6 +533,8 @@ def neighbours(conn, document_id: int) -> list[tuple[int, str, str]]:
         wanted += [("fs_quarter", p, "earlier" if p_i < i else "later", year)
                    for p_i, p in enumerate(PERIOD_ORDER) if abs(p_i - i) == 1]
         wanted += [(t, rp, "report", year) for q, t, rp in SAME_DATE if q == period]
+        if period == "Q3":
+            wanted.append(("fs_semiannual", "H1", "half_year", year))
         if period == "Q1":
             wanted.append(("fs_quarter", "Q4", "prev_year_end", year - 1))
         if period == "Q4":
@@ -563,18 +594,23 @@ def document_evidence(conn, document_id: int, load=None, cells_fn=None) -> Docum
     missing = [MissingRow(st, code, REQUIRED_NAMES.get(code, code), "required")
                for st, code, _ in cells.required_missing]
     peers = neighbours(conn, document_id)
+    loaded: list[tuple[Cells, str]] = []
     for peer_id, peer_period, relation in peers:
         peer_record = _load(peer_id)
-        if peer_record is None:
-            continue
-        peer = cells_fn(peer_id, peer_period, peer_record)
+        if peer_record is not None:
+            loaded.append((cells_fn(peer_id, peer_period, peer_record), relation))
+    # Bán niên đứng cạnh cặp quý 2 - quý 3: với quý 3 là "half_year", với quý 2 là "report"
+    half = next((p for p, rel in loaded if rel == "half_year" or rel == "report" and p.period == "H1"), None)
+    for peer, relation in loaded:
         seen = {(m.statement, m.key) for m in missing}
         missing += [m for m in missing_rows(cells, peer, relation) if (m.statement, m.key) not in seen]
-        checks += {"earlier": lambda: compare_periods(peer, cells), "later": lambda: compare_periods(cells, peer),
+        checks += {"earlier": lambda: compare_periods(peer, cells, half if peer.period == "Q2" else None),
+                   "later": lambda: compare_periods(cells, peer, half if cells.period == "Q2" else None),
                    "report": lambda: compare_same_date(cells, peer), "quarter": lambda: compare_same_date(peer, cells),
                    "prev_year_end": lambda: compare_year_start(peer, cells),
                    "next_year_start": lambda: compare_year_start(cells, peer),
                    "prev_year_same": lambda: [],     # chỉ dùng để tìm dòng thiếu
+                   "half_year": lambda: [],          # chỉ dùng trong compare_periods
                    }[relation]()
     return DocumentEvidence(cells, checks, cell_status(cells, checks, second, period[1]), peers, missing)
 

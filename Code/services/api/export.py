@@ -28,8 +28,8 @@ FILLS = {"both": "CDEED6", "period": "E3F4E8", "sum": "EEF7F0", "none": "F1F2F4"
 SHORT = {"both": "khớp cộng tổng và giữa các kỳ", "period": "khớp giữa các kỳ", "sum": "khớp cộng tổng",
          "none": "chưa kiểm được", "restated": "khác kỳ trước do trình bày lại",
          "differs": "hai BCTC in khác nhau", "second": "chưa có phép kiểm, hai lần đọc trùng",
-         "second_differs": "hai lần đọc khác nhau, cần xem lại", "image_ok": "đã đối chiếu ảnh",
-         "conflict": "cần xem lại"}
+         "second_differs": "hai lần đọc ra hai số, cần xem ảnh", "image_ok": "đã đối chiếu ảnh",
+         "conflict": "cần xem ảnh"}
 BOLD = Font(bold=True)
 
 

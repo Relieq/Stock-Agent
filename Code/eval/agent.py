@@ -39,6 +39,13 @@ def load_golden(limit: int | None = None) -> list[dict]:
     return rows[:limit] if limit else rows
 
 
+def write_case(g: dict) -> dict:
+    """Câu và kế hoạch dùng cho phép đo viết: câu có `write_as` (kỳ gốc chưa có BCTC trong kho, ví dụ quý 3 khi công ty
+    chưa công bố) được đo trên bản dời sang kỳ đã có số; phép đo hiểu yêu cầu vẫn dùng câu gốc."""
+    w = g.get("write_as")
+    return {"q": w["q"], "expect": g["expect"] | w["expect"]} if w else {"q": g["q"], "expect": g["expect"]}
+
+
 def score_plan(got: dict, expect: dict) -> dict[str, bool]:
     out = {}
     for f in FIELDS + (SCREEN_FIELDS if expect["kind"] == "screen" else ()):
@@ -219,7 +226,7 @@ class EvalDeps:
     def understand(self, question):
         from services.analyst import store
         from services.analyst.plan import Plan, check_plan
-        e = self.gold["expect"]
+        e = write_case(self.gold)["expect"]
         plan = Plan(e["kind"], e["tickers"], e["year"], e["period"], e["basis"], [], [], e["advice_request"],
                     e.get("sector", "all"), e.get("measure", "growth"))
         known = self.real.known_tickers()
@@ -341,7 +348,7 @@ def cmd_write(args) -> None:
                     pass
                 deps = holder["deps"] = EvalDeps(conn, client, g, letter_dir=out_dir(args.provider) / "explanations")
                 build(deps, InMemorySaver()).invoke(
-                    {"report_id": 0, "question": g["q"]},
+                    {"report_id": 0, "question": write_case(g)["q"]},
                     {"configurable": {"thread_id": str(g["id"])}, "recursion_limit": 60})
                 return deps
 

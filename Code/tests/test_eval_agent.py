@@ -192,3 +192,12 @@ def test_outcome_follows_what_the_system_does():
     # bỏ sót một mã thì khác
     two = dict(exp, kind="compare", tickers=["TCB", "PLX"])
     assert agent_eval.outcome(dict(two, tickers=["TCB"]), real) != agent_eval.outcome(two, real)
+
+
+def test_write_case_moves_only_the_write_eval_to_a_period_with_data():
+    g = {"q": "So sánh KQKD quý 3/2026 của VCB và TCB", "expect": {"kind": "compare", "period": "Q3", "year": 2026},
+         "write_as": {"q": "So sánh KQKD quý 2/2026 của VCB và TCB", "expect": {"period": "Q2"}}}
+    w = agent_eval.write_case(g)
+    assert w["q"].endswith("quý 2/2026 của VCB và TCB") and w["expect"] == {"kind": "compare", "period": "Q2", "year": 2026}
+    assert g["expect"]["period"] == "Q3"            # đáp án của phép đo hiểu yêu cầu giữ nguyên
+    assert agent_eval.write_case({"q": "x", "expect": {"period": "Q1"}}) == {"q": "x", "expect": {"period": "Q1"}}

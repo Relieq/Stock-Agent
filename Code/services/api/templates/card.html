@@ -72,9 +72,9 @@
   </section>
 
   {% if card.not_evaluated %}<p class="small muted">Chưa xét được: {{ card.not_evaluated | join('; ') }}</p>{% endif %}
-  {% if info.causes %}
+  {% if info.causes and admin %}
   <section class="causes">
-    <h2>Vì sao lợi nhuận thay đổi <span class="muted small">(AI viết từ bảng số do code tính trên BCTC đã kiểm chứng và thuyết minh; mỗi con số được kiểm lại)</span></h2>
+    <h2>Vì sao lợi nhuận thay đổi <span class="badge warn">thử nghiệm, chỉ quản trị thấy</span> <span class="muted small">(AI viết từ bảng số do code tính trên BCTC đã kiểm chứng và thuyết minh; mỗi con số được kiểm lại, nhưng câu vẫn có thể gây hiểu nhầm)</span></h2>
     <ul class="reasons">{% for s in info.causes.sentences %}
       <li>{{ s.text }}{% if s.sources %} <span class="small muted">· nguồn: {% for x in s.sources %}<button class="src link" data-doc="{{ x.document_id }}" data-page="{{ x.page }}">{{ x.label | trim }} (trang {{ x.page }})</button>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
   </section>{% endif %}

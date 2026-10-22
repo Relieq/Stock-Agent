@@ -198,7 +198,12 @@ def card_page(request: Request, ticker: str, ky: str | None = None):
     card, info = got if got else (None, None)
     return templates.TemplateResponse(request, "card.html", {
         "ticker": ticker, "name": name[0], "year": year, "period": period, "card": card, "info": info,
-        "doc_id": doc_id, "quarters": quarters, "watching": watching, "private": False, "site": site_url()})
+        "doc_id": doc_id, "quarters": quarters, "watching": watching, "private": False, "site": site_url(),
+        "admin": _is_admin(request)})
+
+
+def _is_admin(request: Request) -> bool:
+    return request.state.user is not None and request.state.user.is_admin
 
 
 @app.get("/the/{doc_id}")
@@ -210,7 +215,8 @@ def card_by_document(request: Request, doc_id: int):
     card, info = got if got else (None, None)
     return templates.TemplateResponse(request, "card.html", {
         "ticker": doc["ticker"], "name": doc["name"], "year": doc["year"], "period": doc["period"], "card": card,
-        "info": info, "doc_id": doc_id, "quarters": [], "watching": False, "private": doc["owner"] is not None})
+        "info": info, "doc_id": doc_id, "quarters": [], "watching": False, "private": doc["owner"] is not None,
+        "admin": _is_admin(request)})
 
 
 @app.get("/api/the/{ticker}")
@@ -225,8 +231,9 @@ def card_api(ticker: str, ky: str | None = None):
     if not info["published"]:
         return {"ticker": ticker.upper(), "year": year, "period": period, "published": False,
                 "status": info["status"]}
+    # Đoạn "vì sao lợi nhuận thay đổi" đang thử nghiệm: chỉ quản trị xem trên trang, không đưa ra API công khai
     return {"published": True, "info": {k: (str(v) if v is not None and k.endswith("_at") else v)
-                                        for k, v in info.items()}, "card": card_dict(card)}
+                                        for k, v in info.items() if k != "causes"}, "card": card_dict(card)}
 
 
 @app.get("/noi-bo")

@@ -147,7 +147,7 @@ class CauseAgent:
             if ref_text(*ref) in seen:
                 continue                     # nhiều dòng dùng chung một thuyết minh (SSI: doanh thu hoạt động, mục 30)
             seen.add(ref_text(*ref))
-            nt = None
+            nt, matched = None, c
             same = [c] + [k for k in self.st.values if k != c and
                           ref in note_refs(getattr(self.facts.rows.get(("IS", k)), "note", None))]
             for c2 in same:
@@ -156,8 +156,11 @@ class CauseAgent:
                                                          "ytd": (v.get("ytd_cur"), v.get("ytd_prev_year"))},
                                 self.st.multiplier * 5)
                 if nt.items:
+                    matched = c2
                     break
-            out.append({"tool": "note", "line": c, "for": code, "number": ref_text(*ref), "title": nt.title, "pages": nt.pages,
+            # "line": dòng KQKD mà bảng thật sự khớp (MWG quý 2: thuyết minh 24 gồm cả doanh thu và doanh thu tài chính;
+            # đọc cho dòng doanh thu nhưng phần khớp là doanh thu tài chính)
+            out.append({"tool": "note", "line": matched, "for": code, "number": ref_text(*ref), "title": nt.title, "pages": nt.pages,
                         "period": nt.period, "verified": nt.verified, "note": nt.note,
                         "items": [[lab, str(a), str(b)] for lab, a, b in nt.items]})
         return out
@@ -257,7 +260,8 @@ class CauseAgent:
                 items = sorted(((lab, Decimal(a), Decimal(b)) for lab, a, b in g["items"]),
                                key=lambda i: -abs(i[1] - i[2]))[:3]
                 for lab, a, b in items:
-                    sh.add("note_item", f"Thuyết minh {g['title'].lower()}, {per} của {self.ticker}: {lab} {ty(a)}, "
+                    line = self.labels.get(g["line"], g["title"]).strip()
+                    sh.add("note_item", f"Thuyết minh của dòng {line} (KQKD), {per} của {self.ticker}: {lab} {ty(a)}, "
                                         f"cùng kỳ {ty(b)} ({'tăng' if a >= b else 'giảm'} {ty(a - b)})",
                            ticker=self.ticker, names=[lab.lower()],
                            sources=[{"document_id": self.doc_id, "page": g["pages"][0] if g["pages"] else None,

@@ -287,6 +287,13 @@ def match_note(raw: dict | None, number: int, pairs: dict[str, tuple[Decimal, De
                                  sg * abs(val(r, jp) or Decimal(0)) * scale if sg < 0 else (val(r, jp) or Decimal(0)) * scale)
                                 for r, sg in zip(items, signs)]
                     if not nt.verified:
+                        sub = _subset(items, val, jc, jp, cur, prev, scale, tolerance)
+                        if sub is not None:
+                            nt.verified = True
+                            nt.items = [(r["label"], (val(r, jc) or Decimal(0)) * scale,
+                                         (val(r, jp) or Decimal(0)) * scale) for r in sub]
+                            nt.note = "khoản con cấp trên của bảng có khoản lồng nhau"
+                            return nt
                         nt.note = "dòng tổng khớp KQKD nhưng các khoản con cộng không ra tổng (bảng có khoản lồng nhau)"
                     return nt
     block = _find_block(rows, val, ncol, pairs, tolerance)
@@ -298,6 +305,30 @@ def match_note(raw: dict | None, number: int, pairs: dict[str, tuple[Decimal, De
         return nt
     nt.note = "tổng các khoản không bằng dòng KQKD ở kỳ này và cùng kỳ"
     return nt
+
+
+MAX_SUBSET_ROWS = 16
+
+
+def _subset(items, val, jc, jp, cur, prev, scale, tolerance):
+    """Bảng có khoản lồng nhau (dòng "trong đó", dòng con thụt vào): tìm tập con các dòng cộng ra đúng dòng KQKD ở CẢ
+    cột kỳ này lẫn cột cùng kỳ (hai cột cùng khớp thì khó trùng ngẫu nhiên). Nhiều tập con cùng khớp thì lấy tập nhiều
+    dòng nhất (chi tiết nhất); vẫn hòa thì không chọn. Trả về các dòng theo thứ tự trong bảng hoặc None."""
+    rows = [r for r in items if val(r, jc) is not None or val(r, jp) is not None][:MAX_SUBSET_ROWS]
+    vc = [(val(r, jc) or Decimal(0)) * scale for r in rows]
+    vp = [(val(r, jp) or Decimal(0)) * scale for r in rows]
+    best, tie = None, False
+    for mask in range(3, 1 << len(rows)):
+        if mask & (mask - 1) == 0:
+            continue                     # một dòng thì chính là dòng tổng, không phải khoản con
+        idx = [i for i in range(len(rows)) if mask >> i & 1]
+        tol = max(tolerance, scale * (len(idx) + 1))
+        if abs(abs(sum(vc[i] for i in idx)) - abs(cur)) <= tol and abs(abs(sum(vp[i] for i in idx)) - abs(prev)) <= tol:
+            if best is None or len(idx) > len(best):
+                best, tie = idx, False
+            elif len(idx) == len(best):
+                tie = True
+    return None if best is None or tie else [rows[i] for i in best]
 
 
 MAX_BLOCK = 15

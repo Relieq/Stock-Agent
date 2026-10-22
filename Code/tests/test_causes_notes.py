@@ -61,3 +61,16 @@ def test_section_numbering_refs():
     assert note_refs("VI.14") == [(6, 14)] and note_refs("26, 28") == [(None, 26), (None, 28)]
     assert note_refs("VI.12.2") == [(6, 12)] and note_refs("V.4(c)") == [(5, 4)]
     assert ref_text(6, 14) == "VI.14" and ref_text(None, 27) == "27"
+
+
+def test_nested_table_subset_matches_both_columns_or_nothing():
+    raw = {"title": "THU NHẬP LÃI", "pages": [30], "columns": ["6T/2026", "6T/2025"], "rows": [
+        {"label": "Lãi tiền gửi", "values": ["4.462", "2.995"], "is_total": False},
+        {"label": "Lãi cho vay", "values": ["79.470", "62.791"], "is_total": False},
+        {"label": "Lãi chứng khoán nợ", "values": ["6.479", "4.974"], "is_total": False},
+        {"label": "- kinh doanh", "values": ["634", "127"], "is_total": False},
+        {"label": "- đầu tư", "values": ["5.845", "4.847"], "is_total": False},
+        {"label": "Cộng", "values": ["90.411", "70.760"], "is_total": True}]}
+    nt = match_note(raw, 14, {"ytd": (D(90_411) * M, D(70_760) * M)}, M * 5)
+    assert nt.verified and len(nt.items) == 4          # tập nhiều dòng nhất: hai dòng con thay cho dòng cha
+    assert "Lãi chứng khoán nợ" not in [lab for lab, *_ in nt.items]

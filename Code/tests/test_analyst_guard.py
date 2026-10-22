@@ -512,7 +512,7 @@ def test_loss_word_counts_only_as_the_metric_result():
     # chữ "lỗ" ngay sau mã hoặc tên chỉ tiêu vẫn là nói kết quả của chỉ tiêu
     assert kinds("FPT lỗ nhiều hơn cùng kỳ.", ["S2"], s, allowed) == ["direction"]
     assert kinds("LNST lỗ trong quý 3.", ["S2"], s, allowed) == ["direction"]
-    assert kinds("Vietcombank (FPT) lỗ nhiều hơn cùng kỳ.", ["S2"], s, allowed) == ["direction"]
+    assert kinds("Công ty Cổ phần FPT (FPT) lỗ nhiều hơn cùng kỳ.", ["S2"], s, allowed) == ["direction"]
     assert kinds("Thẻ KQKD của FPT cũng ghi nhận lỗ nhưng dòng tiền âm.", ["S2"], s, allowed) == ["direction"]
     p, allowed = profit_loss_sheet(), ("TCB", "VCB", "ABC")
     assert kinds("TCB lỗ 50,0 tỷ.", ["S1"], p, allowed) == ["unsourced_number"]
@@ -585,3 +585,40 @@ def test_number_after_higher_than_ticker_is_read_as_a_gap():
           metric="npat_parent", measure="growth", order=["TCB", "VCB"], names=["lnst"])
     r = check_sentence("LNST của TCB tăng nhanh hơn VCB 8,1 điểm %.", ["S1"], s, set(), {"TCB", "VCB"})
     assert r.violations == []       # mức chênh có sẵn trong dòng so sánh
+
+
+def test_company_names_count_as_tickers_and_comparison_may_span_clauses():
+    s = FactSheet()
+    s.add("compare", "LNTT, xếp theo quy mô, quý 2/2026: VCB 17.420 tỷ, TCB 9.670 tỷ; VCB gấp 1,80 lần TCB",
+          metric="pbt", measure="level", order=["VCB", "TCB"], names=["lợi nhuận trước thuế", "lntt"])
+    known = {"VCB", "TCB", "HPG"}
+    kinds = lambda t: [v.kind for v in check_sentence(t, ["S1"], s, {"VCB", "TCB"}, known).violations]   # noqa: E731
+    assert kinds("LNTT của Vietcombank thấp hơn Techcombank.") == ["comparison"]
+    assert kinds("LNTT của Vietcombank cao hơn Techcombank.") == []
+    assert kinds("Ở chỉ tiêu LNTT, VCB thấp hơn với 17.420 tỷ, trong khi TCB là 9.670 tỷ.") == ["comparison"]
+    assert kinds("LNTT của VCB cao hơn Hòa Phát.") == ["foreign_ticker", "comparison"]
+
+
+def test_two_metrics_of_one_ticker_and_self_contradicting_from_to():
+    s = FactSheet()
+    s.add("metric", "Lợi nhuận trước thuế, TCB, quý 3/2026: 10.375 tỷ; cùng kỳ 8.250 tỷ; thay đổi +25,8% (tăng 2.125 tỷ)",
+          ticker="TCB", metric="pbt", direction="up", names=["lợi nhuận trước thuế", "lntt"])
+    s.add("metric", "Tổng thu nhập hoạt động, TCB, quý 3/2026: 16.588 tỷ; cùng kỳ 14.242 tỷ; thay đổi +16,5% (tăng 2.346 tỷ)",
+          ticker="TCB", metric="toi", direction="up", names=["tổng thu nhập hoạt động"])
+    kinds = lambda t: [v.kind for v in check_sentence(t, ["S1", "S2"], s, {"TCB"}, {"TCB"}).violations]   # noqa: E731
+    assert kinds("Lợi nhuận trước thuế của TCB tăng nhanh hơn tổng thu nhập hoạt động.") == []
+    assert kinds("Lợi nhuận trước thuế của TCB tăng chậm hơn tổng thu nhập hoạt động.") == ["comparison"]
+    assert kinds("Lợi nhuận trước thuế của TCB tăng từ 8.250 tỷ lên 10.375 tỷ.") == []
+    assert kinds("Lợi nhuận trước thuế của TCB giảm từ 8.250 tỷ lên 10.375 tỷ.") == ["direction"] or \
+        "direction" in kinds("Lợi nhuận trước thuế của TCB giảm từ 8.250 tỷ lên 10.375 tỷ.")
+
+
+def test_ratio_levels_in_percent_are_not_read_as_growth():
+    s = FactSheet()
+    s.add("compare", "Chi phí hoạt động trên tổng thu nhập hoạt động, xếp theo quy mô, quý 2/2026: VCB 32,0%, TCB 30,9%; "
+          "VCB cao hơn TCB 1,1 điểm %", metric="cir", measure="level", order=["VCB", "TCB"],
+          names=["chi phí hoạt động trên tổng thu nhập hoạt động", "cir"])
+    t = "Chi phí hoạt động trên tổng thu nhập hoạt động của Vietcombank là 32,0%, cao hơn Techcombank với 30,9% là 1,1 điểm %."
+    assert check_sentence(t, ["S1"], s, {"VCB", "TCB"}, {"VCB", "TCB"}).violations == []
+    t = t.replace("cao hơn", "thấp hơn")
+    assert [v.kind for v in check_sentence(t, ["S1"], s, {"VCB", "TCB"}, {"VCB", "TCB"}).violations] == ["comparison"]

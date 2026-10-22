@@ -93,7 +93,9 @@ def mutations(text: str, foreign: str = "HPG") -> list[tuple[str, str]]:
                             ("thấp hơn", "cao hơn"), ("cao nhất", "thấp nhất"), ("thấp nhất", "cao nhất")]}
     for kind, pairs in swaps.items():
         for a, b in pairs:
-            pat = rf"\b{a}\b(?!\s+trưởng)"
+            # "tăng hay giảm", "giảm hoặc tăng" không khẳng định chiều nào: đổi chữ ở đó không làm câu sai
+            pat = (rf"(?<!tăng hay )(?<!giảm hay )(?<!tăng hoặc )(?<!giảm hoặc )\b{a}\b(?!\s+trưởng)"
+                   rf"(?!\s+(?:hay|hoặc)\s+(?:tăng|giảm)\b)")
             if re.search(pat, text):
                 out.append((kind, re.sub(pat, b, text, count=1)))
                 break

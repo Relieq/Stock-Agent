@@ -68,3 +68,16 @@ def common_keys(kinds: set[str], metrics: list[str]) -> list[str]:
         return keys_for(next(iter(kinds)), metrics)
     valid = [k for k in metrics if all(name(kd, k) for kd in kinds)]
     return valid or SHARED
+
+
+# Tên gọi thường dùng của công ty -> mã, để bộ kiểm tra nhận ra câu gọi bằng tên ("Vietcombank thấp hơn Techcombank").
+# Viết thường, không cần dấu chính xác của tên pháp lý; tên dài đặt trước tên ngắn chứa trong nó (Masan Consumer, Masan).
+COMPANY_NAMES = {
+    "vietcombank": "VCB", "techcombank": "TCB", "vietinbank": "CTG", "bidv": "BID", "mb bank": "MBB", "mbbank": "MBB",
+    "ngân hàng quân đội": "MBB", "ngân hàng mb": "MBB", "hdbank": "HDB", "lpbank": "LPB", "lộc phát": "LPB",
+    "seabank": "SSB", "sacombank": "STB", "vpbank": "VPB", "ngân hàng á châu": "ACB", "ngân hàng quốc tế": "VIB",
+    "hòa phát": "HPG", "masan consumer": "MCH", "masan": "MSN", "thế giới di động": "MWG", "sabeco": "SAB",
+    "vinamilk": "VNM", "vingroup": "VIC", "vinhomes": "VHM", "vinpearl": "VPL", "vincom retail": "VRE",
+    "vietjet": "VJC", "pv gas": "GAS", "petrovietnam gas": "GAS", "lọc hóa dầu bình sơn": "BSR", "bình sơn": "BSR",
+    "cao su việt nam": "GVR", "chứng khoán kỹ thương": "TCX", "tcbs": "TCX", "novaland": "NVL",
+}

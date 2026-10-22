@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from services.analyst import catalog
 from services.analyst.sheet import Fact, FactSheet
+from services.metrics.card import vn
 
 MONEY = (("nghìn tỷ", Decimal(10) ** 12), ("ngàn tỷ", Decimal(10) ** 12), ("tỷ", Decimal(10) ** 9),
          ("triệu", Decimal(10) ** 6), ("đồng", Decimal(1)))
@@ -194,11 +195,14 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
             continue
         bad("advice", m.group(0))
     fact_text = " ".join(f.text for f in facts)
-    for t in sorted(set(TICKER.findall(text)) & known):
+    named = with_tickers(text)          # "Vietcombank" -> "VCB": kiểm mã, so sánh, thứ hạng như khi câu viết bằng mã
+    for t in sorted(set(TICKER.findall(named)) & known):
         if t not in allowed and t not in fact_text:
             bad("foreign_ticker", t)
-    _check_directions(text, facts, out, bad, sheet)
-    _check_ranks(text, facts, bad, sheet)
+    _check_directions(named, facts, out, bad, sheet)
+    _check_ranks(named, facts, bad, sheet)
+    for detail in _self_contradictions(text):
+        bad("direction", detail)
     # nói "lỗ" mà các dòng câu ghi không có khoản lỗ nào (số âm hoặc chữ "lỗ"); câu đã bị bắt sai chiều hoặc sai dấu
     # (số tiền sau "lỗ" đã kiểm ở trên) thì không báo thêm
     if facts and _loss_claim(text) and not any(loss for _, _, loss in allowed_nums) \
@@ -209,6 +213,35 @@ def check_sentence(text: str, uses: list[str], sheet: FactSheet, allowed: set[st
     elif facts and not any(v.kind in ("direction", "unsourced_number") for v in out.violations) \
             and (item := _flipped_item(text, facts)):
         bad("direction", f"câu nói “{item}” nhưng dòng câu ghi là lãi: {text.strip()}")
+    return out
+
+
+_COMPANY = re.compile(r"(?i)(?<!\w)(" + "|".join(sorted(map(re.escape, catalog.COMPANY_NAMES), key=len, reverse=True))
+                      + r")(?!\w)")
+
+
+def with_tickers(text: str) -> str:
+    """Thay tên gọi công ty bằng mã (ngân hàng Vietcombank -> ngân hàng VCB)."""
+    return _COMPANY.sub(lambda m: catalog.COMPANY_NAMES[m.group(1).lower()], text)
+
+
+# "giảm từ 107 tỷ lên 757 tỷ": từ chỉ chiều ngược với chính hai số trong câu
+_FROM_TO = re.compile(r"(?i)\b(tăng|giảm|sụt)\b[^.;:]{0,60}?\btừ\s+")
+_TO_WORD = re.compile(r"(?i)^\s*(?:lên|xuống|còn|đến|thành)\s+")
+
+
+def _self_contradictions(text: str) -> list[str]:
+    out = []
+    for m in _FROM_TO.finditer(text):
+        rest = text[m.end():m.end() + 80]
+        ns = numbers(rest)
+        if len(ns) < 2 or ns[0].start != 0 or not _TO_WORD.match(rest[ns[0].end:ns[1].start]) or ns[0].kind != ns[1].kind:
+            continue
+        a, b = abs(ns[0].value), abs(ns[1].value)
+        up = m.group(1).lower() == "tăng"
+        if (up and b < a) or (not up and b > a):
+            out.append(f"“{m.group(1)}” nhưng số đi từ {rest[ns[0].start:ns[0].end].strip()} "
+                       f"{'xuống' if b < a else 'lên'} {rest[ns[1].start:ns[1].end].strip()}: {text.strip()}")
     return out
 
 
@@ -358,7 +391,7 @@ COMP_DOWN = re.compile(r"(chậm hơn|thấp hơn|nhỏ hơn|ít hơn|yếu hơn
 SUP_TOP = re.compile(r"(cao nhất|lớn nhất|nhanh nhất|mạnh nhất|nhiều nhất|sâu nhất|dẫn đầu|đứng đầu)")
 SUP_BOTTOM = re.compile(r"(thấp nhất|nhỏ nhất|chậm nhất|yếu nhất|ít nhất|nhẹ nhất|kém nhất|đứng cuối)")
 # Dấu phẩy thập phân ("23,7%") không tách vế; từ nối nhân quả/đối lập tách vế (trừ "không còn", "chưa còn")
-CLAUSE = re.compile(r",(?!\d)|;|(?<!không)(?<!chưa)\s(?:nhờ|do|vì|khiến|giúp|mặc dù|dù|trong khi|còn|nhưng|song"
+CLAUSE = re.compile(r",(?!\d)|;|:(?!\d)|(?<!không)(?<!chưa)\s(?:nhờ|do|vì|khiến|giúp|mặc dù|dù|trong khi|còn|nhưng|song"
                     r"|tuy nhiên|đồng thời)\s")
 GROWTH_WORDS = re.compile(r"\b(?:nhanh|chậm|tăng|giảm|sụt|tốc độ|điểm phần trăm)\b|%")
 NEGATED_VERB = re.compile(r"\b(?:không|chưa|ngừng)\s+(?:\S+\s+)?$")      # "không tăng", "không còn giảm", "ngừng giảm"
@@ -483,13 +516,36 @@ def _directions_by_number(clause: str, facts: list[Fact], tickers: list[str]) ->
     return out
 
 
+RATIO_KEYS = {k for r in catalog.RATIOS.values() for k in r}
+_CHANGE = re.compile(r"thay đổi ([+−-]\d[\d.]*(?:,\d+)?)%")
+
+
+def _two_metrics(low: str, facts: list[Fact], who: str | None) -> list[tuple[Fact, Decimal]] | None:
+    """Vế câu so tốc độ của hai chỉ tiêu cùng một mã ("LNTT của TCB tăng chậm hơn tổng thu nhập hoạt động"): hai dòng
+    chỉ tiêu theo thứ tự tên xuất hiện, kèm % thay đổi của mỗi dòng; không đúng dạng đó thì None."""
+    rows = [f for f in facts if f.kind in ("metric", "ratio") and f.ticker and (who is None or f.ticker == who)]
+    if len({f.ticker for f in rows}) != 1:
+        return None
+    names = _mentioned(low, rows)
+    found = []
+    for f in rows:
+        pos = [low.find(n) for n in names & set(f.names) if n in low]
+        m = _CHANGE.search(f.text)
+        if pos and m:
+            found.append((min(pos), f, Decimal(m.group(1).replace("−", "-").replace(".", "").replace(",", "."))))
+    found.sort(key=lambda x: x[0])
+    return [(f, g) for _, f, g in found[:2]] if len(found) >= 2 else None
+
+
 def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, sheet: FactSheet | None = None) -> None:
     """Từ tăng/giảm khớp chiều của dòng được ghi; so sánh hai mã và cao nhất/thấp nhất khớp thứ tự trong bảng số.
     Xét từng vế câu; loại số liệu (quy mô hay tốc độ thay đổi) cũng đọc theo từng vế."""
     subject: str | None = None          # mã làm chủ ngữ ở vế trước ("TCB tăng 23,7%, cao hơn VCB")
     prev_low, prev_tickers = "", []
-    for a, b in _clauses(text):
+    spans = _clauses(text)
+    for i, (a, b) in enumerate(spans):
         clause = text[a:b]
+        nxt = list(dict.fromkeys(TICKER.findall(text[spans[i + 1][0]:spans[i + 1][1]]))) if i + 1 < len(spans) else []
         low = clause.lower().replace("tăng trưởng âm", "giảm")
         tickers = list(dict.fromkeys(TICKER.findall(clause)))
         p_low, p_tickers = prev_low, prev_tickers
@@ -515,6 +571,19 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                 # mã đứng sau từ so sánh là vế sau ("..., nhanh hơn VCB"); đứng trước là chủ ngữ ("..., còn TCB nhanh hơn")
                 pair = [subject, tickers[0]] if at and at.start() > comp.start() else [tickers[0], subject]
                 carried = True
+            elif len(tickers) == 1 and [t for t in nxt if t != tickers[0]]:
+                # "VCB thấp hơn với 17.420 tỷ, trong khi TCB là 9.670 tỷ": vế sau của so sánh nằm ở vế câu kế tiếp
+                pair = [tickers[0], next(t for t in nxt if t != tickers[0])]
+            if not pair:
+                two = _two_metrics(low, facts, tickers[0] if tickers else subject)
+                if two and (cue(not tickers) == "growth" or GROWTH_WORDS.search(low)):
+                    (fa, ga), (fb, gb) = two
+                    first = bool(comp_up)
+                    if declining:
+                        first = not first
+                    if (ga > gb) != first and ga != gb:
+                        bad("comparison", f"{clause.strip()} — {fa.id}: {vn(ga)}%, {fb.id}: {vn(gb)}%")
+                    continue
             if pair:
                 a_t, b_t = pair
                 c = cue(carried)
@@ -527,6 +596,8 @@ def _check_directions(text: str, facts: list[Fact], out: SentenceCheck, bad, she
                     cands = [f for f in rows if f.measure == "level"] or [f for f in rows if f.measure == "growth"]
                 else:
                     cands = _named([f for f in rows if f.measure == c], low)
+                    if not cands and c == "growth":     # tỷ lệ (CIR, biên lợi nhuận) có mức tính bằng %, không phải mức tăng
+                        cands = [f for f in _named(rows, low) if f.measure == "level" and f.metric in RATIO_KEYS]
                 if not cands:
                     bad("comparison", f"không có dòng so sánh {a_t} với {b_t}: {clause.strip()}"
                                       + _hint(sheet, [a_t, b_t], c, low))

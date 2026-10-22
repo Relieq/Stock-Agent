@@ -52,7 +52,7 @@ def test_note_items_and_parts_selection():
     from services.causes.agent import orient_items
     # GAS: hoàn nhập dự phòng (in âm) trong thuyết minh chi phí quản lý nhỏ đi -> chi phí tăng, LNST giảm
     gas = item_text("Các khoản dự phòng", -D(492) * B, -D(1634) * B, expense=True)
-    assert "âm 492 tỷ, cùng kỳ âm 1.634 tỷ (tăng 1.142 tỷ), làm LNST giảm 1.142 tỷ" in gas
+    assert "âm 492 tỷ, cùng kỳ âm 1.634 tỷ (độ lớn giảm 1.142 tỷ), làm LNST giảm 1.142 tỷ" in gas
     # VRE: cả khối doanh thu in âm -> xoay chiều, doanh thu tăng làm LNST tăng
     (lab, a, b), = orient_items([("Doanh thu cho thuê", -D(120) * B, -D(100) * B)], natural=D(120) * B)
     assert item_text(lab, a, b, expense=False).endswith("(tăng 20,0 tỷ), làm LNST tăng 20,0 tỷ")
@@ -61,8 +61,23 @@ def test_note_items_and_parts_selection():
                       natural=-D(400) * B)
     assert fx[1][1] == -D(900) * B
     assert item_text(*fx[1], expense=False).endswith("làm LNST giảm 600 tỷ")
-    assert item_text("Giá vốn hàng hóa", D(700) * B, D(500) * B, True, "lợi nhuận gộp").endswith(
+    assert item_text("Giá vốn hàng hóa", D(700) * B, D(500) * B, True, ("lợi nhuận gộp", -1)).endswith(
         "làm lợi nhuận gộp giảm 200 tỷ")
+    # TCB: thuế hiện hành cộng vào chi phí thuế -> tăng thì chi phí thuế tăng
+    assert item_text("Thuế tính trên thu nhập chịu thuế", D(3860) * B, D(2734) * B, True,
+                     ("chi phí thuế", 1)).endswith("làm chi phí thuế tăng 1.126 tỷ")
     parts = [Part(str(i), "x", D(0), D(0), D(e) * B) for i, e in enumerate([19147, -10321, 18567, -8401, 650, 30])]
     bd = Breakdown("61", D(0), D(1), sorted(parts, key=lambda p: -abs(p.effect)))
     assert [p.code for p in sheet_parts(bd)] == ["0", "2", "1", "3"]
+
+
+def test_extra_checks_period_mix_and_unsupported_no_reason():
+    from services.analyst.sheet import FactSheet
+    from services.causes.agent import extra_checks
+    sh = FactSheet()
+    sh.add("cause_part", "Lãi dịch vụ quý 2/2026 của LPB: 1.000 tỷ")
+    sh.add("note_item", "Thuyết minh của dòng Lãi dịch vụ (KQKD), lũy kế 6 tháng năm 2026 của LPB: Phí thanh toán 900 tỷ")
+    v = extra_checks([{"text": "Lãi dịch vụ tăng; riêng 6 tháng phí thanh toán 900 tỷ.", "uses": ["S1", "S2"]},
+                      {"text": "Lũy kế 6 tháng, phí thanh toán 900 tỷ.", "uses": ["S2"]},
+                      {"text": "Công ty không nêu nguyên nhân.", "uses": ["S1"]}], sh)
+    assert [(x.sentence, x.kind) for x in v] == [(0, "period"), (2, "unsupported")]

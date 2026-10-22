@@ -13,6 +13,7 @@ Kết quả lưu ở Data/raw/causes/<id tài liệu>.json.
 from __future__ import annotations
 
 import json
+import re
 from decimal import Decimal
 
 from services.analyst.guard import check_draft
@@ -101,20 +102,30 @@ def part_text(p, label: str, ticker: str, flip: bool = False) -> str:
         sign = -1 if flip and not p.code.startswith("(") else 1      # phần cổ đông không kiểm soát do code tính
         cur, prev = sign * p.cur, sign * p.prev
         show = lambda v: ty(v) if v >= 0 else f"âm {ty(v)} (hoàn nhập hoặc lợi ích)"     # noqa: E731
+        if "hoàn nhập" in p.label.lower():
+            # SHB: dòng "Hoàn nhập/(Chi phí) dự phòng" in (3.825) là khoản chi, từng bị viết là hoàn nhập
+            p = type(p)(**{**p.__dict__, "label": f"{p.label} (số dương là khoản chi, âm là hoàn nhập)"})
     word = "tăng" if cur >= prev else "giảm"
     return (f"{p.label} {label} của {ticker}: {show(cur)}, cùng kỳ {show(prev)} ({word} {ty(cur - prev)}), "
             f"làm LNST {'tăng' if p.effect >= 0 else 'giảm'} {ty(p.effect)}")
 
 
-def item_text(lab: str, a: Decimal, b: Decimal, expense: bool, target: str = "LNST") -> str:
+def item_text(lab: str, a: Decimal, b: Decimal, expense: bool, target: tuple[str, int] = ("LNST", 0)) -> str:
     """Khoản con trong thuyết minh của một dòng KQKD, đã xoay chiều theo bảng (orient_items). `expense`: dòng đó là khoản
     trừ trong công thức LNST. Khoản âm là khoản đi ngược dòng của nó (hoàn nhập trong dòng chi phí, khoản trừ trong dòng
     thu nhập). Ghi luôn tác động lên LNST để câu không phải tự suy (GAS quý 2: "các khoản dự phòng" (492) so với (1.634)
     tỷ là hoàn nhập ít đi, tức chi phí tăng và LNST giảm, từng bị viết là "làm tăng lợi nhuận")."""
     show = lambda v: ty(v) if v >= 0 else f"âm {ty(v)}"     # noqa: E731
-    effect = (b - a) if expense else (a - b)
-    return (f"{lab} {show(a)}, cùng kỳ {show(b)} ({'tăng' if a >= b else 'giảm'} {ty(a - b)}), "
-            f"làm {target} {'tăng' if effect >= 0 else 'giảm'} {ty(effect)}")
+    name, sign = target
+    # Tác động lên LNST theo tính chất dòng; lên dòng cha (target khác LNST) theo dấu của dòng trong công thức dòng cha
+    # (TCB: thuế hiện hành cộng vào chi phí thuế, tăng thì chi phí thuế tăng; giá vốn trừ khỏi lợi nhuận gộp)
+    effect = ((b - a) if expense else (a - b)) if sign == 0 else sign * (a - b)
+    if a <= 0 and b <= 0 and (a, b) != (0, 0):
+        change = f"độ lớn {'tăng' if -a >= -b else 'giảm'} {ty(a - b)}"     # khoản trừ: nói theo độ lớn (VPB quý 3)
+    else:
+        change = f"{'tăng' if a >= b else 'giảm'} {ty(a - b)}"
+    return (f"{lab} {show(a)}, cùng kỳ {show(b)} ({change}), "
+            f"làm {name} {'tăng' if effect >= 0 else 'giảm'} {ty(effect)}")
 
 
 def orient_items(items: list[tuple[str, Decimal, Decimal]], natural: Decimal | None) -> list[tuple[str, Decimal, Decimal]]:
@@ -138,6 +149,27 @@ def sheet_parts(bd):
         return []
     top = max(abs(p.effect) for p in bd.parts)
     return [p for p in bd.parts if abs(p.effect) >= top * MIN_PART_SHARE][:MAX_PARTS]
+
+
+TAX_LINES = {"51", "52", "b.cit", "b.cit_cur", "b.cit_def", "100", "100.1", "100.2"}
+NO_REASON = re.compile(r"(?i)(?:không|chưa)\s+(?:nêu|giải thích|công bố)\s+(?:rõ\s+)?nguyên\s+nhân")
+
+
+def extra_checks(sentences: list[dict], sh: FactSheet) -> list:
+    """Luật riêng của đoạn nguyên nhân, ngoài bộ kiểm tra số: không trộn số riêng quý với số lũy kế trong một câu (LPB);
+    không nói công ty không nêu nguyên nhân khi câu không dẫn dòng nguyên nhân từ công văn (VJC, VPB)."""
+    from services.analyst.guard import Violation
+    out = []
+    for i, s in enumerate(sentences):
+        facts = [f for u in s.get("uses", []) if (f := sh.get(u)) is not None]
+        quarter = any(f.kind in ("metric", "cause_part") for f in facts)
+        ytd = any(f.kind == "note_item" and "lũy kế" in f.text for f in facts)
+        if quarter and ytd:
+            out.append(Violation(0, i, "period", "câu trộn số riêng quý với số lũy kế của thuyết minh: tách thành hai câu, "
+                                                  "câu lũy kế mở đầu bằng \"Lũy kế\""))
+        if NO_REASON.search(s["text"]) and not any(f.kind == "reason" for f in facts):
+            out.append(Violation(0, i, "unsupported", "câu nói công ty không nêu nguyên nhân nhưng không dẫn dòng công văn"))
+    return out
 
 
 class CauseAgent:
@@ -179,13 +211,18 @@ class CauseAgent:
     def note_codes(self, code: str) -> list[tuple[str, tuple[int | None, int]]]:
         """(mã dòng KQKD, (phần, số mục) thuyết minh) của dòng; dòng không in số thuyết minh thì của các dòng trong công
         thức."""
+        if code in TAX_LINES:
+            return []                       # thuyết minh thuế là bảng đối chiếu ("thuế theo thuế suất 20%"), không là nguyên nhân
         own = note_refs(getattr(self.facts.rows.get(("IS", code)), "note", None))
         if own:
             return [(code, n) for n in own]
         out = []
         for r in RULESETS.get(self.facts.template, RULESETS["TT200"]).rules:
             if r.statement == "IS" and r.lhs == code:
-                for _, c in r.rhs:
+                for sign, c in r.rhs:
+                    if code == "20" and sign < 0:
+                        continue            # lợi nhuận gộp: chỉ thuyết minh doanh thu; giá vốn lặp lại doanh thu và từng làm
+                                            # câu viết "giá vốn làm lợi nhuận gộp giảm" khi lợi nhuận gộp tăng (GAS, MCH, VNM)
                     for k in note_refs(getattr(self.facts.rows.get(("IS", c)), "note", None)):
                         if (c, k) not in out:
                             out.append((c, k))
@@ -250,21 +287,22 @@ class CauseAgent:
                         return sign, r.lhs
         return None
 
-    def effect_target(self, code: str) -> str:
+    def effect_target(self, code: str) -> tuple[str, int]:
         """Tên dòng mà khoản con tác động tới: LNST nếu dòng của thuyết minh là dòng lá của bảng tách; không thì dòng lá
         chứa nó (giá vốn, doanh thu -> lợi nhuận gộp; MCH: khoản con của giá vốn từng bị gọi là "khoản làm giảm LNST lớn
         nhất" trong khi lợi nhuận gộp tăng)."""
         bd = self.bd["quarter"]
         leaves = {p.code for p in (bd.parts if bd else [])}
-        cur = code
+        cur, sign = code, 1
         for _ in range(4):
             if cur in leaves:
-                return "LNST" if cur == code else self.labels.get(cur, cur).strip().lower()
+                return ("LNST", 0) if cur == code else (self.labels.get(cur, cur).strip().lower(), sign)
             parent = self._parent(cur)
             if parent is None:
                 break
+            sign *= parent[0]
             cur = parent[1]
-        return "LNST"
+        return "LNST", 0
 
     # ---------- vòng agent ----------
 
@@ -387,6 +425,7 @@ class CauseAgent:
             sentences = draft["sentences"]
             violations, _, _ = check_draft({"sections": [{"heading": "", "sentences": sentences}]}, sh, {self.ticker},
                                            self.known)
+            violations += extra_checks(sentences, sh)
             bad = {v.sentence for v in violations}
             if not bad or attempt == REWRITES:
                 kept = [s for i, s in enumerate(sentences) if i not in bad]

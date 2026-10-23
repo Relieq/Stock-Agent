@@ -67,7 +67,8 @@ def login_finish(request: Request, token: str, next: str = "/mua-bctc"):
     if session is None:
         return templates().TemplateResponse(request, "login.html", {
             "next": next, "sent": False, "dev_link": None, "error": "Link đã hết hạn hoặc đã được dùng. Hãy nhập email để nhận link mới."})
-    resp = RedirectResponse(next if next.startswith("/") else "/mua-bctc", status_code=303)
+    target = feedback.safe_page(next)
+    resp = RedirectResponse(target if target != "/" else "/mua-bctc", status_code=303)
     resp.set_cookie(COOKIE, session, max_age=30 * 86400, httponly=True, samesite="lax",
                     secure=os.environ.get("SITE_URL", "").startswith("https://"))
     return resp
@@ -102,7 +103,8 @@ def watch_submit(request: Request, ticker: str = Form(...), action: str = Form("
         if not exists:
             return _back("/theo-doi", f"Chưa có mã {ticker}. Mã ngoài danh sách: gửi yêu cầu đọc BCTC ở trang Yêu cầu.")
         set_watch(conn, user.id, ticker, action == "add")
-    return RedirectResponse(back if back.startswith("/") else "/theo-doi", status_code=303)
+    back = feedback.safe_page(back)
+    return RedirectResponse(back if back != "/" else "/theo-doi", status_code=303)
 
 
 # ---- yêu cầu đọc BCTC ngoài danh sách, tải file lên ------------------------------------------------------------------

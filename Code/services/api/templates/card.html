@@ -10,9 +10,9 @@
 <section class="cardhead">
   <h1>{{ ticker }} <span class="muted">· {{ name }}</span></h1>
   <div class="kyrow">
-    <select onchange="location='/ma/{{ ticker }}?ky='+this.value">
+    {% if quarters %}<select onchange="location='/ma/{{ ticker }}?ky='+this.value">
     {% for y, p in quarters %}<option value="{{ p|lower }}-{{ y }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
-    </select>
+    </select>{% else %}<b>{{ period }}/{{ year }}</b>{% endif %}
     {% if info %}<span class="small">{{ SCOPE.get(info.scope, info.scope) }} · {{ info.reviewed }}</span>{% endif %}
     {% if not private %}<form method="post" action="/theo-doi" class="inline"><input type="hidden" name="ticker" value="{{ ticker }}">
       <input type="hidden" name="action" value="{{ 'remove' if watching else 'add' }}"><input type="hidden" name="back" value="/ma/{{ ticker }}?ky={{ period|lower }}-{{ year }}">

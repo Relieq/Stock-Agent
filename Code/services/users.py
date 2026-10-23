@@ -64,11 +64,20 @@ def find_user(conn: psycopg.Connection, email: str) -> User | None:
     return User(*row) if row else None
 
 
+MAX_LINKS_PER_HOUR = 5    # chặn người khác gõ email người được mời liên tục để dội thư vào hộp thư họ
+
+
+def links_last_hour(conn: psycopg.Connection, user_id: int) -> int:
+    """Số link đăng nhập đã tạo trong một giờ qua (giờ tạo = hạn dùng - LOGIN_TTL)."""
+    return conn.execute("SELECT count(*) FROM login_tokens WHERE user_id = %s AND expires_at > %s",
+                        (user_id, datetime.now(timezone.utc) + LOGIN_TTL - timedelta(hours=1))).fetchone()[0]
+
+
 def start_login(conn: psycopg.Connection, email: str) -> tuple[bool, str | None]:
     """Gửi link đăng nhập nếu email đã được mời. Trả về (đã gửi qua SMTP, link). Không tiết lộ email có được mời hay
     không: người gọi luôn hiện cùng một thông báo."""
     user = find_user(conn, email)
-    if user is None:
+    if user is None or links_last_hour(conn, user.id) >= MAX_LINKS_PER_HOUR:
         return False, None
     token = secrets.token_urlsafe(32)
     conn.execute("INSERT INTO login_tokens (token_hash, user_id, expires_at) VALUES (%s, %s, %s)",

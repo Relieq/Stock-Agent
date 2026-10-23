@@ -52,6 +52,10 @@ Kiểm tra: mở `https://<tên miền>`, đăng nhập bằng email quản tr�
 trang Chi phí. Chỉ một nơi được chạy bộ canh: tắt bộ canh trên máy phát triển
 (`docker compose -f infra/docker-compose.yml stop watcher`) để hai nơi không cùng đọc và cùng gửi email.
 
+Theo dõi từ bên ngoài: khi máy chủ hoặc Docker dừng thì hệ thống không tự gửi email được. Tạo một monitor HTTP (ví dụ
+UptimeRobot, gói miễn phí, 5 phút một lần) gọi `https://<tên miền>/suc-khoe`, báo email khi mã trả về khác 200. Trang
+trả 503 khi bộ canh im quá 120 phút, và lỗi khi web hoặc CSDL hỏng.
+
 ## 5. Cập nhật mã
 
 ```bash

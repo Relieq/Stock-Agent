@@ -133,3 +133,7 @@ ul.plain { list-style:none; padding:0; } ul.plain li { padding:4px 0; border-bot
 .feedback { max-width:720px; margin:24px 16px 0; }
 .feedback summary { cursor:pointer; color:var(--muted, #666); }
 .feedback textarea { width:100%; font:inherit; padding:8px; box-sizing:border-box; margin:6px 0; }
+@media (max-width: 600px) {
+  .top { flex-wrap:wrap; }
+  .nav { margin-left:0; flex-wrap:wrap; gap:4px 12px; }
+}

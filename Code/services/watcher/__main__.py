@@ -36,6 +36,7 @@ from services.ingestion.vietstock import VietstockClient
 from services.llm import VisionClient
 from services.metrics.letters import read_pending
 from services.alerts import notify_watchers
+from services.health import heartbeat_path, last_heartbeat
 from services.notify import notify_admin
 from services.ondemand import process_queue
 
@@ -54,20 +55,9 @@ def _quarter_start(today: date) -> date:
 _retried: set[int] = set()      # BCTC lỗi đã thử lại trong tiến trình này (mỗi BCTC thử lại một lần)
 
 
-def _heartbeat_path():
-    return raw_data_dir() / "watcher_heartbeat.txt"
-
-
-def _last_heartbeat() -> datetime | None:
-    try:
-        return datetime.fromisoformat(_heartbeat_path().read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return None
-
-
 def _beat() -> None:
     try:
-        _heartbeat_path().write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
+        heartbeat_path().write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
     except OSError:
         pass
 
@@ -249,7 +239,7 @@ def main() -> None:
     p.add_argument("--once", action="store_true")
     args = p.parse_args()
 
-    notice = downtime_notice(_last_heartbeat(), datetime.now(timezone.utc), args.interval)
+    notice = downtime_notice(last_heartbeat(), datetime.now(timezone.utc), args.interval)
     if notice:
         print(notice)
         notify_admin("[Soi] Bộ canh vừa chạy lại sau khi dừng", notice)
@@ -259,6 +249,7 @@ def main() -> None:
         except RuntimeError as e:
             print(f"Chưa cấu hình mô hình đọc ảnh ({e}); bộ canh chỉ thu thập, không đọc BCTC.")
             vision = None
+        _beat()     # đầu lượt cũng ghi, để trang sức khỏe phân biệt "đang chạy lượt dài" với "đã dừng"
         try:
             one_pass(args.year, args.since, vision)
         except Exception:  # lỗi mạng, CSDL... thì báo và chờ lượt sau

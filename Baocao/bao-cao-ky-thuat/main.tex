@@ -802,7 +802,9 @@ có chiều ngược lại; điều này đã được kiểm trên mã nguồn.
 
 \subsection{Triển khai}
 Hiện hệ thống chạy trên máy phát triển bằng Docker Compose; khi triển khai thật sẽ chuyển nguyên cụm container lên một
-máy chủ ảo (VPS) (Hình~\ref{fig:trienkhai}).
+máy chủ ảo (VPS) (Hình~\ref{fig:trienkhai}). Bộ canh ghi nhịp tim ở đầu và cuối mỗi lượt; khi khởi động lại sau một
+thời gian dừng, nó email cho quản trị viên biết đã dừng bao lâu. Khi cả máy dừng thì hệ thống không tự báo được, nên web
+có một trang sức khỏe trả lỗi khi bộ canh im quá hai giờ, để một dịch vụ theo dõi bên ngoài gọi định kỳ và báo tin.
 
 \begin{figure}[H]
 \centering
@@ -1386,6 +1388,7 @@ Giai đoạn thử nghiệm chỉ dành cho người được mời, đăng nh�
 email khi có BCTC mới, gửi yêu cầu đọc mã ngoài danh sách (có hạn mức mỗi ngày), hoặc tải lên BCTC riêng. Tài liệu tải
 lên chỉ chủ sở hữu thấy. Trước khi đọc, hệ thống xem hai trang đầu để kiểm tra file đúng là BCTC của mã và kỳ người dùng
 khai; file khác loại (ví dụ công văn giải trình kết quả kinh doanh) bị từ chối kèm lý do và không tính vào hạn mức.
+Mỗi email được mời nhận tối đa năm link đăng nhập mỗi giờ, để người khác không gõ email đó liên tục làm đầy hộp thư.
 Cuối mỗi trang có ô góp ý: nội dung được lưu kèm trang người dùng đang xem, gửi email cho quản trị viên và hiện trong
 danh sách góp ý ở trang quản trị.
 

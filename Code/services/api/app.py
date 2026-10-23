@@ -38,7 +38,7 @@ from services.api.reports import router as reports_router  # noqa: E402
 app.include_router(reports_router)
 
 # Trang và ảnh chia sẻ thẻ KQKD công khai để mạng xã hội đọc được thẻ xem trước; chỉ thẻ đã kiểm chứng/duyệt tay
-PUBLIC_PATHS = ("/dang-nhap", "/static/", "/chia-se/", "/anh/")
+PUBLIC_PATHS = ("/dang-nhap", "/static/", "/chia-se/", "/anh/", "/suc-khoe")
 
 
 @app.middleware("http")
@@ -54,6 +54,15 @@ async def auth(request: Request, call_next):
         from urllib.parse import quote
         return RedirectResponse(f"/dang-nhap?next={quote(target)}", status_code=303)
     return await call_next(request)
+
+@app.get("/suc-khoe")
+def health():
+    """Cho dịch vụ theo dõi bên ngoài: 200 khi bộ canh còn chạy, 503 khi không (CSDL hỏng thì phần kiểm đăng nhập đã
+    lỗi trước đó). Chỉ trả số phút, không lộ gì khác."""
+    from services.health import status
+    s = status()
+    return JSONResponse(s, status_code=200 if s["ok"] else 503)
+
 
 STATUS = {
     "verified": ("Đã kiểm chứng", "ok"),
@@ -212,10 +221,11 @@ def card_by_document(request: Request, doc_id: int):
     doc = _document(doc_id, request)
     with connect() as conn:
         got = cards.card_for(conn, doc_id)
+        watching = doc["ticker"] in watchlist(conn, request.state.user.id)
     card, info = got if got else (None, None)
     return templates.TemplateResponse(request, "card.html", {
         "ticker": doc["ticker"], "name": doc["name"], "year": doc["year"], "period": doc["period"], "card": card,
-        "info": info, "doc_id": doc_id, "quarters": [], "watching": False, "private": doc["owner"] is not None,
+        "info": info, "doc_id": doc_id, "quarters": [], "watching": watching, "private": doc["owner"] is not None,
         "admin": _is_admin(request)})
 
 

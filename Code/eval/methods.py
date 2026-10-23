@@ -49,7 +49,9 @@ from pathlib import Path
 
 LEVEL_KEYS = ["goc", "tot", "vua", "xau"]
 LEVEL_NAMES = {"goc": "bản gốc", "tot": "scan tốt 200 dpi", "vua": "scan vừa 120 dpi", "xau": "scan xấu 72 dpi"}
-METHODS = ["M1", "M2", "M3", "M4", "M5a", "M5b"]
+METHODS = ["M1", "M2", "M3", "M4", "M5a", "M5b", "M5a_cungAnh", "M5b_cungAnh"]
+# M5a/M5b: kết quả Soi đã lưu của born_digital (bản 120/72 dpi có nhiễu khác bộ ảnh chung, xem prepare);
+# M5a_cungAnh/M5b_cungAnh: Soi đọc lại đúng file làm mờ đã lưu ở Data/raw/methods/degraded (run --method M5)
 DB_DOCS = [6, 160, 162, 5829, 6070, 13892]        # 6 BCTC trong kho có chữ gốc (born_digital measure/degraded)
 COLUMN_KINDS = {
     "BS": ["end_period", "begin_year"],
@@ -423,10 +425,13 @@ def prepare_main(args) -> None:
     from born_digital import LEVELS, VALUE_KINDS, degrade
     from services.db import connect
     from services.extraction.pipeline import _extract_image, _rotation
+    import pymupdf
 
     root = out_dir()
     with connect() as conn:
         for name, src, key, truth_sep, in_db in load_sources(conn):
+            if args.only and name not in args.only:
+                continue
             chosen = next(c for c in key["candidates"] if c["name"] == key["chosen"])
             st_pages = {st: [int(p) for p in ps] for st, ps in chosen["statement_pages"].items() if st in key["raw"]}
             pages = sorted({p for ps in st_pages.values() for p in ps})
@@ -438,8 +443,19 @@ def prepare_main(args) -> None:
                     "key_model": key.get("model"),
                     "page_size": {str(p): [src[p - 1].rect.width, src[p - 1].rect.height] for p in pages},
                     "images": {}}
-            for lv in LEVEL_KEYS:
-                doc = src if lv == "goc" else degrade(src, LEVELS[lv])
+            old = root / "inputs" / f"{name}.json"
+            if args.level and old.exists():
+                meta["images"] = json.loads(old.read_text(encoding="utf-8"))["images"]
+            for lv in args.level or LEVEL_KEYS:
+                doc = src
+                if lv != "goc":
+                    # Bản làm mờ lưu lại thành PDF rồi vẽ ảnh từ chính file đã lưu: phần nhiễu của degrade không lặp lại
+                    # được giữa các lần chạy, nên mọi phương pháp (kể cả Soi đọc lại, chạy lệnh run --method M5) phải
+                    # dùng đúng file này
+                    pdf = root / "degraded" / lv / f"{name}.pdf"
+                    pdf.parent.mkdir(parents=True, exist_ok=True)
+                    pdf.write_bytes(degrade(src, LEVELS[lv]).tobytes())
+                    doc = pymupdf.open(pdf)
                 meta["images"][lv] = {}
                 for p in pages:
                     png = _extract_image(doc, p, _rotation(key, p))
@@ -633,11 +649,54 @@ def run_text_llm(meta: dict, client, ocr: dict, max_usd: float) -> dict:
                    model=client.cfg.model, provider=client.cfg.provider)
 
 
+def _born_digital_usd(name: str, lv: str) -> float:
+    """Chi phí lần đọc của born_digital cho cùng BCTC, cùng mức (để ước chi phí trước khi chạy)."""
+    path = raw_dir() / "born_digital" / "runs" / f"{name}_{lv}.json"
+    return json.loads(path.read_text(encoding="utf-8")).get("usd", 0.13) if path.exists() else 0.13
+
+
+def run_soi(meta: dict, lv: str, client) -> dict:
+    """M5 trên đúng file làm mờ đã lưu: quy trình đọc của born_digital.read_pdf (chép bảng từng báo cáo bằng ảnh của
+    hệ thống, rồi leo thang: định vị ô bằng ràng buộc, đọc lại, chép lại), cùng trang và góc xoay, không ghi CSDL.
+    Ảnh lần chép đầu được so mã băm với bộ ảnh chung trước khi gọi mô hình."""
+    import pymupdf
+
+    from services.extraction import prompts
+    from services.extraction.pipeline import (_check, _escalate, _extract_detail, _extract_image, _rotation,
+                                              fix_row_pages)
+    doc = pymupdf.open(out_dir() / "degraded" / lv / f"{meta['name']}.pdf")
+    usd0, t0 = client.usage.usd, time.monotonic()
+    chosen = {"pages": [], "statement_pages": {st: list(ps) for st, ps in meta["statement_pages"].items()},
+              "rotations": dict(meta["rotations"])}
+    record = {"document_id": int(meta["name"]) if meta["in_db"] else meta["name"], "ticker": meta["ticker"],
+              "doc_type": meta["doc_type"], "company_template": meta["company_template"], "model": client.cfg.model,
+              "provider": client.cfg.provider, "level": lv, "method": "M5", "raw": {},
+              "candidates": [dict(chosen, name="eval")], "chosen": "eval"}
+    for st, pages in chosen["statement_pages"].items():
+        images = []
+        for p in pages:
+            png = _extract_image(doc, p, _rotation(record, p))
+            if hashlib.sha256(png).hexdigest() != meta["images"][lv][str(p)]["sha256"]:
+                raise RuntimeError(f"{meta['name']} {lv} trang {p}: ảnh khác bộ ảnh chung")
+            images.append((f"Trang {p}", png))
+        record["raw"][st] = fix_row_pages(client.json_from_images(prompts.extract_prompt(st), images,
+                                                                  prompts.extract_schema(st), f"statement_{st}",
+                                                                  detail=_extract_detail(doc, pages)), pages)
+    _escalate(record, client, doc, None)
+    _, _, sep, _, checks = _check(record)
+    record["thousands_sep"] = sep
+    record["gate_failed"] = sum(c.gate and not c.passed for c in checks)
+    record["usd"] = client.usage.usd - usd0
+    record["seconds"] = round(time.monotonic() - t0, 2)
+    return record
+
+
 def run_main(args) -> None:
     metas = load_inputs(args.only)
     m = args.method
     levels = args.level or (["goc"] if m == "M1" else LEVEL_KEYS)
     client = None
+    spent: list[float] = []
     src_of = {}
     if m in ("M1",):
         from services.db import connect
@@ -672,11 +731,30 @@ def run_main(args) -> None:
                 if client is None:
                     from services.llm import VisionClient, config
                     client = VisionClient(config())          # chỉ nhà chính (Haiku 5.5), không chuyển nhà dự phòng
+                est = max(spent or [0.015])                  # lượt đắt nhất đã gặp
+                if client.usage.usd + est > args.max_usd:
+                    print(f"[{name}] {lv}: dừng, đã tiêu {client.usage.usd:.4f} USD, lượt kế ước {est:.4f} USD "
+                          f"sẽ vượt trần {args.max_usd} USD", flush=True)
+                    break
                 rec = run_text_llm(meta, client, json.loads(ocr_path.read_text(encoding="utf-8")), args.max_usd)
                 rec["level"] = lv
+            elif m == "M5":
+                if lv not in ("vua", "xau"):
+                    continue          # bản gốc và 200 dpi không có nhiễu: kết quả born_digital đã đọc đúng ảnh này
+                if client is None:
+                    from services.llm import VisionClient
+                    client = VisionClient()                   # cấu hình hiện tại của hệ thống, như born_digital
+                est = 1.25 * _born_digital_usd(name, lv)
+                if client.usage.usd + est > args.max_usd:
+                    print(f"[{name}] {lv}: bỏ qua, đã tiêu {client.usage.usd:.4f} USD, lượt này ước {est:.3f} USD "
+                          f"sẽ vượt trần {args.max_usd} USD", flush=True)
+                    continue
+                rec = run_soi(meta, lv, client)
             else:
                 raise SystemExit(f"run không áp dụng cho {m} (M5a/M5b chấm từ kết quả đã lưu)")
             _save(path, rec)
+            if m in ("M4", "M5"):
+                spent.append(rec["usd"])
             n = sum(len(r["rows"]) for r in rec["raw"].values())
             print(f"[{name}] {m} {LEVEL_NAMES[lv]}: {n} dòng, {rec['seconds']:.1f} s"
                   + (f", {rec['usd']:.4f} USD" if rec.get("usd") else ""), flush=True)
@@ -787,11 +865,15 @@ def score_main(args) -> None:
             for m in methods:
                 for lv in LEVEL_KEYS:
                     lost = []
-                    if m in ("M5a", "M5b"):
-                        rec = soi_record(meta, lv, conn)
+                    if m in ("M5a", "M5b", "M5a_cungAnh", "M5b_cungAnh"):
+                        if m.endswith("_cungAnh"):
+                            path = method_dir("M5") / lv / f"{name}.json"
+                            rec = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+                        else:
+                            rec = soi_record(meta, lv, conn)
                         if rec is None:
                             continue
-                        if m == "M5a":
+                        if m.startswith("M5a"):
                             rec, lost = revert_first_pass(rec)
                     else:
                         path = method_dir(m) / lv / f"{name}.json"
@@ -861,13 +943,16 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("prepare", help="ghi danh sách trang, góc xoay và ảnh dùng chung (image soi-app, cần CSDL)")
+    pr = sub.add_parser("prepare", help="ghi danh sách trang, góc xoay và ảnh dùng chung (image soi-app, cần CSDL)")
+    pr.add_argument("--level", nargs="+", choices=LEVEL_KEYS, help="chỉ dựng lại các mức này")
+    pr.add_argument("--only", nargs="+")
     r = sub.add_parser("run", help="chạy một phương pháp; lượt đã có kết quả thì bỏ qua")
-    r.add_argument("--method", required=True, choices=["M1", "M2", "M3", "M4"])
+    r.add_argument("--method", required=True, choices=["M1", "M2", "M3", "M4", "M5"])
     r.add_argument("--level", nargs="+", choices=LEVEL_KEYS)
     r.add_argument("--only", nargs="+", help="chỉ các tên, ví dụ PLC_Q2_2025 6070")
     r.add_argument("--force", action="store_true", help="chạy lại lượt đã có kết quả (M1-M3 dùng lại đầu ra thô)")
-    r.add_argument("--max-usd", type=float, default=0.10, help="M4: dừng khi chi phí lần chạy chạm mức này")
+    r.add_argument("--max-usd", type=float, default=0.10,
+                   help="M4, M5: không chạy lượt kế khi chi phí lần chạy cộng ước tính của lượt đó vượt mức này")
     c = sub.add_parser("reconvert", help="dựng lại bản ghi M1-M3 từ đầu ra thô đã lưu")
     c.add_argument("--only", nargs="+")
     s = sub.add_parser("score", help="chấm mọi lượt đã có bằng bộ chấm và phép kiểm của Soi (image soi-app)")

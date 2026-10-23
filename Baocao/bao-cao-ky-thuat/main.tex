@@ -476,7 +476,8 @@ Bài toán là lấy ra đúng từng ô số (dòng nào, cột nào, giá tr�
 hàng nghìn, số âm để trong ngoặc, dấu gạch nghĩa là không có số; tên chỉ tiêu dài và xuống dòng; bảng có bốn đến sáu cột
 số xen với cột mã số và cột thuyết minh. Sai một chữ ở tên chỉ tiêu ít hại; sai một chữ số, mất dấu âm hay đặt đúng số
 vào sai dòng mới làm hỏng số liệu. Có năm họ phương pháp chính, mỗi họ có điểm mạnh, điểm yếu riêng. Các điểm yếu nêu
-dưới đây là điều được dự đoán từ cách mỗi họ làm việc; mức độ thật trên BCTC Việt Nam cần đo trên cùng một bộ đáp án.
+dưới đây là điều được dự đoán từ cách mỗi họ làm việc; mức độ thật được đo trên cùng một bộ đáp án ở
+mục~\ref{sec:sosanhpp}.
 
 \subsection{Dùng lớp chữ có sẵn trong file}
 Khi công ty xuất BCTC thẳng từ Excel, Word hoặc phần mềm kế toán, file PDF chứa sẵn chữ và vị trí của chữ. Gom chữ thành
@@ -524,7 +525,7 @@ các họ phương pháp.
 
 \begin{table}[H]
 \centering\small
-\caption{Các họ phương pháp trích xuất số từ BCTC (điểm yếu là dự đoán, chưa đo trên cùng bộ đáp án)}\label{tab:phuongphap}
+\caption{Các họ phương pháp trích xuất số từ BCTC (điểm yếu là dự đoán; số đo ở Bảng~\ref{tab:sosanhpp})}\label{tab:phuongphap}
 \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{2.7cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{2.4cm}@{}}
 \toprule
 \textbf{Phương pháp} & \textbf{Điểm mạnh} & \textbf{Điểm yếu với BCTC scan} & \textbf{Chi phí, phần cứng} \\ \midrule
@@ -1669,6 +1670,50 @@ trong phép đo này; trong quy trình thật nó còn bắt thêm một phần 
 con dấu đè lên số hay vết gấp như bản scan thật; vì vậy con số 99,94\% được dùng cùng với ước tính trên toàn bộ 119
 BCTC, không thay thế nó.
 
+\section{So sánh các phương pháp trích xuất trên cùng bộ đáp án}\label{sec:sosanhpp}
+Các họ phương pháp ở mục~\ref{sec:phuongphap} được đo trên đúng 11 BCTC có đáp án chữ gốc ở trên, với cùng các trang báo
+cáo, cùng ảnh trang ở cùng bốn mức chất lượng, cùng cách chấm và cùng bộ phép kiểm kế toán áp lên đầu ra của mỗi cách.
+Mỗi cách được chấm trên cùng 3.106 ô có số của đáp án (cách chấm ở mục~\ref{sec:dapan} còn tính cả ô một cách đọc ra số
+mà đáp án không có, nên tổng ô hơi khác theo từng cách). Bốn cách được so với Soi: OCR bằng Tesseract tiếng Việt rồi
+dựng bảng bằng luật vị trí; bộ chuyển đổi tài liệu Docling (mô hình nhận dạng bảng kèm OCR, chạy trên CPU); OCR bằng
+Tesseract rồi cho mô hình ngôn ngữ (Claude Haiku 5.5, cùng mô hình Soi dùng) sắp văn bản thành bảng theo đúng khuôn của
+Soi; và đọc lớp chữ có sẵn. Lớp chữ có sẵn chính là nguồn dựng đáp án nên chỉ ghi để tham khảo.
+
+\begin{table}[H]
+\centering\small
+\caption{Tỷ lệ ô đúng trên 3.106 ô đáp án (11 BCTC) theo phương pháp và chất lượng ảnh. Cột cuối: số BCTC qua hết
+phép kiểm ở ảnh gốc (không cần người xem) và số ô sai còn nằm trong các BCTC đó.}\label{tab:sosanhpp}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}Xrrrrr@{}}
+\toprule
+\textbf{Phương pháp} & \textbf{Ảnh gốc} & \textbf{200 dpi} & \textbf{120 dpi} & \textbf{72 dpi} & \textbf{Qua phép kiểm} \\ \midrule
+Lớp chữ có sẵn (tham khảo) & 99,68\% & -- & -- & -- & 2 BCTC, 6 ô sai \\
+Tesseract + luật dựng bảng & 91,98\% & 90,37\% & 77,95\% & 3,22\% & 0 \\
+Docling & 66,97\% & 68,90\% & 62,91\% & 3,80\% & 0 \\
+Tesseract + mô hình ngôn ngữ & 96,81\% & 96,62\% & 93,21\% & 20,70\% & 1 BCTC, 1 ô sai \\
+Soi, lần đọc đầu & 99,97\% & 99,87\% & 99,81\% & 97,04\% & 11 BCTC, 2 ô \\
+Soi, sau kiểm và sửa & 99,97\% & 99,87\% & 99,81\% & 97,75\% & 11 BCTC, 2 ô \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Ba điều rút ra. Thứ nhất, cách đọc bằng OCR mất dần khi ảnh xấu đi và gần như không dùng được ở 72 dpi (3--21\% ô
+đúng), trong khi mô hình đọc ảnh vẫn đúng 97--98\%. Thứ hai, cho mô hình ngôn ngữ sắp lại văn bản OCR nâng tỷ lệ đúng
+so với dựng bảng bằng luật (96,8\% so với 92,0\% ở ảnh gốc), nhưng vẫn còn 94 ô sai ở ảnh gốc; mô hình không nhìn
+ảnh nên không sửa được chữ số mà OCR đã đọc sai và chép theo, như dự đoán ở mục~\ref{sec:phuongphap}. Thứ ba, phép kiểm kế toán áp được cho mọi cách nhưng
+hiệu quả tùy cách: ở ảnh gốc, mọi ô sai của OCR dựng bảng bằng luật và 93/94 ô sai của OCR kết hợp mô hình ngôn ngữ nằm
+trong BCTC bị phép kiểm báo, nên người phải xem lại gần như mọi BCTC; với Docling, 373/677 ô sai lọt qua vì bảng bị vỡ,
+mất cột mã số nên nhiều phép kiểm không chạy được. Soi là cách duy nhất
+mà mọi BCTC ở ảnh gốc qua hết phép kiểm; hai ô sai ở đó là một ô bị bỏ sót và một ô đọc thừa, không phải số sai.
+
+Về chi phí và thời gian ở ảnh gốc: OCR dựng bảng bằng luật mất khoảng 5 giây mỗi BCTC, Docling khoảng 54 giây (CPU),
+cả hai không tốn tiền; OCR kết hợp mô hình ngôn ngữ tốn khoảng 0,012 USD mỗi BCTC; Soi khoảng 0,022 USD ở ảnh gốc và
+0,040 USD ở 72 dpi, do phải đọc lại nhiều ô hơn. Toàn bộ phép so sánh tốn khoảng 1,1 USD.
+
+\textbf{Giới hạn:} cùng bộ đáp án nhỏ như mục~\ref{sec:dapan} (4 công ty, 11 BCTC). Thông số của Tesseract và luật dựng
+bảng chỉ được chỉnh trên một BCTC. Mọi cách dùng chung các trang báo cáo do Soi định vị, nên phép so chỉ đo bước chép
+bảng, không đo bước tìm trang. Ở ảnh gốc, 5 trong 6 BCTC lấy từ kho của Soi được đọc bằng gpt-5.4-mini (trước khi đổi
+nhà cung cấp chính); ở 120 và 72 dpi, Soi đọc lại đúng bộ ảnh mà các cách khác dùng.
+
 \section{Độ đúng theo BCTC và theo từng ô}\label{sec:theoo}
 Hình~\ref{fig:trangthaiketqua} cho trạng thái các BCTC theo kỳ. Bốn BCTC quý 4/2025 \enquote{đã duyệt tay} (BSR, SSB,
 VPL, VHM) là trường hợp chính BCTC tự cộng lệch: lần đọc lại phóng to vẫn ra đúng số cũ, nên người duyệt ghi rõ lý do
@@ -2140,7 +2185,7 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam
 \subsection{Xác suất đúng cho từng ô và bước kiểm chứng tự chọn công cụ theo lợi ích trên chi phí}\chualam
-\subsection{Mở rộng bộ đáp án và so sánh các phương pháp trích xuất trên cùng bộ đáp án}\chualam
+\subsection{Mở rộng bộ đáp án (thêm công ty chứng khoán, bản scan thật có con dấu)}\chualam
 \subsection{Sàng lọc doanh nghiệp tăng trưởng và kiểm định lịch sử (backtest)}\chualam
 \subsection{Radar sự kiện công bố thông tin và bản tin sáng theo danh mục}\chualam
 \subsection{Kênh phân phối: Facebook, Zalo, MCP}\chualam

@@ -1301,7 +1301,7 @@ Hoàn nhập / chi phí dự phòng giảm mạnh & Ngân hàng: dự phòng âm
 Mua bán công ty con, biến động công ty liên kết & Dòng LCTT về mua, bán công ty con; lãi liên doanh, liên kết tăng
 trên 3 lần \\
 Có lãi nhưng dòng tiền kinh doanh âm & LNST lũy kế dương, lưu chuyển tiền thuần từ hoạt động kinh doanh âm \\
-Số liệu bị sửa giữa các BCTC & Hai BCTC cùng ngày (quý 2 và bán niên\ldots) in khác nhau ở các dòng chính \\
+Số liệu bị sửa giữa các BCTC & Hai BCTC cùng ngày (quý 2 và bán niên\ldots) in khác nhau ở các dòng chính; cờ ghi mức chênh và phần trăm \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -1701,6 +1701,11 @@ Soi, sau kiểm và sửa & 99,97\% & 99,87\% & 99,81\% & 97,75\% & 11 BCTC, 2 �
 \end{tabularx}
 \end{table}
 
+Số của Soi ở bảng này khác Bảng~\ref{tab:dapan} vì hai lý do. Bảng này chấm trên bộ ô cố định: ở 200 và 120 dpi Soi
+không đọc sai ô nào, nhưng có 4 và 6 ô đáp án không ghép được với ô nào của bản đọc nên bị tính là chưa đúng. Ở 120 và 72
+dpi, bảng này dùng bộ ảnh làm mờ chung cho mọi cách, có nhiễu khác bộ ảnh của Bảng~\ref{tab:dapan}; ở 120 dpi hai bộ ảnh
+cho cùng kết quả, ở 72 dpi bộ ảnh chung ra 97,75\% thay vì 98,65\%.
+
 Ba điều rút ra. Thứ nhất, cách đọc bằng OCR mất dần khi ảnh xấu đi và gần như không dùng được ở 72 dpi (3--21\% ô
 đúng), trong khi mô hình đọc ảnh vẫn đúng 97--98\%. Thứ hai, cho mô hình ngôn ngữ sắp lại văn bản OCR nâng tỷ lệ đúng
 so với dựng bảng bằng luật (96,8\% so với 92,0\% ở ảnh gốc), nhưng vẫn còn 94 ô sai ở ảnh gốc; mô hình không nhìn
@@ -1771,7 +1776,7 @@ Chưa kiểm được: dòng có phép cộng nhưng hệ thống chưa khai bá
 
 Như vậy 95,5\% số ô được phép kiểm xác nhận, hay 95,1\% nếu không tính 152 ô người sửa (con số dùng ở
 mục~\ref{sec:ketquachinh}). Ô chưa kiểm được có hai loại: dòng mà mẫu biểu không đặt vào phép cộng nào (mục ngoài bảng
-của ngân hàng, lãi trên cổ phiếu, dòng \enquote{trong đó}), và dòng có phép cộng mà hệ thống chưa khai báo, chủ yếu là
+của ngân hàng chưa có số kỳ khác để đối chiếu, lãi trên cổ phiếu, dòng \enquote{trong đó}), và dòng có phép cộng mà hệ thống chưa khai báo, chủ yếu là
 dòng chi tiết của công ty chứng khoán. Các ô này được so với lần đọc thứ hai (mục~\ref{sec:nguoidoc2}). 33 ô vẫn lệch
 phép kiểm sau khi người duyệt đối chiếu ảnh và thấy chính BCTC in lệch (BSR, VHM, VPL, SSB quý 4/2025). Không còn ô
 nào bị phép kiểm chỉ ra nghi sai mà chưa xử lý: khi một ô khác BCTC kỳ khác, hệ thống đọc lại ô ở cả hai BCTC, và nếu cả

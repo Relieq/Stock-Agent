@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Góp ý · Soi{% endblock %}
+{% block body %}
+<h1>Góp ý</h1>
+<p class="muted small">Người dùng gửi từ ô góp ý ở chân mỗi trang; mỗi góp ý cũng được gửi email cho quản trị. Mới nhất ở trên.</p>
+{% if items %}
+<table class="list">
+  <thead><tr><th>Lúc</th><th>Người gửi</th><th>Trang</th><th>Nội dung</th></tr></thead>
+  <tbody>
+  {% for f in items %}
+  <tr>
+    <td class="small">{{ f.created_at | gio }}</td>
+    <td class="small">{{ f.email }}</td>
+    <td class="small"><a href="{{ f.page }}">{{ f.page }}</a></td>
+    <td style="white-space:pre-wrap">{{ f.message }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Chưa có góp ý nào.</p>
+{% endif %}
+{% endblock %}

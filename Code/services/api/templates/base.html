@@ -4,17 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Soi{% endblock %}</title>
-<link rel="stylesheet" href="/static/style.css?v=5">
+<link rel="stylesheet" href="/static/style.css?v=6">
 {% block head %}{% endblock %}
 </head>
 <body>
 {% set me = request.state.user if request and request.state and request.state.user is defined else none %}
 <header class="top"><a href="/mua-bctc" class="brand">Soi</a>
   {% if me %}<nav class="nav"><a href="/mua-bctc">Mùa BCTC</a> <a href="/bao-cao">Báo cáo</a> <a href="/lich">Lịch</a> <a href="/theo-doi">Theo dõi</a> <a href="/yeu-cau">Yêu cầu</a>
-    {% if me.is_admin %}<a href="/duyet">Duyệt</a> <a href="/quan-tri">Người dùng</a> <a href="/quan-tri/chi-phi">Chi phí</a> <a href="/noi-bo" class="muted">Nội bộ</a>{% endif %}
+    {% if me.is_admin %}<a href="/duyet">Duyệt</a> <a href="/quan-tri">Người dùng</a> <a href="/quan-tri/chi-phi">Chi phí</a> <a href="/quan-tri/gop-y">Góp ý</a> <a href="/noi-bo" class="muted">Nội bộ</a>{% endif %}
     <form method="post" action="/dang-xuat" class="inline"><button class="link" title="{{ me.email }}">Đăng xuất</button></form></nav>{% endif %}
 </header>
 <main>{% block body %}{% endblock %}</main>
+{% if me %}{% set qp = request.query_params %}
+<section class="feedback" id="gop-y">
+  <details{% if qp.gopy or qp.gopy_loi %} open{% endif %}><summary>Góp ý cho Soi</summary>
+    {% if qp.gopy %}<p class="infobox">Cảm ơn bạn, góp ý đã được gửi.</p>{% endif %}
+    {% if qp.gopy_loi %}<p class="infobox">{{ qp.gopy_loi }}</p>{% endif %}
+    <form method="post" action="/gop-y">
+      <input type="hidden" name="page" value="{{ request.url.path }}">
+      <textarea name="message" rows="3" maxlength="2000" required
+        placeholder="Số nào sai, chỗ nào khó hiểu, bạn muốn thêm gì... Trang đang xem được gửi kèm."></textarea>
+      <button>Gửi góp ý</button>
+    </form>
+  </details>
+</section>{% endif %}
 <footer class="foot small muted">Thử nghiệm trong khuôn khổ đồ án tốt nghiệp, chỉ dành cho người được mời. Số liệu do AI hỗ trợ trích xuất
   từ BCTC đã công bố và được kiểm chứng bằng ràng buộc kế toán; mỗi số mở được trang BCTC gốc. Đây là thông tin, không phải khuyến nghị đầu tư.</footer>
 </body>

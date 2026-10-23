@@ -695,7 +695,7 @@ F4 & Thẻ KQKD có cờ cảnh báo, mỗi số có nguồn tới trang BCTC & 
 F5 & Bảng xếp hạng mùa BCTC, lịch công bố, ảnh thẻ để chia sẻ & Đã làm \\
 F6 & Theo dõi mã và nhận email khi có BCTC mới & Đã làm \\
 F7 & Yêu cầu đọc mã ngoài danh sách, tải BCTC lên (có hạn mức) & Đã làm \\
-F8 & Quản trị: duyệt tay, sửa ô, mời và phân quyền người dùng, xem chi phí gọi mô hình & Đã làm \\
+F8 & Quản trị: duyệt tay, sửa ô, mời và phân quyền người dùng, xem chi phí gọi mô hình, đọc góp ý & Đã làm \\
 F9 & Chỉ số tài chính (biên lợi nhuận, ROE\ldots) & Một phần \\
 F10 & Agent tạo báo cáo theo câu hỏi của người dùng, kiểm từng con số trong lời văn & Đã làm \\
 \bottomrule
@@ -1386,6 +1386,8 @@ Giai đoạn thử nghiệm chỉ dành cho người được mời, đăng nh�
 email khi có BCTC mới, gửi yêu cầu đọc mã ngoài danh sách (có hạn mức mỗi ngày), hoặc tải lên BCTC riêng. Tài liệu tải
 lên chỉ chủ sở hữu thấy. Trước khi đọc, hệ thống xem hai trang đầu để kiểm tra file đúng là BCTC của mã và kỳ người dùng
 khai; file khác loại (ví dụ công văn giải trình kết quả kinh doanh) bị từ chối kèm lý do và không tính vào hạn mức.
+Cuối mỗi trang có ô góp ý: nội dung được lưu kèm trang người dùng đang xem, gửi email cho quản trị viên và hiện trong
+danh sách góp ý ở trang quản trị.
 
 \section{Agent tạo báo cáo theo yêu cầu}\label{sec:agent}
 Người dùng gõ câu hỏi bằng lời thường và nhận về một báo cáo ngắn có lời văn, bảng số, biểu đồ. Agent trả lời năm loại
@@ -1619,7 +1621,7 @@ chữ gốc, đúng từng chữ số kế toán đã gõ. Soi luôn đọc BCTC
 ta có đáp án cho mọi ô mà không cần người gán nhãn.
 
 Loại file này rất hiếm. Trong 119 BCTC chỉ có 5 file; trong 77 BCTC quý 2 hoặc bán niên 2026 của các mã HOSE, HNX
-và UPCoM ngoài VN30 được quét thêm chỉ có 2 file. Thông tin phần mềm tạo file cho thấy phần lớn số còn lại đi ra từ máy
+và UPCoM ngoài VN30 được quét thêm chỉ có 2 file; BCTC gần nhất năm 2026 của 33 mã VN100 khác không có file nào. Thông tin phần mềm tạo file cho thấy phần lớn số còn lại đi ra từ máy
 scan. Bộ đáp án gom được 11 BCTC của 4 công ty, gồm 6 BCTC ngân hàng (VPB từ quý 3/2025 đến quý 3/2026, ACB quý 1/2026)
 và 5 BCTC doanh nghiệp thường (GVR quý 4/2025; PLC quý 2, quý 3, quý 4/2025 và quý 2/2026), tổng cộng 3.107 ô số. Một file của TIG bị loại vì
 lớp chữ của nó do máy nhận dạng từ ảnh chứ không phải chữ gốc: có lỗi chính tả và số bị tách vỡ.

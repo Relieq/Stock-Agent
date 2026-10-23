@@ -9,7 +9,9 @@ from fastapi.responses import RedirectResponse
 
 from services.alerts import notify_watchers
 from services.db import connect
+from services import feedback
 from services.extraction.verify import apply_manual_fix, approve_document, confirm_reading
+from services.notify import notify_admin
 from services.ondemand import month_spend, monthly_budget, request_ticker, request_upload, used_today
 from services.users import (end_session, finish_login, invite, list_users, remove_user, send_invitation, set_watch,
                             start_login, update_user, watchlist)
@@ -287,6 +289,33 @@ def admin_remove(request: Request, user_id: int):
     except ValueError as e:
         return _back("/quan-tri", str(e))
     return _back("/quan-tri", "Đã xóa người dùng")
+
+
+# ---- góp ý ---------------------------------------------------------------------------------------------------------
+
+@router.post("/gop-y")
+def feedback_submit(request: Request, message: str = Form(""), page: str = Form("/")):
+    user = user_of(request)
+    page = feedback.safe_page(page)
+    if user is None:
+        return RedirectResponse(f"/dang-nhap?next={page}", status_code=303)
+    sep = "&" if "?" in page else "?"
+    try:
+        with connect() as conn:
+            feedback.save(conn, user.id, page, message)
+    except ValueError as e:
+        from urllib.parse import quote
+        return RedirectResponse(f"{page}{sep}gopy_loi={quote(str(e))}#gop-y", status_code=303)
+    notify_admin(f"[Soi] Góp ý từ {user.email}", feedback.email_body(user.email, page, message.strip()))
+    return RedirectResponse(f"{page}{sep}gopy=1#gop-y", status_code=303)
+
+
+@router.get("/quan-tri/gop-y")
+def admin_feedback(request: Request):
+    require_admin(request)
+    with connect() as conn:
+        items = feedback.recent(conn)
+    return templates().TemplateResponse(request, "admin_feedback.html", {"items": items})
 
 
 # ---- hàng duyệt (nội bộ) -------------------------------------------------------------------------------------------

@@ -43,3 +43,11 @@ def test_khong_chuyen_huong_ra_ngoai_sau_dang_nhap():
     from pathlib import Path
     src = (Path(__file__).resolve().parents[1] / "services" / "api" / "accounts.py").read_text(encoding="utf-8")
     assert 'startswith("/") else' not in src      # kiểu kiểm cũ cho lọt "//trang-ngoai"
+
+
+def test_muc_sua_so_ghi_chenh_va_phan_tram():
+    from decimal import Decimal as D
+    from services.metrics.card import revision_gap, ty_signed
+    assert revision_gap(D("15987971e6"), D("17278633e6")) == "số mới thấp hơn 1.291 tỷ, −7,5%"
+    assert revision_gap(D("5e9"), D("-2e9")) == "số mới cao hơn 7,0 tỷ"
+    assert ty_signed(D("-940909e6")) == "âm 941 tỷ"

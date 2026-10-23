@@ -356,6 +356,19 @@ REVISED_MIN_SHARE = Decimal("0.005")   # chênh dưới 0,5% hoặc dưới 1 t�
 REVISED_MIN_AMOUNT = Decimal(10**9)
 
 
+def ty_signed(v: Decimal) -> str:
+    return ("âm " if v < 0 else "") + ty(v)
+
+
+def revision_gap(newer: Decimal, older: Decimal) -> str:
+    """Mức sửa của số mới so với số cũ: "số mới thấp hơn 1.291 tỷ, −7,5%"; % chỉ khi cả hai số dương."""
+    d = newer - older
+    text = f"số mới {'cao' if d > 0 else 'thấp'} hơn {ty(d)}"
+    if newer > 0 and older > 0:
+        text += f", {'+' if d > 0 else '−'}{vn(abs(d) / older * 100)}%"
+    return text
+
+
 def flag_revised(f: Facts, period_checks, labels) -> Flag | None:
     """Số chính khác giữa BCTC này và BCTC khác của cùng công ty (bản soát xét, kiểm toán hoặc trình bày lại)."""
     watched = {f.code("IS", m) for m in ("revenue", "toi", "pbt", "npat", "npat_parent")} - {None}
@@ -369,12 +382,14 @@ def flag_revised(f: Facts, period_checks, labels) -> Flag | None:
         name = labels.get((pc.statement, pc.key), pc.key).strip()
         col = COLUMN_NAMES.get(pc.column, pc.column)
         if pc.kind == "same_date":
-            text = f"{name} ({col}): BCTC quý ghi {ty(pc.later)}, BCTC bán niên/năm đã soát xét hoặc kiểm toán ghi {ty(pc.expected)}"
+            text = (f"{name} ({col}): BCTC quý ghi {ty_signed(pc.later)}, BCTC bán niên/năm đã soát xét hoặc kiểm toán "
+                    f"ghi {ty_signed(pc.expected)} ({revision_gap(pc.expected, pc.later)})")
         elif pc.kind == "is_quarter":
-            text = (f"{name} ({col}): BCTC này ghi {ty(pc.later)}, nhưng lấy lũy kế trừ đi lũy kế đã công bố ở BCTC quý "
-                    f"trước thì ra {ty(pc.expected)}, tức số kỳ trước đã bị sửa")
+            text = (f"{name} ({col}): BCTC này ghi {ty_signed(pc.later)}, nhưng lấy lũy kế trừ đi lũy kế đã công bố ở "
+                    f"BCTC quý trước thì ra {ty_signed(pc.expected)}, tức số kỳ trước đã bị sửa "
+                    f"({revision_gap(pc.later, pc.expected)})")
         else:
-            text = f"{name} ({col}): BCTC này ghi {ty(pc.later)}, BCTC quý liền kề ghi {ty(pc.expected)}"
+            text = f"{name} ({col}): BCTC này ghi {ty_signed(pc.later)}, BCTC quý liền kề ghi {ty_signed(pc.expected)}"
         if pc.restated:
             text += " (BCTC có ghi \"trình bày lại\")"
         lines.append(text)

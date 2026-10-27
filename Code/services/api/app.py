@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 
 from services.api import data
 from services.api.accounts import COOKIE, require_admin, router as accounts_router
+from services.api.landing import demo_videos, is_public, site_stats, video_file
 from services.db import connect
 from services.extraction.evidence import STATUS_LABELS
 from services.ingestion.registry import raw_data_dir
@@ -38,16 +39,14 @@ from services.api.reports import router as reports_router  # noqa: E402
 app.include_router(reports_router)
 
 # Trang và ảnh chia sẻ thẻ KQKD công khai để mạng xã hội đọc được thẻ xem trước; chỉ thẻ đã kiểm chứng/duyệt tay
-PUBLIC_PATHS = ("/dang-nhap", "/static/", "/chia-se/", "/anh/", "/suc-khoe")
-
-
 @app.middleware("http")
 async def auth(request: Request, call_next):
-    """Chỉ người được mời mới vào được (kế hoạch MVP mục 2.3); trang đăng nhập và tệp tĩnh thì công khai."""
+    """Chỉ người được mời mới vào được (kế hoạch MVP mục 2.3); trang giới thiệu, trang đăng nhập và tệp tĩnh thì công
+    khai (landing.is_public)."""
     with connect() as conn:
         request.state.user = session_user(conn, request.cookies.get(COOKIE))
     path = request.url.path
-    if request.state.user is None and not path.startswith(PUBLIC_PATHS):
+    if request.state.user is None and not is_public(path):
         if path.startswith("/api/"):
             return JSONResponse({"detail": "Cần đăng nhập"}, status_code=401)
         target = path + (f"?{request.url.query}" if request.url.query else "")
@@ -167,8 +166,23 @@ def _quarters(conn) -> list[tuple[int, str]]:
 
 
 @app.get("/")
-def home():
-    return RedirectResponse("/mua-bctc")
+def home(request: Request):
+    """Người đã đăng nhập vào thẳng mùa BCTC; người chưa đăng nhập xem trang giới thiệu."""
+    if request.state.user is not None:
+        return RedirectResponse("/mua-bctc")
+    with connect() as conn:
+        stats = site_stats(conn)
+    return templates.TemplateResponse(request, "landing.html", {
+        "stats": stats, "videos": demo_videos(raw_data_dir() / "demo")})
+
+
+@app.get("/video/{name}")
+def demo_video(name: str):
+    """Video demo và ảnh bìa cho trang giới thiệu (tệp nằm ngoài repo, xem landing.py)."""
+    path = video_file(raw_data_dir() / "demo", name)
+    if path is None:
+        raise HTTPException(404)
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/mua-bctc")

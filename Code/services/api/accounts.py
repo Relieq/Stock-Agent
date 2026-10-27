@@ -78,7 +78,7 @@ def login_finish(request: Request, token: str, next: str = "/mua-bctc"):
 def logout(request: Request):
     with connect() as conn:
         end_session(conn, request.cookies.get(COOKIE))
-    resp = RedirectResponse("/dang-nhap", status_code=303)
+    resp = RedirectResponse("/", status_code=303)
     resp.delete_cookie(COOKIE)
     return resp
 

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Soi · Kết quả kinh doanh đọc ngay khi BCTC công bố{% endblock %}
+{% block bodyclass %}landing{% endblock %}
+{% block body %}
+{% set last = stats.last %}
+{% set ky = (last.period | lower) ~ "-" ~ last.year if last else none %}
+<section class="hero">
+  <div class="pitch">
+    <h1>Kết quả kinh doanh của doanh nghiệp niêm yết, đọc ngay khi BCTC công bố</h1>
+    <p class="lead">Soi tự tải BCTC ngay khi công ty đăng lên, đọc từng con số, kiểm bằng các ràng buộc kế toán rồi mới
+      đưa lên thẻ kết quả kinh doanh. Số nào cũng mở được đúng trang BCTC gốc.</p>
+    <div class="cta">
+      <a class="btn primary" href="/dang-nhap">Đăng nhập</a>
+      {% if last %}<a class="btn" href="/chia-se/{{ last.ticker }}/{{ ky }}">Xem một thẻ mẫu</a>{% endif %}
+      {% if videos.user %}<a class="btn" href="#video">Xem video</a>{% endif %}
+    </div>
+    <p class="small muted">Soi đang thử nghiệm, chỉ dành cho người được mời. Đây là thông tin, không phải khuyến nghị đầu tư.</p>
+  </div>
+  {% if last %}<a class="sample" href="/chia-se/{{ last.ticker }}/{{ ky }}" title="Thẻ KQKD {{ last.ticker }} {{ last.period }}/{{ last.year }}">
+    <img src="/anh/{{ last.ticker }}/{{ ky }}.png" alt="Thẻ kết quả kinh doanh {{ last.ticker }} {{ last.period }}/{{ last.year }}" loading="lazy"></a>{% endif %}
+</section>
+
+<section class="stats panel">
+  <div><b>{{ stats.tickers }}</b><span>mã có BCTC đã kiểm chứng</span></div>
+  <div><b>{{ stats.documents }}</b><span>BCTC đã đọc và kiểm chứng</span></div>
+  {% if last %}<div><b>{{ last.ticker }} {{ last.period }}/{{ last.year }}</b><span>BCTC xử lý xong gần nhất, lúc {{ last.at | gio }}</span></div>{% endif %}
+</section>
+
+<section class="how">
+  <h2>Soi làm việc thế nào</h2>
+  <ol class="steps">
+    <li><b>Tự tải BCTC khi công bố.</b> Soi canh trang của HOSE và Vietstock; công ty đăng BCTC lên là Soi tải về, không cần ai bấm.</li>
+    <li><b>Đọc và kiểm từng con số.</b> AI chép số từ BCTC (kể cả bản scan); code kiểm lại bằng ràng buộc kế toán và đối chiếu
+      với BCTC kỳ trước. Ô nào còn đáng ngờ thì người duyệt xem ảnh gốc trước khi xuất bản.</li>
+    <li><b>Đưa lên thẻ và báo cho bạn.</b> Thẻ kết quả kinh doanh, email cho người theo dõi mã, và báo cáo theo câu hỏi
+      bằng lời thường. Mọi con số do code tính từ số đã kiểm chứng.</li>
+  </ol>
+</section>
+
+{% macro vcard(v) %}
+<figure class="vcard panel">
+  <video controls preload="none" playsinline poster="/video/{{ v.slug }}.jpg" src="/video/{{ v.slug }}.mp4"></video>
+  <figcaption><b>{{ v.title }}</b> <span class="muted small">{{ (v.seconds // 60) }}:{{ "%02d" | format(v.seconds % 60) }}</span>
+    <span class="small">{{ v.desc }}</span></figcaption>
+</figure>
+{% endmacro %}
+{% if videos.user %}
+<section class="videos" id="video">
+  <h2>Xem Soi chạy thật</h2>
+  <p class="muted">Quay trên chính Soi với BCTC quý 3/2026; chữ dưới video là lời dẫn.</p>
+  <div class="vgrid">{% for v in videos.user %}{{ vcard(v) }}{% endfor %}</div>
+  {% if videos.behind %}
+  <h3>Phía sau: số được kiểm và duyệt thế nào</h3>
+  <div class="vgrid">{% for v in videos.behind %}{{ vcard(v) }}{% endfor %}</div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="join panel">
+  <div>
+    <h2>Muốn dùng thử?</h2>
+    <p>Soi đang trong giai đoạn thử nghiệm của một đồ án tốt nghiệp và chỉ mở cho người được mời. Đã có lời mời thì đăng
+      nhập bằng email: Soi gửi link đăng nhập, không cần mật khẩu.</p>
+  </div>
+  <a class="btn primary" href="/dang-nhap">Đăng nhập</a>
+</section>
+{% endblock %}

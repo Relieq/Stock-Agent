@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Soi{% endblock %}</title>
 <link rel="stylesheet" href="/static/fonts.css?v=1">
-<link rel="stylesheet" href="/static/style.css?v=10">
+<link rel="stylesheet" href="/static/style.css?v=11">
 {% block head %}{% endblock %}
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
@@ -17,7 +17,7 @@
     {% if me.is_admin %}<details class="admin"><summary>Quản trị</summary><div class="menu">
       <a href="/duyet">Duyệt</a><a href="/quan-tri">Người dùng</a><a href="/quan-tri/chi-phi">Chi phí</a><a href="/quan-tri/gop-y">Góp ý</a><a href="/noi-bo">Nội bộ</a></div></details>{% endif %}
     <form method="post" action="/dang-xuat" class="inline out"><button class="link" title="{{ me.email }}">Đăng xuất</button></form></nav>
-  {% elif here != "/dang-nhap" %}<nav class="nav"><a href="/dang-nhap" class="signin">Đăng nhập</a></nav>{% endif %}
+  {% elif here != "/dang-nhap" %}<nav class="nav">{% if here in ("/", "/gioi-thieu") %}<a href="#tinh-nang" class="wide-only">Tính năng</a><a href="#tin-duoc" class="wide-only">Vì sao tin được</a><a href="#cau-hoi" class="wide-only">Câu hỏi</a>{% endif %}<a href="/dang-nhap" class="signin">Đăng nhập</a></nav>{% endif %}
 </div></header>
 <main>{% block body %}{% endblock %}</main>
 {% if me %}{% set qp = request.query_params %}

@@ -1,7 +1,7 @@
 """Trang giới thiệu: đường dẫn công khai, danh sách video demo, tên tệp video an toàn."""
 import json
 
-from services.api.landing import demo_videos, is_public, video_file
+from services.api.landing import available, demo_videos, is_public, video_file
 
 
 def test_only_home_and_listed_prefixes_are_public():
@@ -18,6 +18,13 @@ def test_video_file_accepts_only_plain_names_in_the_demo_folder(tmp_path):
     assert video_file(tmp_path, "the-kqkd.jpg") == tmp_path / "the-kqkd.jpg"
     for bad in ("../secret.mp4", "videos.json", "a.exe", "khong-co.mp4", "THE.mp4"):
         assert video_file(tmp_path, bad) is None
+
+
+def test_available_lists_only_servable_names(tmp_path):
+    for n in ("soi-1080.mp4", "f-the.jpg", "videos.json", "Ghi chu.txt"):
+        (tmp_path / n).write_bytes(b"x")
+    assert available(tmp_path) == {"soi-1080.mp4", "f-the.jpg"}
+    assert available(tmp_path / "khong-co") == set()
 
 
 def test_demo_videos_split_into_user_and_behind_the_scenes_and_skip_missing_files(tmp_path):

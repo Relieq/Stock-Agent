@@ -3,65 +3,135 @@
 {% block bodyclass %}landing{% endblock %}
 {% block body %}
 {% set last = stats.last %}
-{% set ky = (last.period | lower) ~ "-" ~ last.year if last else none %}
+{% set qp = request.query_params %}
+{% macro loop(name, alt) %}{% if name ~ ".mp4" in have %}<div class="shot"><div class="shotbar"><i></i><i></i><i></i></div>
+  <video class="autoplay" muted loop playsinline preload="none" poster="/video/{{ name }}.jpg" aria-label="{{ alt }}">
+    <source src="/video/{{ name }}.mp4" type="video/mp4"></video></div>{% endif %}{% endmacro %}
+
 <section class="hero">
   <div class="pitch">
+    <p class="eyebrow">Mùa BCTC{% if stats.season %} {{ stats.season }}{% endif %} · VN30</p>
     <h1>Kết quả kinh doanh của doanh nghiệp niêm yết, đọc ngay khi BCTC công bố</h1>
     <p class="lead">Soi tự tải BCTC ngay khi công ty đăng lên, đọc từng con số, kiểm bằng các ràng buộc kế toán rồi mới
       đưa lên thẻ kết quả kinh doanh. Số nào cũng mở được đúng trang BCTC gốc.</p>
     <div class="cta">
-      <a class="btn primary" href="/dang-nhap">Đăng nhập</a>
-      {% if last %}<a class="btn" href="/chia-se/{{ last.ticker }}/{{ ky }}">Xem một thẻ mẫu</a>{% endif %}
-      {% if videos.user %}<a class="btn" href="#video">Xem video</a>{% endif %}
+      <a class="btn primary" href="#dung-thu">Xin dùng thử</a>
+      {% if "soi-1080.mp4" in have %}<a class="btn" href="#video">▶ Xem video 90 giây</a>{% endif %}
     </div>
-    <p class="small muted">Soi đang thử nghiệm, chỉ dành cho người được mời. Đây là thông tin, không phải khuyến nghị đầu tư.</p>
+    <p class="small muted">Đã có lời mời? <a href="/dang-nhap">Đăng nhập</a> · Đây là thông tin, không phải khuyến nghị đầu tư.</p>
   </div>
-  {% if last %}<a class="sample" href="/chia-se/{{ last.ticker }}/{{ ky }}" title="Thẻ KQKD {{ last.ticker }} {{ last.period }}/{{ last.year }}">
-    <img src="/anh/{{ last.ticker }}/{{ ky }}.png" alt="Thẻ kết quả kinh doanh {{ last.ticker }} {{ last.period }}/{{ last.year }}" loading="lazy"></a>{% endif %}
+  {{ loop("f-mua", "Mùa BCTC trên Soi: xếp hạng các mã đã công bố") }}
 </section>
 
 <section class="stats panel">
   <div><b>{{ stats.tickers }}</b><span>mã có BCTC đã kiểm chứng</span></div>
   <div><b>{{ stats.documents }}</b><span>BCTC đã đọc và kiểm chứng</span></div>
   {% if last %}<div><b>{{ last.ticker }} {{ last.period }}/{{ last.year }}</b><span>BCTC xử lý xong gần nhất, lúc {{ last.at | gio }}</span></div>{% endif %}
+  <div><b>HOSE · Vietstock</b><span>nguồn: BCTC gốc công ty công bố</span></div>
 </section>
 
-<section class="how">
-  <h2>Soi làm việc thế nào</h2>
-  <ol class="steps">
-    <li><b>Tự tải BCTC khi công bố.</b> Soi canh trang của HOSE và Vietstock; công ty đăng BCTC lên là Soi tải về, không cần ai bấm.</li>
-    <li><b>Đọc và kiểm từng con số.</b> AI chép số từ BCTC (kể cả bản scan); code kiểm lại bằng ràng buộc kế toán và đối chiếu
-      với BCTC kỳ trước. Ô nào còn đáng ngờ thì người duyệt xem ảnh gốc trước khi xuất bản.</li>
-    <li><b>Đưa lên thẻ và báo cho bạn.</b> Thẻ kết quả kinh doanh, email cho người theo dõi mã, và báo cáo theo câu hỏi
-      bằng lời thường. Mọi con số do code tính từ số đã kiểm chứng.</li>
-  </ol>
-</section>
-
-{% macro vcard(v) %}
-<figure class="vcard panel">
-  <video controls preload="none" playsinline poster="/video/{{ v.slug }}.jpg" src="/video/{{ v.slug }}.mp4"></video>
-  <figcaption><b>{{ v.title }}</b> <span class="muted small">{{ (v.seconds // 60) }}:{{ "%02d" | format(v.seconds % 60) }}</span>
-    <span class="small">{{ v.desc }}</span></figcaption>
-</figure>
-{% endmacro %}
-{% if videos.user %}
-<section class="videos" id="video">
-  <h2>Xem Soi chạy thật</h2>
-  <p class="muted">Quay trên chính Soi với BCTC quý 3/2026; chữ dưới video là lời dẫn.</p>
-  <div class="vgrid">{% for v in videos.user %}{{ vcard(v) }}{% endfor %}</div>
-  {% if videos.behind %}
-  <h3>Phía sau: số được kiểm và duyệt thế nào</h3>
-  <div class="vgrid">{% for v in videos.behind %}{{ vcard(v) }}{% endfor %}</div>
-  {% endif %}
+{% if "soi-1080.mp4" in have %}
+<section class="promo" id="video">
+  <div class="promobox">
+    <video id="promo" controls preload="none" playsinline poster="/video/soi-poster.jpg">
+      <source src="/video/soi-1080.mp4" type="video/mp4"></video>
+    <div class="quality" role="group" aria-label="Chất lượng video">
+      <button type="button" data-src="/video/soi-1080.mp4" class="on">1080p</button>
+      <button type="button" data-src="/video/soi-720.mp4">720p</button>
+    </div>
+  </div>
 </section>
 {% endif %}
 
-{% set qp = request.query_params %}
+<section class="features" id="tinh-nang">
+  <h2>Soi làm gì cho bạn</h2>
+  <div class="feature">
+    <div class="ftext">
+      <h3>Thẻ kết quả kinh doanh, có nguồn tới từng trang</h3>
+      <ul>
+        <li>Số chính của quý so với cùng kỳ: doanh thu, lợi nhuận gộp, LNST của cổ đông công ty mẹ; ngân hàng có thu nhập lãi thuần, dự phòng.</li>
+        <li>Bấm vào con số nào cũng mở đúng trang BCTC gốc chứa con số đó.</li>
+        <li>Công văn giải trình của công ty được gắn lên thẻ và đối chiếu từng con số với BCTC.</li>
+      </ul>
+    </div>
+    {{ loop("f-the", "Thẻ kết quả kinh doanh") }}
+  </div>
+  <div class="feature flip">
+    <div class="ftext">
+      <h3>Báo ngay khi BCTC công bố</h3>
+      <ul>
+        <li>Soi canh trang của HOSE và Vietstock; công ty đăng BCTC là Soi tải về và đọc, không cần ai bấm.</li>
+        <li>Ví dụ Masan Consumer quý 3/2026: HOSE đăng lúc 13:19, thẻ đã kiểm chứng có trên Soi lúc 13:28.</li>
+        <li>Theo dõi mã bạn quan tâm: mỗi BCTC kiểm chứng xong là một email. Không có thông báo theo giá.</li>
+      </ul>
+    </div>
+    {{ loop("f-theo-doi", "Theo dõi mã, nhận email") }}
+  </div>
+  <div class="feature">
+    <div class="ftext">
+      <h3>Hỏi bằng lời thường, nhận báo cáo có số và biểu đồ</h3>
+      <ul>
+        <li>"So sánh KQKD quý 3 của TCB và VPB", "LNST của FPT 4 quý gần nhất", "mã nào có KQKD tốt nhất?"</li>
+        <li>Số do code tính từ BCTC đã kiểm chứng; AI chỉ viết câu, từng câu được kiểm lại trước khi hiện ra.</li>
+        <li>Bảng số cuối báo cáo ghi nguồn tới trang BCTC gốc; tải được PDF.</li>
+      </ul>
+    </div>
+    {{ loop("f-bao-cao", "Báo cáo theo câu hỏi") }}
+  </div>
+  <div class="feature flip">
+    <div class="ftext">
+      <h3>Bằng chứng cho từng ô số</h3>
+      <ul>
+        <li>Mỗi ô ghi được kiểm bằng phép nào: cộng tổng, đối chiếu với BCTC kỳ khác, hay hai lần đọc độc lập trùng nhau.</li>
+        <li>Bảng số đặt cạnh ảnh trang gốc để tự đối chiếu.</li>
+        <li>Tải BCTC đã kiểm chứng ra Excel, cạnh mỗi cột số là bằng chứng và số trang.</li>
+      </ul>
+    </div>
+    {{ loop("f-kiem-chung", "Bằng chứng từng ô số") }}
+  </div>
+</section>
+
+<section class="trust" id="tin-duoc">
+  <div class="ttext">
+    <h2>Vì sao tin được</h2>
+    <ol class="tlist">
+      <li><b>AI chỉ chép chữ, code tính mọi con số.</b> Mô hình AI chép số như in trên BCTC (kể cả bản scan); cộng trừ,
+        tỷ lệ, so sánh đều do code làm.</li>
+      <li><b>Khớp ràng buộc kế toán.</b> Tổng tài sản bằng tổng nguồn vốn, dòng tổng bằng tổng các dòng con, lợi nhuận
+        sau thuế bằng lợi nhuận trước thuế trừ thuế... Không khớp thì không xuất bản.</li>
+      <li><b>Khớp với kỳ trước.</b> Số đầu năm, số lũy kế được đối chiếu với BCTC các kỳ trước của chính công ty.</li>
+      <li><b>Người xem ảnh gốc khi còn nghi ngờ.</b> Ô nào chưa chắc, người duyệt mở đúng trang ảnh gốc trước khi xuất
+        bản; mọi lần sửa đều được ghi lại.</li>
+    </ol>
+    <p class="small muted">Cách đo độ chính xác và các con số đo được: <a href="https://github.com/Relieq/Stock-Agent/blob/master/Baocao/bao-cao-ky-thuat/main.pdf" target="_blank" rel="noopener">báo cáo kỹ thuật</a>.</p>
+  </div>
+  {{ loop("f-xem-anh", "Ô cần xem ảnh") }}
+</section>
+
+{% if stats.coverage %}
+<section class="coverage panel">
+  <h2>Mã đang theo dõi</h2>
+  <p class="muted small">{{ stats.coverage | length }} mã{% if stats.season %}; tô màu: đã có BCTC kiểm chứng quý {{ stats.season }}{% endif %}.
+    Mã khác gửi yêu cầu đọc sau khi đăng nhập.</p>
+  <div class="tickers">{% for t, done in stats.coverage %}<span class="tk{% if done %} done{% endif %}">{{ t }}</span>{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="faq" id="cau-hoi">
+  <h2>Câu hỏi thường gặp</h2>
+  <details><summary>Soi có mất phí không?</summary><p>Không. Soi đang thử nghiệm trong khuôn khổ một đồ án tốt nghiệp và chỉ mở cho người được mời.</p></details>
+  <details><summary>Số liệu lấy từ đâu?</summary><p>Từ chính file BCTC công ty công bố trên HOSE và Vietstock. Soi không lấy số từ trang tổng hợp nào khác; mỗi con số mở được trang BCTC gốc.</p></details>
+  <details><summary>Soi có khuyến nghị mua bán không?</summary><p>Không. Soi chỉ đọc, kiểm và trình bày số liệu đã công bố. Đây là thông tin, không phải khuyến nghị đầu tư.</p></details>
+  <details><summary>Nếu Soi đọc sai thì sao?</summary><p>BCTC chỉ được xuất bản khi khớp các ràng buộc kế toán; ô còn nghi ngờ được người duyệt đối chiếu ảnh gốc. Bạn thấy số nào lạ thì gửi góp ý ở cuối mỗi trang, kèm trang đang xem.</p></details>
+  <details><summary>Mã ngoài danh sách thì sao?</summary><p>Sau khi đăng nhập, bạn gửi yêu cầu đọc BCTC của mã khác ở trang Yêu cầu (có hạn mức mỗi ngày), hoặc tải lên file BCTC riêng.</p></details>
+  <details><summary>Vì sao Soi chỉ chạy khoảng 7h–23h?</summary><p>Soi đang chạy trên một máy tính cá nhân, tắt ban đêm. BCTC công bố ngoài giờ này được đọc ngay khi Soi chạy lại.</p></details>
+</section>
+
 <section class="join panel" id="dung-thu">
   <div>
     <h2>Muốn dùng thử?</h2>
-    <p>Soi đang trong giai đoạn thử nghiệm của một đồ án tốt nghiệp và chỉ mở cho người được mời. Để lại email, khi được
-      mời bạn sẽ nhận email kèm link đăng nhập. Đã có lời mời thì <a href="/dang-nhap">đăng nhập</a> luôn.</p>
+    <p>Để lại email, khi được mời bạn sẽ nhận email kèm link đăng nhập (không cần mật khẩu). Đã có lời mời thì
+      <a href="/dang-nhap">đăng nhập</a> luôn.</p>
   </div>
   {% if qp.xin %}<p class="infobox">Cảm ơn bạn, yêu cầu đã được ghi lại. Khi được mời, bạn sẽ nhận email kèm link đăng nhập.</p>
   {% else %}
@@ -74,4 +144,43 @@
   </form>
   {% endif %}
 </section>
+
+{% if videos.user or videos.behind %}
+<details class="more">
+  <summary>Xem chi tiết từng tính năng ({{ (videos.user | length) + (videos.behind | length) }} video có lời dẫn)</summary>
+  <div class="vgrid">{% for v in videos.user + videos.behind %}
+    <figure class="vcard panel">
+      <video controls preload="none" playsinline poster="/video/{{ v.slug }}.jpg" src="/video/{{ v.slug }}.mp4"></video>
+      <figcaption><b>{{ v.title }}</b> <span class="muted small">{{ (v.seconds // 60) }}:{{ "%02d" | format(v.seconds % 60) }}</span>
+        <span class="small">{{ v.desc }}</span></figcaption>
+    </figure>{% endfor %}</div>
+</details>
+{% endif %}
+
+<section class="sitefoot">
+  <div><b>Soi</b><p class="small muted">Đọc và kiểm chứng BCTC của doanh nghiệp niêm yết ngay khi công bố. Đồ án tốt nghiệp,
+    Đại học Bách khoa Hà Nội.</p></div>
+  <div><b>Sản phẩm</b><a href="#tinh-nang">Tính năng</a><a href="#tin-duoc">Vì sao tin được</a><a href="#cau-hoi">Câu hỏi thường gặp</a><a href="#video">Video giới thiệu</a></div>
+  <div><b>Nguồn và tài liệu</b><a href="https://www.hsx.vn" target="_blank" rel="noopener">HOSE</a><a href="https://finance.vietstock.vn" target="_blank" rel="noopener">Vietstock</a>
+    <a href="https://github.com/Relieq/Stock-Agent/blob/master/Baocao/bao-cao-ky-thuat/main.pdf" target="_blank" rel="noopener">Báo cáo kỹ thuật</a></div>
+  <div><b>Tài khoản</b><a href="#dung-thu">Xin dùng thử</a><a href="/dang-nhap">Đăng nhập</a></div>
+</section>
+
+<script>
+// Clip minh họa: chỉ tải và chạy khi cuộn tới; video chính: đổi chất lượng giữ nguyên chỗ đang xem
+const io = new IntersectionObserver(es => es.forEach(e => {
+  const v = e.target;
+  if (e.isIntersecting) { if (v.preload === "none") { v.preload = "auto"; v.load(); } v.play().catch(() => {}); }
+  else v.pause();
+}), { threshold: 0.35 });
+document.querySelectorAll("video.autoplay").forEach(v => io.observe(v));
+const promo = document.getElementById("promo");
+document.querySelectorAll(".quality button").forEach(b => b.onclick = () => {
+  if (!promo || b.classList.contains("on")) return;
+  const t = promo.currentTime, playing = !promo.paused;
+  promo.querySelector("source").src = b.dataset.src; promo.load();
+  promo.addEventListener("loadedmetadata", () => { promo.currentTime = t; if (playing) promo.play(); }, { once: true });
+  document.querySelectorAll(".quality button").forEach(x => x.classList.toggle("on", x === b));
+});
+</script>
 {% endblock %}

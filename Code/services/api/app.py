@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 
 from services.api import data
 from services.api.accounts import COOKIE, require_admin, router as accounts_router
-from services.api.landing import demo_videos, is_public, site_stats, video_file
+from services.api.landing import available, demo_videos, is_public, site_stats, video_file
 from services.db import connect
 from services.extraction.evidence import STATUS_LABELS
 from services.ingestion.registry import raw_data_dir
@@ -178,8 +178,9 @@ def about(request: Request):
     """Trang giới thiệu cho mọi người, kể cả người đã đăng nhập (xem lại video, gửi link cho người khác)."""
     with connect() as conn:
         stats = site_stats(conn)
+    folder = raw_data_dir() / "demo"
     return templates.TemplateResponse(request, "landing.html", {
-        "stats": stats, "videos": demo_videos(raw_data_dir() / "demo")})
+        "stats": stats, "videos": demo_videos(folder), "have": available(folder)})
 
 
 @app.get("/video/{name}")

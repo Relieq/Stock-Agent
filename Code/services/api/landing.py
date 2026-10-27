@@ -29,6 +29,11 @@ def video_file(folder: Path, name: str) -> Path | None:
     return path if path.is_file() else None
 
 
+def available(folder: Path) -> set[str]:
+    """Tên các tệp video/ảnh có trong thư mục demo (trang chỉ hiện phần có tệp)."""
+    return {p.name for p in folder.glob("*") if _NAME.match(p.name)} if folder.is_dir() else set()
+
+
 def demo_videos(folder: Path) -> dict:
     """{"intro": video giới thiệu hoặc None, "user": [...], "behind": [...]} theo thứ tự trong videos.json, bỏ video
     thiếu tệp."""
@@ -60,4 +65,21 @@ def site_stats(conn) -> dict:
              AND owner_user_id IS NULL AND duplicate_of IS NULL AND processed_at IS NOT NULL
            ORDER BY processed_at DESC LIMIT 1""").fetchone()
     return {"documents": row[0], "tickers": row[1],
-            "last": {"ticker": last[0], "period": last[1], "year": last[2], "at": last[3]} if last else None}
+            "last": {"ticker": last[0], "period": last[1], "year": last[2], "at": last[3]} if last else None,
+            **coverage(conn)}
+
+
+def coverage(conn) -> dict:
+    """Các mã đang theo dõi và mã nào đã có BCTC quý kiểm chứng của kỳ quý mới nhất."""
+    latest = conn.execute(
+        """SELECT fiscal_year, fiscal_period FROM documents
+           WHERE status IN ('verified', 'approved') AND doc_type = 'fs_quarter' AND owner_user_id IS NULL
+           ORDER BY fiscal_year DESC, fiscal_period DESC LIMIT 1""").fetchone()
+    done = set()
+    if latest:
+        done = {r[0] for r in conn.execute(
+            """SELECT DISTINCT ticker FROM documents WHERE status IN ('verified', 'approved') AND doc_type = 'fs_quarter'
+               AND owner_user_id IS NULL AND fiscal_year = %s AND fiscal_period = %s""", latest).fetchall()}
+    tickers = [r[0] for r in conn.execute("SELECT ticker FROM companies WHERE tracked ORDER BY ticker").fetchall()]
+    return {"coverage": [(t, t in done) for t in tickers],
+            "season": f"{latest[1]}/{latest[0]}" if latest else None}

@@ -170,6 +170,12 @@ def home(request: Request):
     """Người đã đăng nhập vào thẳng mùa BCTC; người chưa đăng nhập xem trang giới thiệu."""
     if request.state.user is not None:
         return RedirectResponse("/mua-bctc")
+    return about(request)
+
+
+@app.get("/gioi-thieu")
+def about(request: Request):
+    """Trang giới thiệu cho mọi người, kể cả người đã đăng nhập (xem lại video, gửi link cho người khác)."""
     with connect() as conn:
         stats = site_stats(conn)
     return templates.TemplateResponse(request, "landing.html", {

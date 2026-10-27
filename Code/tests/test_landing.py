@@ -7,6 +7,7 @@ from services.api.landing import demo_videos, is_public, video_file
 def test_only_home_and_listed_prefixes_are_public():
     assert is_public("/") and is_public("/dang-nhap") and is_public("/video/the-kqkd.mp4")
     assert is_public("/chia-se/MCH/q3-2026") and is_public("/static/style.css") and is_public("/xin-dung-thu")
+    assert is_public("/gioi-thieu")
     assert not is_public("/mua-bctc") and not is_public("/ma/MCH") and not is_public("/quan-tri")
 
 

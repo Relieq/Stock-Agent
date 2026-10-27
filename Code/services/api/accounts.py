@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 
 from services.alerts import notify_watchers
 from services.db import connect
-from services import feedback
+from services import access, feedback
 from services.extraction.verify import apply_manual_fix, approve_document, confirm_reading
 from services.notify import notify_admin
 from services.ondemand import month_spend, monthly_budget, request_ticker, request_upload, used_today
@@ -167,8 +167,8 @@ async def request_upload_submit(request: Request, file: UploadFile = File(...), 
 def admin_users(request: Request, tb: str | None = None):
     require_admin(request)
     with connect() as conn:
-        users = list_users(conn)
-    return templates().TemplateResponse(request, "admin_users.html", {"users": users, "tb": tb})
+        users, asking = list_users(conn), access.pending(conn)
+    return templates().TemplateResponse(request, "admin_users.html", {"users": users, "asking": asking, "tb": tb})
 
 
 @router.get("/quan-tri/chi-phi")
@@ -264,6 +264,7 @@ def admin_invite(request: Request, email: str = Form(...), role: str = Form("use
     try:
         with connect() as conn:
             user = invite(conn, email, role == "admin")
+            access.mark_invited(conn, user.email)
     except ValueError as e:
         return _back("/quan-tri", str(e))
     sent = send_invitation(user) if notify else False
@@ -291,6 +292,25 @@ def admin_remove(request: Request, user_id: int):
     except ValueError as e:
         return _back("/quan-tri", str(e))
     return _back("/quan-tri", "Đã xóa người dùng")
+
+
+# ---- xin dùng thử (khách, từ trang giới thiệu) ------------------------------------------------------------------
+
+@router.post("/xin-dung-thu")
+def access_request(email: str = Form(""), note: str = Form(""), website: str = Form("")):
+    """Khách để lại email xin dùng thử. Ô `website` ẩn với người thật: có chữ là máy tự điền, bỏ qua mà không báo lỗi."""
+    from urllib.parse import quote
+    if website:
+        return RedirectResponse("/?xin=1#dung-thu", status_code=303)
+    try:
+        with connect() as conn:
+            new = access.save(conn, email, note)
+    except ValueError as e:
+        return RedirectResponse(f"/?xin_loi={quote(str(e))}#dung-thu", status_code=303)
+    if new:
+        email, note = access.clean_request(email, note)
+        notify_admin(f"[Soi] {email} xin dùng thử", access.email_body(email, note))
+    return RedirectResponse("/?xin=1#dung-thu", status_code=303)
 
 
 # ---- góp ý ---------------------------------------------------------------------------------------------------------

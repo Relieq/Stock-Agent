@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 # "/" chỉ công khai đúng trang chủ; các mục còn lại công khai theo tiền tố
-PUBLIC_PREFIXES = ("/dang-nhap", "/static/", "/chia-se/", "/anh/", "/suc-khoe", "/video/")
+PUBLIC_PREFIXES = ("/dang-nhap", "/static/", "/chia-se/", "/anh/", "/suc-khoe", "/video/", "/xin-dung-thu")
 INTRO = "gioi-thieu"
 # Video phía quản trị: cho người xem thấy số được kiểm và duyệt thế nào
 BEHIND = ("xem-anh", "duyet-tay", "chi-phi")

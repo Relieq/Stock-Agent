@@ -13,6 +13,22 @@
   <button>Mời</button>
 </form>
 
+{% if asking %}
+<h2>Xin dùng thử ({{ asking | length }})</h2>
+<p class="muted small">Khách để lại email ở trang giới thiệu. Bấm Mời để thêm vào danh sách và gửi email mời.</p>
+<table class="list">
+  <thead><tr><th>Email</th><th>Ghi chú</th><th>Lúc xin</th><th></th></tr></thead>
+  <tbody>
+  {% for a in asking %}
+  <tr><td>{{ a.email }}</td><td class="small">{{ a.note }}</td><td class="small">{{ a.created_at | gio }}</td>
+    <td><form method="post" action="/quan-tri/moi" class="inline">
+      <input type="hidden" name="email" value="{{ a.email }}"><input type="hidden" name="role" value="user">
+      <input type="hidden" name="notify" value="1"><button>Mời</button></form></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h2>Người dùng</h2>
+{% endif %}
 <table class="list">
   <thead><tr><th>Email</th><th>Quyền · hạn mức/ngày</th><th>Được mời</th><th>Đăng nhập gần nhất</th><th>Theo dõi</th><th>Yêu cầu</th><th></th></tr></thead>
   <tbody>

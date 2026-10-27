@@ -56,12 +56,22 @@
 </section>
 {% endif %}
 
-<section class="join panel">
+{% set qp = request.query_params %}
+<section class="join panel" id="dung-thu">
   <div>
     <h2>Muốn dùng thử?</h2>
-    <p>Soi đang trong giai đoạn thử nghiệm của một đồ án tốt nghiệp và chỉ mở cho người được mời. Đã có lời mời thì đăng
-      nhập bằng email: Soi gửi link đăng nhập, không cần mật khẩu.</p>
+    <p>Soi đang trong giai đoạn thử nghiệm của một đồ án tốt nghiệp và chỉ mở cho người được mời. Để lại email, khi được
+      mời bạn sẽ nhận email kèm link đăng nhập. Đã có lời mời thì <a href="/dang-nhap">đăng nhập</a> luôn.</p>
   </div>
-  <a class="btn primary" href="/dang-nhap">Đăng nhập</a>
+  {% if qp.xin %}<p class="infobox">Cảm ơn bạn, yêu cầu đã được ghi lại. Khi được mời, bạn sẽ nhận email kèm link đăng nhập.</p>
+  {% else %}
+  <form method="post" action="/xin-dung-thu" class="askform">
+    {% if qp.xin_loi %}<p class="warnbox">{{ qp.xin_loi }}</p>{% endif %}
+    <input type="email" name="email" placeholder="email@vidu.com" required maxlength="254" aria-label="Email">
+    <input name="note" placeholder="Bạn quan tâm mã nào? (không bắt buộc)" maxlength="500" aria-label="Ghi chú">
+    <input name="website" class="trap" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <button class="primary">Xin dùng thử</button>
+  </form>
+  {% endif %}
 </section>
 {% endblock %}

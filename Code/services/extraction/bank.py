@@ -292,6 +292,36 @@ def assign_children(st: ExtractedStatement) -> int:
     return n
 
 
+_CF_TOTAL = re.compile(r"^(luu chuyen )?tien thuan .*hoat dong (kinh doanh|kd|dau tu|tai chinh)$")
+_CF_HEADING = re.compile(r"^luu chuyen tien (te )?(tu|cua) (cac )?hoat dong (kinh doanh|kd|dau tu|tai chinh)")
+
+
+def reorder_cash_flow_totals(st: ExtractedStatement) -> int:
+    """Đưa dòng tổng của một khúc LCTT về cuối khúc khi mô hình chép nó lên trước tiêu đề của chính khúc đó. Trả về
+    số dòng đã chuyển.
+
+    ACB quý 3/2026: LCTT sang trang 8, mô hình chép "II. Lưu chuyển tiền thuần từ hoạt động đầu tư" ở đầu trang rồi mới
+    đến tiêu đề "Lưu chuyển tiền từ hoạt động đầu tư" và các dòng con; các dòng con khúc đầu tư bị đánh mã vào khúc tài
+    chính. Dòng tổng đứng ngay trên tiêu đề (không số) của cùng khúc thì chắc chắn sai thứ tự: chuyển nó xuống trước
+    dòng tiếp theo là tiêu đề hoặc dòng tổng khác."""
+    items, moved, i = st.items, 0, 0
+    while i < len(items) - 1:
+        total = _CF_TOTAL.match(fold(clean_label(items[i].label)))
+        head = _CF_HEADING.match(fold(clean_label(items[i + 1].label)))
+        if (total and head and total.group(2) == head.group(4) and _has_values(items[i])
+                and not _has_values(items[i + 1])):
+            j = i + 2
+            while j < len(items):
+                lab = fold(clean_label(items[j].label))
+                if _CF_HEADING.match(lab) or re.match(r"^(luu chuyen )?tien thuan ", lab):
+                    break
+                j += 1
+            items.insert(j - 1, items.pop(i))
+            moved += 1
+        i += 1
+    return moved
+
+
 def canonicalize(extracted: list[ExtractedStatement], repair_labels: bool = False) -> dict[str, list[str]]:
     """Gán mã chuẩn (b.*) cho các dòng chưa có mã. Trả về {báo cáo: [mã chuẩn không tìm thấy]}."""
     missing: dict[str, list[str]] = {}
@@ -303,6 +333,8 @@ def canonicalize(extracted: list[ExtractedStatement], repair_labels: bool = Fals
             it.code = None
         if repair_labels:
             repair_wrapped_labels(st)
+        if st.statement == "CF":
+            reorder_cash_flow_totals(st)
         items = [(it, fold(clean_label(it.label))) for it in st.items]
         for canonical, patterns in _PATTERNS.get(st.statement, []):
             hit = None

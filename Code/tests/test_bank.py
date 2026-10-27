@@ -138,6 +138,33 @@ def test_operating_cash_flow_takes_the_last_matching_total():
     assert [it.code for it in extracted[0].items] == ["b.cfo.1", "b.cfo.2", "b.cfo", "b.cfi"]
 
 
+def test_cash_flow_total_read_before_its_own_section_is_moved_back():
+    # ACB quý 3/2026: LCTT sang trang 8, mô hình chép dòng tổng khúc đầu tư lên đầu trang, trước tiêu đề khúc đó
+    rows = [
+        (None, "Tiền chi trả cho nhân viên", "(10)"),
+        (None, "LƯU CHUYỂN TIỀN THUẦN TỪ HOẠT ĐỘNG KINH DOANH", "(10)"),
+        (None, "LƯU CHUYỂN TIỀN THUẦN TỪ HOẠT ĐỘNG ĐẦU TƯ", "(5)"),
+        (None, "LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG ĐẦU TƯ", None),
+        (None, "Mua sắm tài sản cố định", "(8)"),
+        (None, "Tiền thu cổ tức và lợi nhuận được chia từ các khoản đầu tư, góp vốn dài hạn", "3"),
+        (None, "LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG TÀI CHÍNH", None),
+        (None, "Cổ tức trả cho cổ đông, lợi nhuận đã chia", "(4)"),
+        (None, "LƯU CHUYỂN TIỀN THUẦN TỪ HOẠT ĐỘNG TÀI CHÍNH", "(4)"),
+        (None, "LƯU CHUYỂN TIỀN THUẦN TRONG KỲ", "(19)"),
+    ]
+    extracted = [_st("CF", rows, "ytd_cur")]
+    canonicalize(extracted)
+    got = [(it.code, it.label) for it in extracted[0].items if it.code]
+    assert got == [("b.cfo.1", "Tiền chi trả cho nhân viên"),
+                   ("b.cfo", "LƯU CHUYỂN TIỀN THUẦN TỪ HOẠT ĐỘNG KINH DOANH"),
+                   ("b.cfi.1", "Mua sắm tài sản cố định"),
+                   ("b.cfi.2", "Tiền thu cổ tức và lợi nhuận được chia từ các khoản đầu tư, góp vốn dài hạn"),
+                   ("b.cfi", "LƯU CHUYỂN TIỀN THUẦN TỪ HOẠT ĐỘNG ĐẦU TƯ"),
+                   ("b.cff.1", "Cổ tức trả cho cổ đông, lợi nhuận đã chia"),
+                   ("b.cff", "LƯU CHUYỂN TIỀN THUẦN TỪ HOẠT ĐỘNG TÀI CHÍNH"),
+                   ("b.net", "LƯU CHUYỂN TIỀN THUẦN TRONG KỲ")]
+
+
 def test_minority_interest_sign_does_not_follow_expense_convention():
     # Chi phí in số dương (không đảo dấu), nhưng lợi ích cổ đông không kiểm soát in trong ngoặc (như MBB, VPB)
     rows = [

@@ -97,11 +97,12 @@ def _period_text(pc, mult: Decimal, period_of: dict[int, str]) -> str:
     return f"{what}: BCTC {later} in {f(pc.later)}, BCTC {other} in {f(pc.expected)}, lệch {f(pc.diff)}"
 
 
-def cell_reasons(evidence, template: str | None) -> dict[tuple[str, str, str], list[str]]:
-    """Vì sao từng ô của tài liệu đang xem cần xem ảnh, bằng lời và có số."""
+def cell_reasons(evidence, template: str | None, checks=()) -> dict[tuple[str, str, str], list[str]]:
+    """Vì sao từng ô của tài liệu đang xem cần xem ảnh, bằng lời và có số (`checks`: các phép kiểm của tài liệu)."""
     if evidence is None:
         return {}
     cells = evidence.cells
+    by_rule = {(c.rule_id, c.column_kind): c for c in checks if not c.passed}
     period_of = {cells.document_id: cells.period, **{d: p for d, p, _ in evidence.peers}}
     out: dict[tuple[str, str, str], list[str]] = {}
     for pc in evidence.period_checks:
@@ -112,7 +113,11 @@ def cell_reasons(evidence, template: str | None) -> dict[tuple[str, str, str], l
             if d == cells.document_id:
                 out.setdefault((st, key, col), []).append(text)
     for cell, rules in cells.sum_conflicts.items():
-        out.setdefault(cell, []).extend(f"Phép cộng không khớp: {_formula(template, r)[0]}" for r in rules)
+        st, _, col = cell
+        labels = {k: v for (s, k), v in cells.labels.items() if s == st}
+        out.setdefault(cell, []).extend(
+            sum_reason(rule_words(template, r, labels), by_rule.get((r, col)), cells.multiplier.get(st, Decimal(1)))
+            for r in rules)
     for cell, e in evidence.status.items():
         if "Q1: quý ≠ lũy kế" in e.get("conflict", []):
             out.setdefault(cell, []).append("Quý 1: số quý phải bằng số lũy kế nhưng hai cột in khác nhau")
@@ -129,18 +134,33 @@ def _short(label: str, n: int = 45) -> str:
     return label if len(label) <= n else label[:n - 1].rstrip() + "…"
 
 
+def rule_words(template: str | None, rid: str, labels: dict[str, str]) -> str:
+    """Một ràng buộc viết bằng tên dòng (labels: mã -> tên dòng của cùng báo cáo) thay cho mã ràng buộc nội bộ."""
+    name = lambda c: _short(labels.get(c, c))    # noqa: E731
+    _, grp, parent = rid.partition("_grp_")
+    if grp:
+        return f"{name(parent)} = tổng các dòng con"
+    rs = RULESETS.get(template) if template else None
+    for r in rs.rules if rs else []:
+        if r.id == rid:
+            terms = " ".join(("+ " if s > 0 else "− ") + name(c) for s, c in r.rhs).removeprefix("+ ")
+            return f"{name(r.lhs)} = {terms}"
+    return _formula(template, rid)[0]
+
+
+def sum_reason(words: str, check, mult: Decimal) -> str:
+    """Lý do ô cần xem ảnh vì phép cộng không khớp, kèm số theo đơn vị in trên BCTC."""
+    text = f"Phép cộng không khớp: {words}"
+    if check is not None:
+        text += (f". Dòng tổng in {_printed(check.lhs, mult)}, cộng các dòng con ra {_printed(check.rhs, mult)}, "
+                 f"lệch {_printed(check.diff, mult)}")
+    return text
+
+
 def evidence_words(e: dict, template: str | None, labels: dict[str, str]) -> dict[str, list[str]]:
     """Phép kiểm của một ô viết bằng tên dòng thay cho mã ràng buộc nội bộ (chú thích khi rê chuột vào ô)."""
-    def rule(rid: str) -> str:
-        rs = RULESETS.get(template) if template else None
-        for r in rs.rules if rs else []:
-            if r.id == rid:
-                name = lambda c: _short(labels.get(c, c))    # noqa: E731
-                terms = " ".join(("+ " if s > 0 else "− ") + name(c) for s, c in r.rhs).removeprefix("+ ")
-                return f"{name(r.lhs)} = {terms}"
-        return _formula(template, rid)[0]
     period = lambda ds: list(dict.fromkeys(PERIOD_WORDS.get(d.split(":")[0], d) for d in ds))    # noqa: E731
-    return {"sum": [rule(x) if not x.startswith("Q1") else x for x in e.get("sum", [])],
+    return {"sum": [rule_words(template, x, labels) if not x.startswith("Q1") else x for x in e.get("sum", [])],
             "period": period(e.get("period", [])), "differs": period(e.get("differs", []))}
 
 
@@ -196,7 +216,7 @@ def detail(record: dict, evidence=None) -> dict:
     # Ô cần xem ảnh (phép cộng không khớp, lệch với BCTC kỳ khác, hai lần đọc ra hai số): người duyệt xem ảnh rồi bấm
     # "đúng như ảnh" hoặc sửa tay
     review = []
-    reasons = cell_reasons(evidence, template)
+    reasons = cell_reasons(evidence, template, checks)
     period_of = {d: p for d, p, _ in evidence.peers} if evidence else {}
     other_docs: dict[tuple, set[int]] = {}
     for pc in evidence.period_checks if evidence else []:

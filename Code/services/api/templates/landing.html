@@ -5,8 +5,8 @@
 {% set last = stats.last %}
 {% set qp = request.query_params %}
 {% macro loop(name, alt) %}{% if name ~ ".mp4" in have %}<div class="shot"><div class="shotbar"><i></i><i></i><i></i></div>
-  <video class="autoplay" muted loop playsinline preload="none" poster="/video/{{ name }}.jpg" aria-label="{{ alt }}">
-    <source src="/video/{{ name }}.mp4" type="video/mp4"></video></div>{% endif %}{% endmacro %}
+  <video class="autoplay" muted loop playsinline preload="none" poster="/video/{{ name }}.jpg?v={{ have[name ~ ".jpg"] }}" aria-label="{{ alt }}">
+    <source src="/video/{{ name }}.mp4?v={{ have[name ~ ".mp4"] }}" type="video/mp4"></video></div>{% endif %}{% endmacro %}
 
 <section class="hero">
   <div class="pitch">
@@ -33,11 +33,11 @@
 {% if "soi-1080.mp4" in have %}
 <section class="promo" id="video">
   <div class="promobox">
-    <video id="promo" controls preload="none" playsinline poster="/video/soi-poster.jpg">
-      <source src="/video/soi-1080.mp4" type="video/mp4"></video>
+    <video id="promo" controls preload="none" playsinline poster="/video/soi-poster.jpg?v={{ have["soi-poster.jpg"] }}">
+      <source src="/video/soi-1080.mp4?v={{ have["soi-1080.mp4"] }}" type="video/mp4"></video>
     <div class="quality" role="group" aria-label="Chất lượng video">
-      <button type="button" data-src="/video/soi-1080.mp4" class="on">1080p</button>
-      <button type="button" data-src="/video/soi-720.mp4">720p</button>
+      <button type="button" data-src="/video/soi-1080.mp4?v={{ have["soi-1080.mp4"] }}" class="on">1080p</button>
+      <button type="button" data-src="/video/soi-720.mp4?v={{ have["soi-720.mp4"] }}">720p</button>
     </div>
   </div>
 </section>
@@ -166,6 +166,9 @@
   <div><b>Tài khoản</b><a href="#dung-thu">Xin dùng thử</a><a href="/dang-nhap">Đăng nhập</a></div>
 </section>
 
+<dialog id="zoom" aria-label="Clip phóng to"><button type="button">Đóng ✕</button>
+  <video muted loop playsinline controls></video></dialog>
+
 <script>
 // Clip minh họa: chỉ tải và chạy khi cuộn tới; video chính: đổi chất lượng giữ nguyên chỗ đang xem
 const io = new IntersectionObserver(es => es.forEach(e => {
@@ -174,6 +177,14 @@ const io = new IntersectionObserver(es => es.forEach(e => {
   else v.pause();
 }), { threshold: 0.35 });
 document.querySelectorAll("video.autoplay").forEach(v => io.observe(v));
+const zoom = document.getElementById("zoom");
+document.querySelectorAll(".shot").forEach(s => s.onclick = () => {
+  const src = s.querySelector("source").src, v = zoom.querySelector("video");
+  v.src = src; zoom.showModal(); v.play().catch(() => {});
+});
+zoom.querySelector("button").onclick = () => zoom.close();
+zoom.onclick = e => { if (e.target === zoom) zoom.close(); };
+zoom.onclose = () => zoom.querySelector("video").pause();
 const promo = document.getElementById("promo");
 document.querySelectorAll(".quality button").forEach(b => b.onclick = () => {
   if (!promo || b.classList.contains("on")) return;

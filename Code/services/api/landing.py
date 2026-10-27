@@ -29,9 +29,12 @@ def video_file(folder: Path, name: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def available(folder: Path) -> set[str]:
-    """Tên các tệp video/ảnh có trong thư mục demo (trang chỉ hiện phần có tệp)."""
-    return {p.name for p in folder.glob("*") if _NAME.match(p.name)} if folder.is_dir() else set()
+def available(folder: Path) -> dict[str, int]:
+    """Tệp video/ảnh có trong thư mục demo -> thời điểm sửa (trang chỉ hiện phần có tệp; thời điểm sửa gắn vào đường
+    dẫn để trình duyệt tải bản mới khi tệp được dựng lại, vì /video/ cho trình duyệt nhớ 1 ngày)."""
+    if not folder.is_dir():
+        return {}
+    return {p.name: int(p.stat().st_mtime) for p in folder.glob("*") if _NAME.match(p.name)}
 
 
 def demo_videos(folder: Path) -> dict:

@@ -23,8 +23,9 @@ def test_video_file_accepts_only_plain_names_in_the_demo_folder(tmp_path):
 def test_available_lists_only_servable_names(tmp_path):
     for n in ("soi-1080.mp4", "f-the.jpg", "videos.json", "Ghi chu.txt"):
         (tmp_path / n).write_bytes(b"x")
-    assert available(tmp_path) == {"soi-1080.mp4", "f-the.jpg"}
-    assert available(tmp_path / "khong-co") == set()
+    assert set(available(tmp_path)) == {"soi-1080.mp4", "f-the.jpg"}
+    assert all(isinstance(v, int) for v in available(tmp_path).values())
+    assert available(tmp_path / "khong-co") == {}
 
 
 def test_demo_videos_split_into_user_and_behind_the_scenes_and_skip_missing_files(tmp_path):

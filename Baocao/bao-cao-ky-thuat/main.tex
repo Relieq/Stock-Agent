@@ -801,27 +801,38 @@ có chiều ngược lại; điều này đã được kiểm trên mã nguồn.
 \end{figure}
 
 \subsection{Triển khai}
-Hiện hệ thống chạy trên máy phát triển bằng Docker Compose; khi triển khai thật sẽ chuyển nguyên cụm container lên một
-máy chủ ảo (VPS) (Hình~\ref{fig:trienkhai}). Bộ canh ghi nhịp tim ở đầu và cuối mỗi lượt; khi khởi động lại sau một
-thời gian dừng, nó email cho quản trị viên biết đã dừng bao lâu. Khi cả máy dừng thì hệ thống không tự báo được, nên web
-có một trang sức khỏe trả lỗi khi bộ canh im quá hai giờ, để một dịch vụ theo dõi bên ngoài gọi định kỳ và báo tin.
+Từ 27/10/2026 hệ thống chạy công khai tại \url{https://soi.rediov.com}, trên một máy tính cá nhân bằng Docker Compose
+(Hình~\ref{fig:trienkhai}). Web ra Internet qua Cloudflare Tunnel: một container trên máy chủ động kết nối ra mạng của
+Cloudflare, nên không phải mở cổng nào trên bộ định tuyến và không lộ địa chỉ IP của máy; Cloudflare lo HTTPS. Chỉ trang
+web được đưa ra ngoài, cơ sở dữ liệu chỉ mở cho chính máy đó. Máy tắt ban đêm (khoảng 23h đến 7h); BCTC hầu như được công
+bố trong giờ làm việc, và khi máy bật lại bộ canh tự quét bù nên BCTC đăng ban đêm chỉ được đọc muộn hơn chứ không bị bỏ
+sót. Khi cần chạy suốt ngày đêm, cả cụm container chuyển nguyên lên một máy chủ ảo (VPS).
+
+Bộ canh ghi nhịp tim ở đầu và cuối mỗi lượt; khi khởi động lại sau một thời gian dừng, nó email cho quản trị viên biết đã
+dừng bao lâu. Khi cả máy dừng thì hệ thống không tự báo được, nên web có một trang sức khỏe trả lỗi khi bộ canh im quá hai
+giờ hoặc cơ sở dữ liệu hỏng; một dịch vụ theo dõi bên ngoài gọi trang này 5 phút một lần và email cho quản trị viên khi
+có lỗi.
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[scale=0.83, transform shape, font=\footnotesize\sffamily]
   \node[udnode,text width=26mm] (web) at (0,0) {«container»\\\textbf{web}\\FastAPI, cổng 8765};
   \node[udnode,text width=26mm] (watch) at (4.2,0) {«container»\\\textbf{watcher}\\bộ canh, 15 phút/lượt};
-  \node[udnode,text width=26mm] (db) at (2.1,-2.7) {«container»\\\textbf{db}\\PostgreSQL 16 + pgvector};
+  \node[udnode,text width=26mm] (db) at (4.2,-2.7) {«container»\\\textbf{db}\\PostgreSQL 16 + pgvector};
+  \node[udnode,text width=26mm] (cfd) at (0,-2.7) {«container»\\\textbf{cloudflared}\\đầu tunnel};
   \begin{scope}[on background layer]
-    \node[udnode,fill=white,fit=(web)(watch)(db),inner xsep=6mm,inner ysep=6mm,yshift=4mm,
-          label={[font=\footnotesize\sffamily,anchor=north]south:«device» \textbf{Máy chủ} (Docker Compose)}] (srv) {};
+    \node[udnode,fill=white,fit=(web)(watch)(db)(cfd),inner xsep=6mm,inner ysep=6mm,yshift=4mm,
+          label={[font=\footnotesize\sffamily,anchor=north]south:«device» \textbf{Máy tính chạy Soi} (Docker Compose)}] (srv) {};
   \end{scope}
-  \node[udnode,text width=24mm] (browser) at (-5.4,-1.3) {«device»\\\textbf{Trình duyệt}\\của người dùng};
+  \node[udnode,text width=24mm] (browser) at (-5.6,0) {«device»\\\textbf{Trình duyệt}\\của người dùng};
+  \node[udnode,text width=24mm] (cf) at (-5.6,-2.7) {«external»\\\textbf{Cloudflare}\\(DNS, HTTPS)};
+  \draw[thick] (browser) -- node[left,guard]{HTTPS} (cf);
+  \draw[thick] (cfd) -- node[above,guard]{tunnel} (cf);
+  \draw[thick] (cfd) -- node[left,guard]{HTTP} (web);
   \node[udnode,text width=26mm] (vs) at (9.8,1.2) {«external»\\\textbf{Vietstock, HOSE}};
   \node[udnode,text width=26mm] (llm) at (9.8,-1.3) {«external»\\\textbf{Nhà cung cấp mô hình}\\(Claude, OpenAI)};
   \node[udnode,text width=26mm] (smtp) at (9.8,-3.8) {«external»\\\textbf{Máy chủ email}\\(SMTP)};
-  \draw[thick] (browser) -- node[above,guard]{HTTPS} (web);
-  \draw[thick] (web) -- node[left,guard]{SQL} (db);
+  \draw[thick] (web) -- node[above,guard,sloped]{SQL} (db);
   \draw[thick] (watch) -- node[right,guard]{SQL} (db);
   \draw[thick] (watch.east) -- node[above,guard,sloped]{HTTPS} (vs);
   \draw[thick] (watch.east) -- node[above,guard,sloped]{HTTPS} (llm);
@@ -829,7 +840,7 @@ có một trang sức khỏe trả lỗi khi bộ canh im quá hai giờ, để 
   \draw[thick] (watch.south east) -- node[below,guard,sloped]{SMTP} (smtp);
 \end{tikzpicture}
 \caption{Biểu đồ triển khai. Hộp ba chiều là nút (thiết bị hoặc môi trường chạy); đường nối là kênh giao tiếp, ghi giao
-thức.}\label{fig:trienkhai}
+thức. Kết nối tunnel do máy chạy Soi mở ra phía Cloudflare, không có kết nối nào từ ngoài vào máy.}\label{fig:trienkhai}
 \end{figure}
 
 \subsection{Vòng đời một tài liệu}
@@ -2200,7 +2211,7 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Sàng lọc doanh nghiệp tăng trưởng và kiểm định lịch sử (backtest)}\chualam
 \subsection{Radar sự kiện công bố thông tin và bản tin sáng theo danh mục}\chualam
 \subsection{Kênh phân phối: Facebook, Zalo, MCP}\chualam
-\subsection{Triển khai lên máy chủ và số liệu người dùng thật}\chualam
+\subsection{Số liệu người dùng thật và chạy suốt ngày đêm trên máy chủ ảo}\chualam
 
 \clearpage\phantomsection
 \addcontentsline{toc}{chapter}{Tài liệu tham khảo}

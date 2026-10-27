@@ -27,7 +27,8 @@ DIAGRAMS = {
     },
     "erd-nguoi-dung": {
         "full": {"users": (5.4, 0), "sessions": (0, 0), "login_tokens": (0, -3.4), "watchlist": (10.8, 0),
-                 "notifications": (10.8, -3.0), "processing_requests": (5.4, -4.4), "feedback": (0, -6.8)},
+                 "notifications": (10.8, -3.0), "processing_requests": (5.4, -4.4), "feedback": (0, -6.8),
+                 "access_requests": (0, -9.8)},
         "stub": {"companies": (15.2, -0.3), "documents": (11.4, -7.4)},
     },
 }

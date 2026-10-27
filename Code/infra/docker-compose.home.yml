@@ -1,0 +1,36 @@
+# Chạy trên PC ở nhà và đưa web ra ngoài qua Cloudflare Tunnel, chồng lên docker-compose.yml (xem infra/DEPLOY.md):
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.home.yml up -d
+# Khác máy phát triển: không hiện link đăng nhập trên trang, link trong email và cookie dùng https://soi.rediov.com,
+# CSDL chỉ mở cho chính máy này. Không mở cổng nào trên router: cloudflared tự kết nối ra Cloudflare, Cloudflare lo HTTPS
+# và chuyển yêu cầu tới web trong mạng nội bộ của Docker. Token của tunnel đặt ở infra/.env (CLOUDFLARE_TUNNEL_TOKEN).
+
+x-site: &site
+  SITE_URL: https://soi.rediov.com
+
+services:
+  db:
+    ports: !override
+      - "127.0.0.1:5433:5432"
+
+  web:
+    environment:
+      <<: *site
+      DEV_LOGIN_LINK: "0"
+
+  watcher:
+    environment:
+      <<: *site
+
+  app:
+    environment:
+      <<: *site
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.10.0
+    container_name: soi-cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?đặt CLOUDFLARE_TUNNEL_TOKEN trong infra/.env}
+    depends_on:
+      - web
+    restart: always

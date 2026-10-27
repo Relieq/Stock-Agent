@@ -56,6 +56,26 @@ Theo dõi từ bên ngoài: khi máy chủ hoặc Docker dừng thì hệ thốn
 UptimeRobot, gói miễn phí, 5 phút một lần) gọi `https://<tên miền>/suc-khoe`, báo email khi mã trả về khác 200. Trang
 trả 503 khi bộ canh im quá 120 phút, và lỗi khi web hoặc CSDL hỏng.
 
+## Chạy trên PC ở nhà qua Cloudflare Tunnel (cách đang dùng từ 26/10/2026)
+
+Thay cho mục 1–4 khi không thuê máy chủ: Soi chạy trên PC của người quản trị, web ra ngoài tại `https://soi.rediov.com`
+qua Cloudflare Tunnel. Không mở cổng nào trên router, không lộ IP nhà, Cloudflare lo HTTPS (không cần Caddy).
+
+1. Tên miền `rediov.com` dùng DNS của Cloudflare (gói Free). Trong Networking → Tunnels có tunnel `soi`,
+   route loại Published application `soi.rediov.com` → `http://web:8765` (tên dịch vụ trong mạng Docker, không phải
+   localhost). Các bản ghi khác của tên miền (`maclinh` → GitHub Pages, `www` → Google, email Zoho) để DNS only.
+2. Token của tunnel: người quản trị tự dán vào `Code/infra/.env` dòng `CLOUDFLARE_TUNNEL_TOKEN=...` (không đưa lên git).
+3. Chạy:
+
+```bash
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.home.yml up -d
+docker logs soi-cloudflared --tail 20     # phải thấy "Registered tunnel connection"
+```
+
+Máy tắt ban đêm: BCTC thường công bố trong giờ làm việc; khi máy bật lại, bộ canh tự quét bù. Docker Desktop cần bật
+"Start Docker Desktop when you sign in", và chỉ chạy sau khi đăng nhập Windows. Dịch vụ theo dõi bên ngoài gọi
+`/suc-khoe` nên chỉ kiểm trong giờ máy bật, tránh báo lỗi mỗi đêm.
+
 ## 5. Cập nhật mã
 
 ```bash

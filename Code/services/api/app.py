@@ -97,6 +97,42 @@ templates.env.filters["ty"] = ty
 templates.env.filters["dong"] = dong
 templates.env.filters["tien"] = lambda v: "–" if v is None else ("−" if v < 0 else "") + card_ty(v)
 templates.env.filters["gio"] = lambda t: t.astimezone(VN_TZ).strftime("%H:%M %d/%m/%Y") if t else "–"
+
+
+def change_parts(text: str | None) -> dict:
+    """Tách câu thay đổi của thẻ ("+12,3% (từ 1 tỷ lên 2 tỷ)", "chuyển từ lỗ ... sang lãi ...") thành chiều (để tô màu
+    tăng/giảm), phần chính và phần trong ngoặc. Màu chỉ chỉ chiều của con số, không đánh giá tốt xấu."""
+    text = (text or "").strip()
+    if not text:
+        return {"cls": "", "main": "", "rest": ""}
+    main, _, rest = text.partition(" (")
+    rest = rest[:-1] if rest.endswith(")") else rest
+    if text.startswith("+") or text.startswith(("chuyển từ lỗ", "lỗ thu hẹp")):
+        cls = "pos"
+    elif text.startswith("−") or text.startswith(("chuyển từ lãi", "lỗ tăng")):
+        cls = "neg"
+    else:
+        cls = "flat"
+    return {"cls": cls, "main": main, "rest": rest}
+
+
+templates.env.filters["chg"] = change_parts
+
+
+def short_name(name: str | None) -> str:
+    """Tên công ty gọn cho danh sách: bỏ loại hình ("Công ty Cổ phần", "Thương mại Cổ phần") ở đầu hoặc cuối tên."""
+    s = (name or "").strip()
+    for pre in ("Công ty Cổ phần - ", "Tổng Công ty Cổ phần ", "Công ty Cổ phần ", "CTCP "):
+        if s.startswith(pre):
+            s = s[len(pre):]
+    s = s.replace("Ngân hàng Thương mại Cổ phần ", "Ngân hàng ").replace("Ngân hàng TMCP ", "Ngân hàng ")
+    for suf in (" - Công ty Cổ phần", " - CTCP"):
+        if s.endswith(suf):
+            s = s[: -len(suf)]
+    return s or (name or "")
+
+
+templates.env.filters["short_name"] = short_name
 templates.env.globals.update(STATUS=STATUS, SCOPE=SCOPE, COMPANY_KIND=COMPANY_KIND)
 
 
@@ -203,10 +239,21 @@ def card_page(request: Request, ticker: str, ky: str | None = None):
         doc_id = cards.quarter_document(conn, ticker, year, period)
         got = cards.card_for(conn, doc_id) if doc_id else None
         quarters = _quarters(conn)
+        missing = None
+        if got is None:
+            # Kỳ đang chọn chưa có BCTC của mã này: hiện kỳ gần nhất trước đó đã có thẻ, kèm dòng báo kỳ còn thiếu
+            for y, p in quarters:
+                if (y, p) >= (year, period):
+                    continue
+                d = cards.quarter_document(conn, ticker, y, p)
+                g = cards.card_for(conn, d) if d else None
+                if g is not None and g[1]["published"]:
+                    missing, (year, period), doc_id, got = (year, period), (y, p), d, g
+                    break
         watching = ticker in watchlist(conn, request.state.user.id)
     card, info = got if got else (None, None)
     return templates.TemplateResponse(request, "card.html", {
-        "ticker": ticker, "name": name[0], "year": year, "period": period, "card": card, "info": info,
+        "ticker": ticker, "name": name[0], "year": year, "period": period, "card": card, "info": info, "missing": missing,
         "doc_id": doc_id, "quarters": quarters, "watching": watching, "private": False, "site": site_url(),
         "admin": _is_admin(request)})
 

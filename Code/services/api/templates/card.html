@@ -7,8 +7,9 @@
   {%- else %}<span title="{{ v.computed or '' }}">{{ v.value | tien }}{% if v.computed %}*{% endif %}</span>{% endif -%}
 {%- endmacro %}
 {% block body %}
-<section class="cardhead">
-  <h1>{{ ticker }} <span class="muted">· {{ name }}</span></h1>
+<section class="cardhead panel">
+  <div class="headline"><h1>{{ ticker }}</h1><span class="cname">{{ name }}</span>
+    {% if card and info.published %}{% if info.status == "approved" %}<span class="badge ok">Đã duyệt tay</span>{% else %}<span class="badge ok">✓ Đã kiểm chứng</span>{% endif %}{% endif %}</div>
   <div class="kyrow">
     {% if quarters %}<select onchange="location='/ma/{{ ticker }}?ky='+this.value">
     {% for y, p in quarters %}<option value="{{ p|lower }}-{{ y }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
@@ -16,8 +17,9 @@
     {% if info %}<span class="small">{{ SCOPE.get(info.scope, info.scope) }} · {{ info.reviewed }}</span>{% endif %}
     {% if not private %}<form method="post" action="/theo-doi" class="inline"><input type="hidden" name="ticker" value="{{ ticker }}">
       <input type="hidden" name="action" value="{{ 'remove' if watching else 'add' }}"><input type="hidden" name="back" value="/ma/{{ ticker }}?ky={{ period|lower }}-{{ year }}">
-      <button>{{ "Đang theo dõi ✓" if watching else "Theo dõi, nhận email" }}</button></form>{% endif %}
+      <button class="{{ '' if watching else 'primary' }}">{{ "Đang theo dõi ✓" if watching else "Theo dõi, nhận email" }}</button></form>{% endif %}
   </div>
+  {% if missing %}<p class="infobox small">BCTC quý {{ missing[1][1:] }}/{{ missing[0] }} của {{ ticker }} chưa công bố; đang hiện quý {{ period[1:] }}/{{ year }}, kỳ gần nhất đã có số.</p>{% endif %}
   {% if private %}<p class="warnbox small">BCTC từ file bạn tải lên, chưa đối chiếu được với bản chính thức trên Vietstock; chỉ bạn xem được.</p>{% endif %}
   {% if info %}<div class="small muted">Công bố sớm nhất: {{ info.first_at | gio }} ({{ info.first_source }}) · Hệ thống xử lý xong: {{ info.processed_at | gio }}</div>{% endif %}
 </section>
@@ -29,7 +31,7 @@
 {% elif not card.supported %}
   <p class="muted">{{ card.not_evaluated | join('; ') }}</p>
 {% else %}
-  <p>{% if info.status == "approved" %}<span class="badge ok">Đã duyệt tay</span>{% else %}<span class="badge ok">Đã kiểm chứng</span>{% endif %} <span class="small">{{ info.gate[0] }}/{{ info.gate[1] }} ràng buộc kế toán đạt{% if info.manual_fixes %}; {{ info.manual_fixes }} ô đã được người đối chiếu ảnh gốc sửa{% endif %}</span></p>
+  <p class="small muted gate">{{ info.gate[0] }}/{{ info.gate[1] }} ràng buộc kế toán đạt{% if info.manual_fixes %}; {{ info.manual_fixes }} ô đã được người đối chiếu ảnh gốc sửa{% endif %}</p>
 
   {% if not private %}{% set ky = period|lower ~ '-' ~ year %}{% set share_url = site ~ '/chia-se/' ~ ticker ~ '/' ~ ky %}
   <div class="sharebox small">Chia sẻ thẻ:
@@ -39,7 +41,7 @@
   </div>{% endif %}
 
   {% if card.flags %}
-  <section class="flags">
+  <section class="flags panel">
     <h2>Cần xem kỹ</h2>
     {% for f in card.flags %}
     <div class="flagbox"><b>{{ f.title }}</b>
@@ -50,21 +52,21 @@
   </section>
   {% endif %}
 
-  <section>
+  <section class="panel">
     <h2>Số chính <span class="muted small">(tỷ đồng; bấm vào số để xem trang BCTC gốc)</span></h2>
-    {% for m in card.metrics %}
-    <div class="metric">
+    <div class="tiles">
+    {% for m in card.metrics %}{% set cq = m.q_change | chg %}{% set cy = m.ytd_change | chg %}
+    <div class="tile">
       <div class="mname">{{ m.name }}</div>
-      <div class="mgrid">
-        <div><span class="muted small">Quý này</span><br>{{ num(m.q_cur) }}</div>
-        <div><span class="muted small">Cùng kỳ</span><br>{{ num(m.q_prev_year) }}</div>
-        <div class="mchange">{{ m.q_change or "" }}</div>
-        <div><span class="muted small">Lũy kế</span><br>{{ num(m.ytd_cur) }}</div>
-        <div><span class="muted small">Lũy kế năm trước</span><br>{{ num(m.ytd_prev_year) }}</div>
-        <div class="mchange">{{ m.ytd_change or "" }}</div>
-      </div>
+      <div class="big">{{ num(m.q_cur) }}</div>
+      <div class="tline">{% if cq.main %}<span class="delta {{ cq.cls }}">{{ cq.main }}</span>{% endif %}
+        <span class="muted small">quý này · cùng kỳ {{ num(m.q_prev_year) }}</span></div>
+      <div class="ytd"><span class="muted small">Lũy kế</span> <b>{{ num(m.ytd_cur) }}</b>
+        {% if cy.main %}<span class="delta {{ cy.cls }}">{{ cy.main }}</span>{% endif %}
+        <span class="muted small">năm trước {{ num(m.ytd_prev_year) }}</span></div>
     </div>
     {% endfor %}
+    </div>
     {% if card.plan %}<p>Lũy kế {{ card.plan.name }} <b>{{ card.plan.ytd | tien }}</b>, đạt <b>{{ card.plan.pct_text }}</b> kế hoạch năm {{ year }}
       ({{ card.plan.plan | tien }}, <a href="{{ card.plan.source_url }}" target="_blank" rel="noopener">nghị quyết ĐHCĐ</a>).</p>
     {% endif %}
@@ -73,13 +75,13 @@
 
   {% if card.not_evaluated %}<p class="small muted">Chưa xét được: {{ card.not_evaluated | join('; ') }}</p>{% endif %}
   {% if info.causes and admin %}
-  <section class="causes">
+  <section class="causes panel">
     <h2>Vì sao lợi nhuận thay đổi <span class="badge warn">thử nghiệm, chỉ quản trị thấy</span> <span class="muted small">(AI viết từ bảng số do code tính trên BCTC đã kiểm chứng và thuyết minh; mỗi con số được kiểm lại, nhưng câu vẫn có thể gây hiểu nhầm)</span></h2>
     <ul class="reasons">{% for s in info.causes.sentences %}
       <li>{{ s.text }}{% if s.sources %} <span class="small muted">· nguồn: {% for x in s.sources %}<button class="src link" data-doc="{{ x.document_id }}" data-page="{{ x.page }}">{{ x.label | trim }} (trang {{ x.page }})</button>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
   </section>{% endif %}
   {% if info.explanation %}{% set lv = info.explanation.view %}
-  <section class="letter">
+  <section class="letter panel">
     <h2>Công ty giải thích <span class="muted small">(công văn giải trình; hệ thống đối chiếu từng con số với BCTC đã kiểm chứng)</span></h2>
     {% if lv.reasons or lv.headline %}
     {% if lv.period_kind and lv.period_kind != "quarter" %}<p class="small muted">Công văn chỉ giải thích số {{ {"ytd": "lũy kế", "half_year": "6 tháng", "year": "cả năm"}.get(lv.period_kind, lv.period_kind) }}.</p>{% endif %}

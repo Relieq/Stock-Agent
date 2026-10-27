@@ -1,20 +1,35 @@
 {% extends "base.html" %}
 {% block title %}Đăng nhập · Soi{% endblock %}
+{% block bodyclass %}loginpage{% endblock %}
 {% block body %}
-<section class="narrow">
-  <h1>Đăng nhập</h1>
-  <p class="muted">Soi đang thử nghiệm, chỉ dành cho người được mời. Nhập email để nhận link đăng nhập (không cần mật khẩu).</p>
-  {% if error %}<p class="warnbox">{{ error }}</p>{% endif %}
-  {% if sent %}
-    <p class="infobox">Nếu email này đã được mời, link đăng nhập đã được gửi tới hộp thư. Link dùng được một lần trong 30 phút.</p>
-    {% if dev_link %}<p class="small">Máy chủ chưa cấu hình gửi email, đang chạy trên máy này nên hiện link ở đây:
-      <a href="{{ dev_link }}?next={{ next | urlencode }}">đăng nhập</a></p>{% endif %}
-  {% else %}
-  <form method="post" action="/dang-nhap" class="stack">
-    <input type="hidden" name="next" value="{{ next }}">
-    <input type="email" name="email" placeholder="email@vidu.com" required autofocus>
-    <button>Gửi link đăng nhập</button>
-  </form>
-  {% endif %}
+<section class="hero">
+  <div class="pitch">
+    <h1>Kết quả kinh doanh của doanh nghiệp niêm yết, đọc ngay khi BCTC công bố</h1>
+    <p class="lead">Soi đọc BCTC của các công ty VN30 ngay khi công bố, tự kiểm từng con số rồi mới đưa lên thẻ kết quả kinh doanh.</p>
+    <ul class="points">
+      <li><b>Số đã được kiểm chứng.</b> Mỗi con số phải khớp các ràng buộc kế toán ngay trong chính BCTC, ví dụ tổng tài sản bằng tổng nguồn vốn.</li>
+      <li><b>Có nguồn tới từng trang.</b> Bấm vào số nào cũng mở đúng trang BCTC gốc.</li>
+      <li><b>Báo qua email.</b> Theo dõi mã bạn quan tâm, Soi gửi email khi mã đó công bố BCTC mới.</li>
+    </ul>
+    <p class="small muted">Đây là thông tin, không phải khuyến nghị đầu tư.</p>
+  </div>
+  <div class="panel loginbox">
+    <h2>Đăng nhập</h2>
+    {% if error %}<p class="warnbox">{{ error }}</p>{% endif %}
+    {% if sent %}
+      <p class="infobox">Nếu email này đã được mời, link đăng nhập đã được gửi tới hộp thư (nhớ xem cả mục Spam).
+        Link dùng được một lần trong 30 phút.</p>
+      {% if dev_link %}<p class="small">Máy chủ chưa cấu hình gửi email, đang chạy trên máy này nên hiện link ở đây:
+        <a href="{{ dev_link }}?next={{ next | urlencode }}">đăng nhập</a></p>{% endif %}
+      <p class="small"><a href="/dang-nhap?next={{ next | urlencode }}">Gửi lại tới email khác</a></p>
+    {% else %}
+    <form method="post" action="/dang-nhap" class="stack">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label>Email<input type="email" name="email" placeholder="email@vidu.com" required autofocus></label>
+      <button class="primary">Gửi link đăng nhập</button>
+    </form>
+    <p class="small muted">Không cần mật khẩu: Soi gửi link đăng nhập qua email. Soi đang thử nghiệm, chỉ dành cho người được mời.</p>
+    {% endif %}
+  </div>
 </section>
 {% endblock %}

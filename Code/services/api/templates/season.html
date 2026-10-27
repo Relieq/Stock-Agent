@@ -2,14 +2,19 @@
 {% block title %}Mùa BCTC {{ period }}/{{ year }} · Soi{% endblock %}
 {% block body %}
 <div class="seasonhead">
-  <h1>BCTC {{ period }}/{{ year }}</h1>
+  <h1>Mùa BCTC {{ period }}/{{ year }}</h1>
   <select onchange="location='/mua-bctc/'+this.value">
   {% for y, p in quarters %}<option value="{{ p|lower }}-{{ y }}" {% if y == year and p == period %}selected{% endif %}>{{ p }}/{{ y }}</option>{% endfor %}
   </select>
   <a class="small" href="/lich/{{ period|lower }}-{{ year }}">Lịch công bố</a>
 </div>
 {% set done = rows | selectattr('card') | list %}
-<p class="muted small">{{ done | length }}/{{ rows | length }} mã đã có BCTC. LNST: của cổ đông công ty mẹ (ngân hàng: của cổ đông ngân hàng mẹ), quý này so với cùng kỳ.
+{% set waiting = rows | rejectattr('card') | rejectattr('info') | list %}
+<div class="progress" title="{{ done | length }}/{{ rows | length }} mã đã có BCTC">
+  <div class="bar"><span style="width:{{ (100 * (done | length) / ((rows | length) or 1)) | round(1) }}%"></span></div>
+  <span class="small"><b>{{ done | length }}/{{ rows | length }}</b> mã đã có BCTC</span>
+</div>
+<p class="muted small">LNST: của cổ đông công ty mẹ (ngân hàng: của cổ đông ngân hàng mẹ), quý này so với cùng kỳ.
   Xếp hạng chỉ theo số liệu đã kiểm chứng, không phải khuyến nghị đầu tư.</p>
 
 <div class="toolbar">
@@ -22,27 +27,32 @@
 </div>
 
 <div class="seasonlist" id="list">
-{% for r in rows %}
+{% for r in rows if r.card or r.info %}
   {% set ok = r.card and r.info.published and r.card.supported %}
   <a class="srow" href="/ma/{{ r.ticker }}?ky={{ period|lower }}-{{ year }}"
      data-ticker="{{ r.ticker }}" data-kind="{{ r.kind }}" data-ok="{{ 1 if ok else 0 }}"
      data-group="{{ r.growth.group if ok else 'none' }}" data-pct="{{ r.growth.pct if ok and r.growth.pct is not none else '' }}"
      data-flags="{{ (r.flag_keys or []) | join(' ') if ok else '' }}"
      data-listed="{{ r.info.listed_at.isoformat() if r.info and r.info.listed_at else '' }}">
-    <div class="sticker"><b>{{ r.ticker }}</b><span class="muted small">{{ r.name }}</span></div>
+    <div class="sticker"><b>{{ r.ticker }}</b><span class="muted small" title="{{ r.name }}">{{ r.name | short_name }}</span></div>
     <div class="sbody">
     {% if ok %}
-      {% set np = (r.card.metrics | selectattr('key', 'equalto', 'npat_parent') | first) %}
-      <div>LNST quý <b>{{ np.q_cur.value | tien }}</b> <span class="muted">· {{ np.q_change }}</span></div>
+      {% set np = (r.card.metrics | selectattr('key', 'equalto', 'npat_parent') | first) %}{% set c = np.q_change | chg %}
+      <div class="sline"><span class="slabel">LNST quý</span> <span class="sval">{{ np.q_cur.value | tien }}</span>
+        {% if c.main %}<span class="delta {{ c.cls }}">{{ c.main }}</span>{% endif %}
+        {% if c.rest %}<span class="muted small">{{ c.rest }}</span>{% endif %}</div>
       {% if r.card.flags %}<div class="chips">{% for f in r.card.flags %}<span class="chip flag">{{ f.title }}</span>{% endfor %}</div>{% endif %}
     {% elif r.card and not r.card.supported %}<span class="muted">Thẻ chưa hỗ trợ công ty chứng khoán</span>
-    {% elif r.info %}<span class="muted">Đã có BCTC, đang chờ kiểm chứng</span>
-    {% else %}<span class="muted">Chưa công bố</span>{% endif %}
+    {% else %}<span class="muted">Đã có BCTC, đang chờ kiểm chứng</span>{% endif %}
     </div>
     <div class="srank small muted"></div>
   </a>
 {% endfor %}
 </div>
+{% if waiting %}
+<div class="panel notyet"><b>Chưa công bố ({{ waiting | length }})</b>
+  <div class="tickers">{% for r in waiting %}<a href="/ma/{{ r.ticker }}?ky={{ period|lower }}-{{ year }}" title="{{ r.name }}">{{ r.ticker }}</a>{% endfor %}</div>
+</div>{% endif %}
 <script>
 (() => {
   const list = document.getElementById('list'), rows = [...list.children];

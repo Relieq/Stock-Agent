@@ -4,16 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Soi{% endblock %}</title>
-<link rel="stylesheet" href="/static/style.css?v=7">
+<link rel="stylesheet" href="/static/fonts.css?v=1">
+<link rel="stylesheet" href="/static/style.css?v=8">
 {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{% block bodyclass %}{% endblock %}">
 {% set me = request.state.user if request and request.state and request.state.user is defined else none %}
-<header class="top"><a href="/mua-bctc" class="brand">Soi</a>
-  {% if me %}<nav class="nav"><a href="/mua-bctc">Mùa BCTC</a> <a href="/bao-cao">Báo cáo</a> <a href="/lich">Lịch</a> <a href="/theo-doi">Theo dõi</a> <a href="/yeu-cau">Yêu cầu</a>
-    {% if me.is_admin %}<a href="/duyet">Duyệt</a> <a href="/quan-tri">Người dùng</a> <a href="/quan-tri/chi-phi">Chi phí</a> <a href="/quan-tri/gop-y">Góp ý</a> <a href="/noi-bo" class="muted">Nội bộ</a>{% endif %}
-    <form method="post" action="/dang-xuat" class="inline"><button class="link" title="{{ me.email }}">Đăng xuất</button></form></nav>{% endif %}
-</header>
+{% set here = request.url.path if request else "" %}
+{% macro navlink(href, text) %}<a href="{{ href }}"{% if here == href or here.startswith(href ~ '/') %} class="on"{% endif %}>{{ text }}</a>{% endmacro %}
+<header class="top"><div class="topin"><a href="/mua-bctc" class="brand"><span class="mark">S</span>Soi</a>
+  {% if me %}<nav class="nav">{{ navlink("/mua-bctc", "Mùa BCTC") }}{{ navlink("/bao-cao", "Báo cáo") }}{{ navlink("/lich", "Lịch") }}{{ navlink("/theo-doi", "Theo dõi") }}{{ navlink("/yeu-cau", "Yêu cầu") }}
+    {% if me.is_admin %}<details class="admin"><summary>Quản trị</summary><div class="menu">
+      <a href="/duyet">Duyệt</a><a href="/quan-tri">Người dùng</a><a href="/quan-tri/chi-phi">Chi phí</a><a href="/quan-tri/gop-y">Góp ý</a><a href="/noi-bo">Nội bộ</a></div></details>{% endif %}
+    <form method="post" action="/dang-xuat" class="inline out"><button class="link" title="{{ me.email }}">Đăng xuất</button></form></nav>{% endif %}
+</div></header>
 <main>{% block body %}{% endblock %}</main>
 {% if me %}{% set qp = request.query_params %}
 <section class="feedback" id="gop-y">

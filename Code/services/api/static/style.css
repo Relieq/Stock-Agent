@@ -1,13 +1,29 @@
-:root { --fg:#1d2329; --muted:#6b7480; --line:#e3e6ea; --bg:#fff; --soft:#f6f7f9; --ok:#1f7a3f; --okbg:#e3f4e8;
-        --warn:#8a5a00; --warnbg:#fff1d6; --bad:#a32020; --badbg:#fde4e4; --sel:#e6f0ff; }
+/* Màu: --brand là màu nhận diện (thanh trên, nút chính, link); --page là nền trang, --bg là nền khung nội dung.
+   Màu ý nghĩa chỉ dùng cho chiều số liệu (--pos tăng, --neg giảm), cờ cảnh báo (--warn) và trạng thái (--ok). */
+:root { --brand:#14365c; --brand2:#1f5d99; --link:#1d5fa3; --page:#f2f5f9; --bg:#fff; --fg:#18212b; --muted:#5f6b7a;
+        --line:#e1e6ed; --soft:#f5f7fa; --ok:#1f7a3f; --okbg:#e3f4e8; --warn:#8a5a00; --warnbg:#fff1d6;
+        --bad:#a32020; --badbg:#fde4e4; --sel:#e6f0ff; --pos:#12804a; --posbg:#e2f5ea; --neg:#c23a2b; --negbg:#fde8e5;
+        --radius:10px; --shadow:0 1px 2px rgba(20,40,70,.06), 0 2px 8px rgba(20,40,70,.05); }
 * { box-sizing: border-box; }
-body { margin:0; font:14px/1.45 system-ui, "Segoe UI", Roboto, sans-serif; color:var(--fg); background:var(--bg); }
-a { color:#0b5cad; }
-.top { display:flex; gap:12px; align-items:baseline; padding:10px 16px; border-bottom:1px solid var(--line); }
-.brand { font-weight:700; font-size:18px; text-decoration:none; color:var(--fg); }
+body { margin:0; font:15px/1.5 "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, sans-serif; color:var(--fg);
+       background:var(--page); -webkit-font-smoothing:antialiased; }
+a { color:var(--link); text-decoration-thickness:1px; text-underline-offset:2px; }
+h1 { font-size:24px; font-weight:700; letter-spacing:-.01em; }
+.top { position:sticky; top:0; z-index:10; background:var(--brand); color:#fff; box-shadow:0 1px 0 rgba(0,0,0,.08); }
+.topin { max-width:1120px; margin:0 auto; display:flex; gap:20px; align-items:center; padding:10px 20px; }
+.brand { display:flex; align-items:center; gap:8px; font-weight:700; font-size:20px; text-decoration:none; color:#fff; letter-spacing:-.01em; }
+.brand .mark { width:26px; height:26px; border-radius:8px; background:linear-gradient(135deg, #3d8bd8, #7cc4f5);
+               display:grid; place-items:center; font-size:15px; color:var(--brand); font-weight:800; }
 .sub, .muted { color:var(--muted); }
-.small { font-size:12px; }
-main { padding:12px 16px; }
+.small { font-size:13px; }
+main { max-width:1120px; margin:0 auto; padding:20px 20px 8px; }
+.panel { background:var(--bg); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);
+         padding:16px 18px; margin:14px 0; }
+.panel > h2:first-child { margin-top:0; }
+.pos { color:var(--pos); } .neg { color:var(--neg); }
+.delta { display:inline-block; padding:1px 8px; border-radius:999px; font-weight:600; font-size:13px; white-space:nowrap;
+         font-variant-numeric:tabular-nums; }
+.delta.pos { background:var(--posbg); } .delta.neg { background:var(--negbg); } .delta.flat { background:var(--soft); color:var(--muted); }
 .status { display:flex; flex-wrap:wrap; gap:8px 24px; padding:10px 12px; background:var(--soft); border-radius:6px; }
 .status .watch { flex-basis:100%; font-size:12px; color:var(--muted); }
 .filter { display:flex; gap:16px; align-items:center; margin:12px 0; }
@@ -66,23 +82,13 @@ td.ev-second_differs, .legend .ev-second_differs, .chip.ev-second_differs { back
 td.ev-image_ok, .legend .ev-image_ok, .chip.ev-image_ok { background:#dcefe2; }
 .legend span, .chip { padding:0 6px; border-radius:4px; margin-right:4px; white-space:nowrap; }
 td.ev-differs, .legend .ev-differs, .chip.ev-differs { background:#dfe9ff; }
-.nav { margin-left:auto; display:flex; gap:12px; }
-.foot { padding:12px 16px 24px; border-top:1px solid var(--line); margin-top:24px; }
 .seasonhead, .kyrow { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-.seasonhead h1, .cardhead h1 { margin:4px 0; font-size:20px; }
 .seasonlist { display:flex; flex-direction:column; }
-.srow { display:flex; gap:12px; padding:10px 4px; border-bottom:1px solid var(--line); color:var(--fg); text-decoration:none; }
-.srow:hover { background:var(--soft); }
-.sticker { width:150px; flex-shrink:0; display:flex; flex-direction:column; }
 .sbody { flex:1; min-width:0; }
 .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
 .chip.flag { background:var(--warnbg); color:var(--warn); border-radius:10px; padding:1px 8px; font-size:12px; }
-h2 { font-size:16px; margin:16px 0 8px; }
 .flagbox { background:var(--warnbg); border-radius:6px; padding:8px 10px; margin:6px 0; }
-.metric { border-bottom:1px solid var(--line); padding:8px 0; }
 .mname { font-weight:600; margin-bottom:4px; }
-.mgrid { display:grid; grid-template-columns:1fr 1fr 2fr; gap:4px 12px; font-variant-numeric:tabular-nums; }
-.mchange { align-self:end; }
 button.src { border:0; background:none; padding:0; font:inherit; color:#0b5cad; cursor:pointer; text-decoration:underline dotted; }
 button.src.link { font-size:12px; }
 dialog#viewer { width:min(960px, 96vw); height:90vh; padding:8px; border:1px solid var(--line); }
@@ -91,15 +97,12 @@ dialog .close { float:right; }
 @media (max-width: 600px) {
   .srow { flex-direction:column; gap:2px; }
   .sticker { width:auto; flex-direction:row; gap:8px; align-items:baseline; }
-  .mgrid { grid-template-columns:1fr 1fr; }
-  .mchange { grid-column:1 / -1; }
 }
 .narrow { max-width:640px; }
 form.stack { display:flex; flex-direction:column; gap:8px; max-width:420px; margin:8px 0 16px; }
 form.stack label { display:flex; flex-direction:column; gap:2px; font-size:13px; }
 form.inline { display:inline; }
 form.row { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
-input, select, button { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); }
 button { cursor:pointer; background:var(--soft); }
 button.link { border:0; background:none; color:#0b5cad; padding:0 4px; }
 ul.plain { list-style:none; padding:0; } ul.plain li { padding:4px 0; border-bottom:1px solid var(--line); }
@@ -130,10 +133,107 @@ ul.plain { list-style:none; padding:0; } ul.plain li { padding:4px 0; border-bot
 .letter ul.reasons li { margin:4px 0; }
 .causes ul.reasons { margin:6px 0; padding-left:20px; }
 .causes ul.reasons li { margin:6px 0; }
-.feedback { max-width:720px; margin:24px 16px 0; }
 .feedback summary { cursor:pointer; color:var(--muted, #666); }
 .feedback textarea { width:100%; font:inherit; padding:8px; box-sizing:border-box; margin:6px 0; }
 @media (max-width: 600px) {
-  .top { flex-wrap:wrap; }
-  .nav { margin-left:0; flex-wrap:wrap; gap:4px 12px; }
+}
+
+/* ---- Giao diện 10/2026: menu, chữ, khung, trang mùa BCTC, thẻ, đăng nhập ---- */
+h2 { font-size:17px; font-weight:600; margin:20px 0 10px; }
+input, select, button { font:inherit; font-size:14px; padding:7px 10px; border:1px solid #cfd6df; border-radius:8px; background:var(--bg); color:var(--fg); }
+input:focus, select:focus, textarea:focus { outline:2px solid #9cc3ec; outline-offset:0; border-color:var(--brand2); }
+button:hover { background:#eaeef3; }
+button.primary { background:var(--brand2); border-color:var(--brand2); color:#fff; font-weight:600; }
+button.primary:hover { background:var(--brand); }
+.nav { margin-left:auto; display:flex; gap:4px; align-items:center; }
+.nav > a, .nav .admin > summary { color:#dbe7f5; text-decoration:none; padding:6px 10px; border-radius:8px; font-size:14px; font-weight:500; }
+.nav > a:hover, .nav .admin > summary:hover { background:rgba(255,255,255,.1); color:#fff; }
+.nav > a.on { background:rgba(255,255,255,.16); color:#fff; }
+.nav .admin { position:relative; }
+.nav .admin > summary { list-style:none; cursor:pointer; }
+.nav .admin > summary::-webkit-details-marker { display:none; }
+.nav .admin > summary::after { content:" ▾"; font-size:11px; }
+.nav .admin .menu { position:absolute; right:0; top:calc(100% + 6px); background:var(--bg); border:1px solid var(--line);
+                    border-radius:var(--radius); box-shadow:0 8px 24px rgba(20,40,70,.15); padding:6px; min-width:170px; z-index:20; }
+.nav .admin .menu a { display:block; padding:7px 10px; border-radius:6px; color:var(--fg); text-decoration:none; }
+.nav .admin .menu a:hover { background:var(--soft); }
+.nav .out button.link { color:#dbe7f5; font-size:14px; padding:6px 10px; }
+.nav .out button.link:hover { background:rgba(255,255,255,.1); color:#fff; }
+.foot { max-width:1120px; margin:28px auto 0; padding:16px 20px 28px; border-top:1px solid var(--line); }
+.feedback { max-width:1120px; margin:28px auto 0; padding:0 20px; }
+.feedback details { max-width:720px; }
+/* Trang mùa BCTC */
+.seasonhead h1, .cardhead h1 { margin:0; font-size:26px; }
+.progress { display:flex; gap:12px; align-items:center; margin:12px 0 4px; }
+.progress .bar { flex:0 1 320px; height:8px; background:#dfe5ec; border-radius:999px; overflow:hidden; }
+.progress .bar span { display:block; height:100%; background:linear-gradient(90deg, var(--brand2), #4aa3e8); border-radius:999px; }
+.seasonlist { gap:10px; margin-top:12px; }
+.srow { display:flex; gap:16px; align-items:center; padding:14px 18px; background:var(--bg); border:1px solid var(--line);
+        border-radius:var(--radius); box-shadow:var(--shadow); color:var(--fg); text-decoration:none; transition:border-color .15s, box-shadow .15s; }
+.srow:hover { border-color:#b9c9dc; box-shadow:0 4px 14px rgba(20,40,70,.1); }
+.sticker { width:210px; flex-shrink:0; display:flex; flex-direction:column; min-width:0; }
+.sticker b { font-size:18px; letter-spacing:.01em; }
+.sticker .small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sline { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; }
+.slabel { color:var(--muted); font-size:13px; }
+.sval { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+.srank { font-weight:600; }
+.notyet { margin-top:16px; }
+.notyet .tickers { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.notyet .tickers a { padding:3px 10px; border:1px solid var(--line); border-radius:999px; text-decoration:none; color:var(--fg);
+                     font-size:13px; font-weight:500; background:var(--soft); }
+.notyet .tickers a:hover { border-color:var(--brand2); color:var(--brand2); }
+/* Thẻ KQKD */
+.cardhead .headline { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; }
+.cardhead .cname { color:var(--muted); font-size:17px; }
+.cardhead .kyrow { margin:10px 0 6px; }
+.gate { margin:4px 2px; }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+.tile { border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; background:linear-gradient(#fff, #fbfcfe); }
+.tile .mname { font-weight:600; color:var(--muted); font-size:14px; margin-bottom:4px; }
+.tile .big { font-size:28px; font-weight:700; line-height:1.2; font-variant-numeric:tabular-nums; }
+.tile .big button.src { font-weight:700; text-decoration:none; color:var(--fg); border-bottom:2px dotted #9fb4cc; }
+.tile .big button.src:hover { color:var(--brand2); }
+.tile .tline { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; margin:6px 0 10px; }
+.tile .ytd { border-top:1px solid var(--line); padding-top:8px; display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center;
+             font-variant-numeric:tabular-nums; }
+.tile .delta { white-space:normal; }
+.flagbox { border-left:4px solid #e0a419; }
+button.src { text-align:left; }
+.badge.ok { font-weight:600; }
+/* Trang tài liệu: bảng số đặt cạnh ảnh trang BCTC, dùng hết bề ngang màn hình */
+.wide main, .wide .topin, .wide .foot, .wide .feedback { max-width:none; }
+/* Trang đăng nhập */
+.loginpage main { max-width:1080px; }
+.hero { display:grid; grid-template-columns:1.25fr 1fr; gap:48px; align-items:center; padding:40px 0 24px; }
+.hero h1 { font-size:34px; line-height:1.2; margin:0 0 14px; color:var(--brand); }
+.hero .lead { font-size:17px; color:#33414f; margin:0 0 18px; }
+.hero .points { list-style:none; padding:0; margin:0 0 16px; display:grid; gap:12px; }
+.hero .points li { position:relative; padding-left:30px; color:#33414f; }
+.hero .points li::before { content:"✓"; position:absolute; left:0; top:1px; width:20px; height:20px; border-radius:50%;
+                           background:var(--posbg); color:var(--pos); font-size:12px; font-weight:700; display:grid; place-items:center; }
+.loginbox { padding:26px 28px; }
+.loginbox h2 { margin:0 0 14px; font-size:20px; }
+.loginbox form.stack { max-width:none; margin:0 0 12px; }
+.loginbox label { font-weight:500; gap:6px; }
+.loginbox input[type=email] { padding:10px 12px; font-size:15px; }
+.loginbox button.primary { padding:10px 14px; font-size:15px; }
+@media (max-width: 860px) {
+  .hero { grid-template-columns:1fr; gap:20px; padding:12px 0; }
+  .hero .loginbox { order:-1; }
+  .hero h1 { font-size:26px; }
+}
+@media (max-width: 600px) {
+  .topin { flex-wrap:wrap; gap:6px 12px; padding:8px 14px; }
+  .nav { margin-left:0; flex-wrap:wrap; gap:2px; }
+  .nav > a, .nav .admin > summary, .nav .out button.link { padding:5px 8px; font-size:13px; }
+  main { padding:14px 14px 4px; }
+  .srow { padding:12px 14px; align-items:stretch; position:relative; }
+  .sticker { width:auto; flex-direction:row; gap:8px; align-items:baseline; padding-right:36px; }
+  .sbody { width:100%; }
+  .srank { position:absolute; right:14px; top:14px; width:auto; }
+  .seg button { padding:6px 8px; font-size:13px; }
+  .tile .big { font-size:24px; }
+  .seasonhead h1, .cardhead h1 { font-size:22px; }
+  .legend span, .chip { white-space:normal; display:inline-block; max-width:100%; }
 }

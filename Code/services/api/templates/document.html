@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ doc.ticker }} {{ doc.period }}/{{ doc.year }} · Soi{% endblock %}
+{% block bodyclass %}wide{% endblock %}
 {% block body %}
 <section class="dochead">
   <h1>{{ doc.ticker }} <span class="muted">· {{ doc.name }}</span></h1>

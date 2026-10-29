@@ -73,6 +73,46 @@
     <p class="small muted">* Số tính từ các dòng in trên BCTC vì BCTC không in sẵn.</p>
   </section>
 
+  {% if card.cash %}{% set cq = card.cash %}{% set s = cq.summary %}
+  {% set ky_ytd = {"Q1": "quý 1", "Q2": "6 tháng", "Q3": "9 tháng", "Q4": "cả năm"}.get(period, "lũy kế") %}
+  {% macro pct(x, sign=true) %}{% if x is none %}–{% else %}{{ ("+" if x >= 0 else "−") if sign else "" }}{{ "%.0f"|format(x|abs) }}%{% endif %}{% endmacro %}
+  <section class="panel cashq">
+    <h2>Lợi nhuận có thu về thành tiền không <span class="muted small">({{ ky_ytd }}; bấm vào số để xem trang BCTC gốc)</span></h2>
+    <table class="cashsum">
+      <thead><tr><th></th><th class="num">{{ ky_ytd | capitalize }} {{ year }}</th>{% if s.ytd_prev_year %}<th class="num">Cùng kỳ {{ year - 1 }}</th>{% endif %}</tr></thead>
+      <tbody>
+      <tr><td>LNST</td><td class="num">{{ num(s.ytd_cur.npat) }}</td>{% if s.ytd_prev_year %}<td class="num">{{ num(s.ytd_prev_year.npat) }}</td>{% endif %}</tr>
+      <tr><td>Tiền thu từ hoạt động kinh doanh</td><td class="num">{{ num(s.ytd_cur.cfo) }}</td>{% if s.ytd_prev_year %}<td class="num">{{ num(s.ytd_prev_year.cfo) }}</td>{% endif %}</tr>
+      <tr class="ratio"><td>Tiền thu về trên mỗi đồng lợi nhuận</td><td class="num">{{ pct(s.ytd_cur.ratio, false) }}</td>{% if s.ytd_prev_year %}<td class="num">{{ pct(s.ytd_prev_year.ratio, false) }}</td>{% endif %}</tr>
+      </tbody>
+    </table>
+
+    {% if cq.bridge %}{% set b = cq.bridge %}
+    <h3>{% if b.start.value > 0 %}Vì sao lãi {{ b.start.value | tien }} mà tiền thu về {{ b.end.value | tien }}{% else %}Từ lợi nhuận đến tiền thu về{% endif %}</h3>
+    <table class="bridge">
+      <tr class="start"><td><div>Lợi nhuận trước thay đổi vốn lưu động</div><div class="wbar"><i style="left:{{ b.start_bar.left }}%;width:{{ b.start_bar.width }}%"></i></div></td><td class="num">{{ num(b.start) }}</td></tr>
+      {% for side, title in (("down", "Làm tiền ít đi"), ("up", "Làm tiền nhiều lên")) %}{% if b[side] %}
+      <tr class="grp"><td colspan="2">{{ title }}</td></tr>
+      {% for r in b[side] %}
+      <tr class="item {{ side }}"><td><div>{{ r.name }}</div><div class="wbar"><i style="left:{{ r.bar.left }}%;width:{{ r.bar.width }}%"></i></div></td><td class="num">{{ num(r.value) }}</td></tr>
+      {% endfor %}{% endif %}{% endfor %}
+      <tr class="end"><td><div>Tiền thu về từ hoạt động kinh doanh</div><div class="wbar"><i style="left:{{ b.end_bar.left }}%;width:{{ b.end_bar.width }}%"></i></div></td><td class="num">{{ num(b.end) }}</td></tr>
+    </table>
+    <p class="small muted">Mốc đầu là lợi nhuận trước thuế đã cộng lại các khoản không chi bằng tiền (khấu hao, dự phòng) và bỏ lãi từ đầu tư, như cách LCTT trình bày. Số lấy từ LCTT {{ ky_ytd }}.</p>
+    {% elif cq.bridge_reason %}<p class="small muted">Không lập được bảng tiền đi đâu: {{ cq.bridge_reason }}.</p>{% endif %}
+
+    {% if cq.balances %}
+    <h3>Tiền nằm ở hàng tồn kho và khoản phải thu</h3>
+    <ul class="bal">{% for r in cq.balances %}
+      <li><b>{{ r.name }}</b>: đầu năm {{ num(r.begin) }}, cuối kỳ {{ num(r.end) }}{% if r.change is not none %} ({{ pct(r.change) }}){% endif %}.
+        {% if r.flow_change is not none %}Cùng lúc, {{ r.flow_name }} {{ ky_ytd }} {{ pct(r.flow_change) }} so với cùng kỳ.{% endif %}
+        {% if r.days %}Số cuối kỳ bằng khoảng {{ "%.0f"|format(r.days) }} ngày {{ r.flow_name }}.{% endif %}</li>
+    {% endfor %}</ul>
+    {% endif %}
+    <p class="small muted">Đây là dữ kiện để tự đánh giá, không phải nhận định tốt hay xấu: ngành theo mùa hoặc công ty vừa mua công ty con có thể lệch nhiều mà không bất thường.</p>
+  </section>
+  {% endif %}
+
   {% if card.not_evaluated %}<p class="small muted">Chưa xét được: {{ card.not_evaluated | join('; ') }}</p>{% endif %}
   {% if info.causes and admin %}
   <section class="causes panel">

@@ -322,3 +322,26 @@ dialog#zoom button { position:absolute; top:10px; right:10px; background:rgba(8,
                      border-radius:8px; padding:6px 12px; cursor:pointer; }
 .feature.flip { grid-template-columns:1.65fr 1fr; }
 @media (max-width: 860px) { .feature.flip { grid-template-columns:1fr; } }
+
+/* Thẻ KQKD: chất lượng lợi nhuận. Bảng "tiền đi đâu" là thác nước nằm ngang: mỗi dòng một thanh từ mức trước tới mức
+   sau; nhóm "làm tiền ít đi / nhiều lên" là tiêu đề nhỏ thụt vào, khác hẳn hai dòng đầu và cuối */
+.cashq h3 { font-size:15px; margin:18px 0 6px; }
+.cashq table.cashsum { max-width:560px; }
+.cashq th { position:static; }
+.cashq table.cashsum tr.ratio td { font-weight:600; }
+.cashq table.bridge { max-width:720px; }
+.cashq table.bridge td { border-bottom:none; padding:4px 8px; vertical-align:middle; }
+.cashq table.bridge td.num { width:1%; }
+.cashq table.bridge tr.start td { font-weight:600; border-bottom:1px solid var(--line); padding-bottom:8px; }
+.cashq table.bridge tr.grp td { font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase;
+                                letter-spacing:.04em; padding:10px 8px 2px 22px; }
+.cashq table.bridge tr.item td:first-child { padding-left:22px; }
+.cashq table.bridge tr.end td { font-weight:700; border-top:2px solid var(--fg); background:var(--soft); padding:8px; }
+.cashq .wbar { position:relative; height:8px; margin-top:3px; background:var(--soft); border-radius:2px; }
+.cashq tr.end .wbar { background:#fff; }
+.cashq .wbar i { position:absolute; top:0; bottom:0; border-radius:2px; background:#9fb4cc; }
+.cashq tr.down .wbar i { background:var(--neg); opacity:.75; }
+.cashq tr.up .wbar i { background:var(--pos); opacity:.75; }
+.cashq tr.end .wbar i { background:var(--brand2); }
+.cashq ul.bal { padding-left:20px; margin:4px 0; }
+.cashq ul.bal li { margin:4px 0; }

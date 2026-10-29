@@ -1327,6 +1327,34 @@ Số liệu bị sửa giữa các BCTC & Hai BCTC cùng ngày (quý 2 và bán 
 Khi người dùng mở thẻ của một mã ở kỳ mà mã đó chưa công bố BCTC (thường gặp đầu mùa), thẻ hiện kỳ gần nhất đã có số
 và ghi rõ kỳ đang chọn còn thiếu, thay vì để trống.
 
+\textbf{Lợi nhuận có thu về thành tiền không.} Lợi nhuận kế toán được ghi khi bán hàng, kể cả khi khách chưa trả tiền,
+nên một công ty có thể lãi lớn mà tiền thu về ít. Thẻ của doanh nghiệp có thêm mục trả lời câu hỏi này, tính hoàn toàn
+bằng code từ số đã kiểm chứng (hình~\ref{fig:chatluong}):
+\begin{itemize}
+  \item LNST và tiền thu từ hoạt động kinh doanh, lũy kế kỳ này và cùng kỳ, cùng tỷ lệ tiền thu về trên mỗi đồng lợi
+        nhuận. LCTT chỉ có số lũy kế nên phép so dùng số lũy kế; BCTC quý 1 thường chỉ in cột quý trên KQKD và lũy kế
+        quý 1 chính là số quý.
+  \item Bảng \enquote{tiền đi đâu}: đi từ lợi nhuận trước thay đổi vốn lưu động qua từng dòng của LCTT lập theo phương
+        pháp gián tiếp tới dòng tiền kinh doanh. Mỗi dòng được gọi tên theo việc đã xảy ra (\enquote{nhập thêm hàng, tồn
+        kho tăng}, \enquote{nợ nhà cung cấp nhiều hơn}) và xếp vào nhóm làm tiền ít đi hay nhiều lên, nên không còn số
+        âm phải tự suy nghĩa; mỗi dòng có một thanh thác nước. Các dòng phải cộng ra đúng dòng tiền kinh doanh (sai số
+        làm tròn như phép kiểm của LCTT), không thì bảng không hiện. BCTC không in dòng lợi nhuận trước thay đổi vốn lưu
+        động thì hệ thống cộng các dòng phía trên; LCTT lập theo phương pháp trực tiếp thì không có bảng này.
+  \item Hàng tồn kho và phải thu ngắn hạn: đầu năm, cuối kỳ, mức thay đổi đặt cạnh mức tăng giá vốn hoặc doanh thu so
+        với cùng kỳ, và số dư cuối kỳ bằng khoảng bao nhiêu ngày giá vốn hoặc doanh thu.
+\end{itemize}
+Ô nào đang \enquote{cần xem lại} thì phần dùng ô đó không hiện. Mục này không áp dụng cho ngân hàng và công ty chứng
+khoán, vì dòng tiền kinh doanh của họ gồm cả tiền gửi, cho vay và cho vay ký quỹ. Trên 53 BCTC quý của doanh nghiệp đã
+kiểm chứng tính đến 29/10/2026 (quý 4/2025 đến quý 3/2026), 51 thẻ có đủ mục và mọi bảng tiền đi đâu đều cộng khớp; 2
+thẻ quý 4 thiếu vì KQKD chỉ in số quý trong khi LCTT là số cả năm.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{web-chat-luong-loi-nhuan.png}
+\caption{Mục \enquote{Lợi nhuận có thu về thành tiền không} trên thẻ MWG quý 3/2026: LNST 9 tháng gấp đôi cùng kỳ
+nhưng tiền thu từ kinh doanh chỉ bằng 32\% lợi nhuận, chủ yếu vì tiền đi vào hàng tồn kho.}\label{fig:chatluong}
+\end{figure}
+
 \subsection{Vì sao lợi nhuận thay đổi: agent tìm nguyên nhân}\label{sec:nguyennhan}
 Với mỗi BCTC quý đã kiểm chứng, bộ canh chạy thêm một agent nhỏ để viết vài câu giải thích vì sao LNST thay đổi so với
 cùng kỳ; đoạn này nằm ở mục \enquote{Vì sao lợi nhuận thay đổi} của thẻ, hiện đang thử nghiệm và chỉ quản trị viên thấy

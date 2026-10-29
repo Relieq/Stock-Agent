@@ -10,6 +10,7 @@ from services.extraction.evidence import document_evidence
 from services.extraction.pipeline import _load_record
 from services.metrics.card import Card, Facts, build_card
 
+HIDDEN = {"conflict", "second_differs"}   # ô "cần xem lại" (như services/analyst/store.py)
 PUBLISHABLE = ("verified", "approved")   # tự đạt kiểm chứng, hoặc người duyệt đã đối chiếu ảnh gốc
 
 
@@ -69,8 +70,9 @@ def card_for(conn: psycopg.Connection, document_id: int) -> tuple[Card, dict] | 
     ev = document_evidence(conn, document_id)
     plans = {m: (v, url) for m, v, url in conn.execute(
         "SELECT metric, value, source_url FROM agm_plans WHERE ticker = %s AND fiscal_year = %s", (ticker, year))}
+    hidden = {k for k, v in (ev.status.items() if ev else []) if v["status"] in HIDDEN}
     card = build_card(document_id, ticker, year, period, rec, npat_history(conn, ticker, scope),
-                      ev if ev is not None and ev.peers else None, plans)
+                      ev if ev is not None and ev.peers else None, plans, hidden)
     s = rec.get("summary", {})
     info = {"ticker": ticker, "name": name, "year": year, "period": period, "scope": scope, "doc_type": doc_type,
             "status": status, "published": status in PUBLISHABLE,

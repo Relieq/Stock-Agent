@@ -26,6 +26,7 @@ CORPORATE: dict[tuple[str, str], dict[str, str]] = {
     ("IS", "npat_parent"): {"TT200": "61", "TT99": "61"},
     ("IS", "minority"): {"TT200": "62", "TT99": "62"},
     ("BS", "cash"): {"TT200": "110", "TT99": "110"},
+    ("BS", "receivables"): {"TT200": "130", "TT99": "130"},  # phải thu ngắn hạn
     ("BS", "inventory"): {"TT200": "140", "TT99": "140"},
     ("BS", "total_assets"): {"TT200": "270", "TT99": "280"},   # TT99 in 270 thì xem detect_template/rules
     ("BS", "liabilities"): {"TT200": "300", "TT99": "300"},

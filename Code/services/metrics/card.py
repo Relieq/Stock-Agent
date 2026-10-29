@@ -19,6 +19,7 @@ from services.extraction.pipeline import _check_cached
 from services.extraction.rules import BANK_INCOME_PARTS, RULESETS
 from services.extraction.validate import expenses_printed_negative
 from services.metrics.canonical import code_for
+from services.metrics.cash import cash_quality
 
 QUARTERS = ("Q1", "Q2", "Q3", "Q4")
 
@@ -86,6 +87,7 @@ class Card:
     not_evaluated: list[str]              # cờ chưa xét được và lý do
     supported: bool = True
     plan: dict | None = None              # lũy kế so với kế hoạch năm của ĐHCĐ
+    cash: dict | None = None              # chất lượng lợi nhuận (services/metrics/cash.py)
 
 
 # ---- đọc số từ bản ghi trích xuất -------------------------------------------------------------------------------
@@ -426,7 +428,8 @@ def plan_progress(f: Facts, plans: dict[str, tuple[Decimal, str]]) -> dict | Non
 
 def build_card(document_id: int, ticker: str, year: int, period: str, record: dict,
                history: dict[tuple[int, str], Decimal] | None = None, evidence=None,
-               plans: dict[str, tuple[Decimal, str]] | None = None) -> Card:
+               plans: dict[str, tuple[Decimal, str]] | None = None, hidden: set | None = None) -> Card:
+    """hidden: ô (báo cáo, mã, cột) đang "cần xem lại", không dùng cho phần chất lượng lợi nhuận."""
     f = Facts(document_id, record, {(m.statement, m.key) for m in evidence.missing} if evidence is not None else None)
     kind = {"TCTD": "TCTD", "CTCK": "CTCK", "TT200": "corporate", "TT99": "corporate"}.get(f.template)
     if kind is None:
@@ -463,8 +466,18 @@ def build_card(document_id: int, ticker: str, year: int, period: str, record: di
             flags.append(x)
     else:
         not_evaluated.append("Số liệu khác giữa các BCTC: chưa có BCTC khác của cùng công ty để đối chiếu")
+    if kind == "corporate":
+        cash, reason = cash_quality(f, year, period, hidden)
+        if reason:
+            not_evaluated.append(reason)
+    else:
+        cash = None
+        not_evaluated.append("Chất lượng lợi nhuận: dòng tiền kinh doanh của " +
+                             ("ngân hàng gồm cả tiền gửi và tiền cho vay" if kind == "TCTD" else
+                              "công ty chứng khoán đi theo dư nợ cho vay ký quỹ và danh mục tự doanh") +
+                             ", không dùng để đo")
     return Card(document_id, ticker, year, period, f.template, metrics, flags, not_evaluated,
-                plan=plan_progress(f, plans or {}))
+                plan=plan_progress(f, plans or {}), cash=cash)
 
 
 def card_dict(card: Card) -> dict:

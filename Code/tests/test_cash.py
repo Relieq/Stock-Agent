@@ -96,3 +96,25 @@ def test_first_quarter_uses_quarter_column_but_other_quarters_do_not():
     assert out["summary"]["ytd_cur"]["ratio"] == 50
     out, reason = cash_quality(_facts(cf=cf, is_=is_), 2026, "Q4")
     assert out is None and "lũy kế" in reason
+
+
+def test_working_capital_flag_needs_all_four_conditions():
+    """Cờ tồn kho/phải thu: số ngày gấp 1,25 lần đầu năm và tăng ít nhất 15 ngày, số dư tăng nhanh hơn giá vốn/doanh
+    thu ít nhất 30 điểm %, khoản đó từ 5% tổng tài sản (đo trên 86 dòng quý 1-3/2026: bật 4, BSR quý 1 và VPL)."""
+    from services.metrics.card import Value, flag_working_capital
+    is_ = {"10": {"ytd_cur": "1500", "ytd_prev_year": "1400"}, "11": {"ytd_cur": "1000", "ytd_prev_year": "900"}}
+    bs = {"131": {"end_period": "330", "begin_year": "300"}, "140": {"end_period": "900", "begin_year": "200"},
+          "280": {"end_period": "3000"}}
+    year_flows = {"cogs": Value(D(1300) * B), "revenue": Value(D(1900) * B)}
+    flags = flag_working_capital(_facts(is_=is_, bs=bs), 2026, "Q3", year_flows, set())
+    assert [x.key for x in flags] == ["inventory"]
+    assert "246 ngày giá vốn" in flags[0].detail and "đầu năm 56 ngày" in flags[0].detail
+    assert "+350%" in flags[0].detail and "+11,1%" in flags[0].detail
+    # Khoản nhỏ (dưới 5% tổng tài sản) hoặc đang cần xem lại thì không bật; thiếu số cả năm trước thì không xét
+    small = dict(bs, **{"280": {"end_period": "30000"}})
+    assert flag_working_capital(_facts(is_=is_, bs=small), 2026, "Q3", year_flows, set()) == []
+    assert flag_working_capital(_facts(is_=is_, bs=bs), 2026, "Q3", year_flows, {("BS", "140", "end_period")}) == []
+    assert flag_working_capital(_facts(is_=is_, bs=bs), 2026, "Q3", {}, set()) == []
+    # Doanh thu tăng nhanh hơn số dư (bất động sản bàn giao dồn cuối năm) thì không bật dù số ngày tăng
+    fast = dict(is_, **{"11": {"ytd_cur": "1000", "ytd_prev_year": "200"}})
+    assert flag_working_capital(_facts(is_=fast, bs=bs), 2026, "Q3", year_flows, set()) == []

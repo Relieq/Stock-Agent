@@ -10,6 +10,7 @@ Mô hình ngôn ngữ không tham gia: không có phép tính nào do LLM làm.
 from __future__ import annotations
 
 import re
+from datetime import date
 from dataclasses import asdict, dataclass, field
 from decimal import Decimal
 
@@ -19,7 +20,7 @@ from services.extraction.pipeline import _check_cached
 from services.extraction.rules import BANK_INCOME_PARTS, RULESETS
 from services.extraction.validate import expenses_printed_negative
 from services.metrics.canonical import code_for
-from services.metrics.cash import cash_quality
+from services.metrics.cash import balances, cash_quality
 
 QUARTERS = ("Q1", "Q2", "Q3", "Q4")
 
@@ -352,6 +353,55 @@ def flag_cash(f: Facts) -> Flag | None:
                 f"{ty(cfo.value)}.", _src(npat, cfo))
 
 
+# Cờ tồn kho/phải thu: đo trên 86 dòng (tồn kho, phải thu) của doanh nghiệp quý 1-3/2026, bật 4 (BSR quý 1 tồn kho;
+# VPL quý 2 tồn kho, quý 3 cả hai). Bất động sản bàn giao dồn cuối năm nên số ngày tăng mạnh mà doanh thu còn tăng nhanh
+# hơn số dư (VHM, VIC): điều kiện chênh mức tăng loại các ca đó.
+WC_DAYS_RATIO = Decimal("1.25")      # số ngày cuối kỳ gấp ít nhất bấy nhiêu lần số ngày đầu năm
+WC_DAYS_MORE = 15                    # và nhiều hơn ít nhất bấy nhiêu ngày
+WC_GAP = 30                          # số dư tăng nhanh hơn giá vốn/doanh thu ít nhất bấy nhiêu điểm %
+WC_SHARE = 5                         # khoản đó ít nhất bấy nhiêu % tổng tài sản
+# Phải thu: chỉ phải thu của khách hàng. Phải thu ngắn hạn còn gồm trả trước cho người bán (VPL quý 3/2026: 4.049 lên
+# 21.004 tỷ, trong khi phải thu khách hàng chỉ +29%), không phải doanh thu chưa thu được tiền.
+WC_ITEMS = (("inventory", "Hàng tồn kho", "cogs", "giá vốn"),
+            ("trade_receivables", "Phải thu của khách hàng", "revenue", "doanh thu"))
+WC_TITLES = {"inventory": "Tồn kho tăng nhanh hơn giá vốn",
+             "trade_receivables": "Phải thu khách hàng tăng nhanh hơn doanh thu"}
+
+
+def _pct_text(x: Decimal) -> str:
+    return ("+" if x >= 0 else "−") + vn(abs(x), 0 if abs(x) >= 100 else 1) + "%"
+
+
+def flag_working_capital(f: Facts, year: int, period: str, year_flows: dict[str, Value],
+                         hidden: set | None = None) -> list[Flag]:
+    """Tồn kho (phải thu) cuối kỳ tính ra số ngày giá vốn (doanh thu) lũy kế, so với đầu năm tính theo giá vốn (doanh
+    thu) cả năm trước. year_flows: {"cogs"|"revenue": số cả năm trước}, lấy từ BCTC quý 4 năm trước."""
+    if f.template not in ("TT200", "TT99"):
+        return []
+    total = f.metric("BS", "total_assets", "end_period")
+    prev_days = (date(year, 1, 1) - date(year - 1, 1, 1)).days
+    out = []
+    for row in balances(f, hidden or set(), year, period, WC_ITEMS):
+        key, fy = row["key"], year_flows.get("cogs" if row["key"] == "inventory" else "revenue")
+        if fy is None or not fy.value or fy.value <= 0 or not total.value or row["days"] is None \
+                or row["begin"].value is None or row["change"] is None or row["flow_change"] is None:
+            continue
+        begin_days = row["begin"].value / fy.value * prev_days
+        gap = row["change"] - row["flow_change"]
+        share = row["end"].value / total.value * 100
+        if not (row["days"] >= begin_days * WC_DAYS_RATIO and row["days"] - begin_days >= WC_DAYS_MORE
+                and gap >= WC_GAP and share >= WC_SHARE):
+            continue
+        out.append(Flag(key, WC_TITLES[key],
+                        f"{row['name']} cuối kỳ bằng {vn(row['days'], 0)} ngày {row['flow_name']}, đầu năm "
+                        f"{vn(begin_days, 0)} ngày (tính theo {row['flow_name']} cả năm {year - 1}). Từ đầu năm "
+                        f"{row['name'].lower()} {_pct_text(row['change'])}, {row['flow_name']} lũy kế "
+                        f"{_pct_text(row['flow_change'])} so với cùng kỳ; khoản này bằng {vn(share, 0)}% tổng tài sản.",
+                        _src(row["end"], row["begin"], row["flow"], fy)))
+    return out
+
+
+
 COLUMN_NAMES = {"q_cur": "quý này", "q_prev_year": "cùng kỳ năm trước", "ytd_cur": "lũy kế",
                 "ytd_prev_year": "lũy kế năm trước", "end_period": "cuối kỳ", "begin_year": "đầu năm"}
 REVISED_MIN_SHARE = Decimal("0.005")   # chênh dưới 0,5% hoặc dưới 1 tỷ thì bỏ qua (làm tròn, sửa nhỏ)
@@ -428,8 +478,10 @@ def plan_progress(f: Facts, plans: dict[str, tuple[Decimal, str]]) -> dict | Non
 
 def build_card(document_id: int, ticker: str, year: int, period: str, record: dict,
                history: dict[tuple[int, str], Decimal] | None = None, evidence=None,
-               plans: dict[str, tuple[Decimal, str]] | None = None, hidden: set | None = None) -> Card:
-    """hidden: ô (báo cáo, mã, cột) đang "cần xem lại", không dùng cho phần chất lượng lợi nhuận."""
+               plans: dict[str, tuple[Decimal, str]] | None = None, hidden: set | None = None,
+               year_flows: dict[str, Value] | None = None) -> Card:
+    """hidden: ô (báo cáo, mã, cột) đang "cần xem lại", không dùng cho phần chất lượng lợi nhuận và cờ tồn kho/phải thu.
+    year_flows: giá vốn, doanh thu cả năm trước (cờ tồn kho/phải thu)."""
     f = Facts(document_id, record, {(m.statement, m.key) for m in evidence.missing} if evidence is not None else None)
     kind = {"TCTD": "TCTD", "CTCK": "CTCK", "TT200": "corporate", "TT99": "corporate"}.get(f.template)
     if kind is None:
@@ -470,6 +522,11 @@ def build_card(document_id: int, ticker: str, year: int, period: str, record: di
         cash, reason = cash_quality(f, year, period, hidden)
         if reason:
             not_evaluated.append(reason)
+        if year_flows:
+            flags += flag_working_capital(f, year, period, year_flows, hidden)
+        else:
+            not_evaluated.append(f"Tồn kho, phải thu so với đầu năm: chưa có BCTC quý 4/{year - 1} đã kiểm chứng để "
+                                 "lấy giá vốn, doanh thu cả năm trước")
     else:
         cash = None
         not_evaluated.append("Chất lượng lợi nhuận: dòng tiền kinh doanh của " +

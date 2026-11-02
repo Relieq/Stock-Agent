@@ -169,20 +169,23 @@ def bridge(f, hidden: set) -> tuple[dict | None, str | None]:
             "end": cfo, "end_bar": bar(Decimal(0), cfo.value)}, None
 
 
-def balances(f, hidden: set, year: int, period: str) -> list[dict]:
-    """Tồn kho và phải thu ngắn hạn: đầu năm, cuối kỳ, thay đổi, đặt cạnh mức tăng giá vốn/doanh thu lũy kế so cùng
-    kỳ, và số ngày giá vốn/doanh thu mà số dư cuối kỳ tương ứng."""
+BALANCE_ITEMS = (("inventory", "Hàng tồn kho", "cogs", "giá vốn"),
+                 ("receivables", "Phải thu ngắn hạn", "revenue", "doanh thu"))
+
+
+def balances(f, hidden: set, year: int, period: str, items=BALANCE_ITEMS) -> list[dict]:
+    """Tồn kho và phải thu ngắn hạn (hoặc các khoản `items`): đầu năm, cuối kỳ, thay đổi, đặt cạnh mức tăng giá
+    vốn/doanh thu lũy kế so cùng kỳ, và số ngày giá vốn/doanh thu mà số dư cuối kỳ tương ứng."""
     days = period_days(year, period)
     out = []
-    for key, name, flow_key, flow_name in (("inventory", "Hàng tồn kho", "cogs", "giá vốn"),
-                                           ("receivables", "Phải thu ngắn hạn", "revenue", "doanh thu")):
+    for key, name, flow_key, flow_name in items:
         code = f.code("BS", key)
         end, begin = f.get("BS", code, "end_period"), f.get("BS", code, "begin_year")
         (flow, col), (flow_prev, col_prev) = ytd(f, flow_key, "ytd_cur", period), ytd(f, flow_key, "ytd_prev_year", period)
         if end.value is None or _blocked(hidden, ("BS", code, "end_period"), ("BS", code, "begin_year"),
                                          ("IS", f.code("IS", flow_key), col), ("IS", f.code("IS", flow_key), col_prev)):
             continue
-        row = {"name": name, "end": end, "begin": begin, "flow_name": flow_name, "flow": flow,
+        row = {"key": key, "name": name, "end": end, "begin": begin, "flow_name": flow_name, "flow": flow,
                "change": _growth(end.value, begin.value), "flow_change": _growth(flow.value, flow_prev.value),
                "days": None}
         if days and flow.value and flow.value > 0:

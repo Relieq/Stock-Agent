@@ -45,6 +45,22 @@ def npat_history(conn: psycopg.Connection, ticker: str, scope: str) -> dict[tupl
     return prev | own
 
 
+def prior_year_flows(conn: psycopg.Connection, ticker: str, scope: str, year: int) -> dict:
+    """Giá vốn, doanh thu cả năm trước: cột lũy kế của BCTC quý 4 năm trước đã kiểm chứng hoặc đã duyệt tay (bản mới
+    nhất, kể cả bản điều chỉnh)."""
+    from services.metrics.cash import ytd
+    row = conn.execute(
+        """SELECT id FROM documents WHERE ticker = %s AND scope = %s AND doc_type = 'fs_quarter' AND fiscal_year = %s
+             AND fiscal_period = 'Q4' AND status IN ('verified', 'approved') AND content_kind = 'full'
+             AND duplicate_of IS NULL AND owner_user_id IS NULL ORDER BY source_listed_at DESC NULLS LAST, id DESC
+           LIMIT 1""", (ticker, scope, year - 1)).fetchone()
+    rec = _record(conn, row[0]) if row else None
+    if rec is None:
+        return {}
+    f = Facts(row[0], rec)
+    return {k: v for k in ("cogs", "revenue") if (v := ytd(f, k, "ytd_cur", "Q4")[0]).value is not None}
+
+
 SOURCE_NAMES = {"vietstock": "Vietstock", "hose": "HOSE", "upload": "tệp tải lên"}
 
 
@@ -72,7 +88,8 @@ def card_for(conn: psycopg.Connection, document_id: int) -> tuple[Card, dict] | 
         "SELECT metric, value, source_url FROM agm_plans WHERE ticker = %s AND fiscal_year = %s", (ticker, year))}
     hidden = {k for k, v in (ev.status.items() if ev else []) if v["status"] in HIDDEN}
     card = build_card(document_id, ticker, year, period, rec, npat_history(conn, ticker, scope),
-                      ev if ev is not None and ev.peers else None, plans, hidden)
+                      ev if ev is not None and ev.peers else None, plans, hidden,
+                      prior_year_flows(conn, ticker, scope, year))
     s = rec.get("summary", {})
     info = {"ticker": ticker, "name": name, "year": year, "period": period, "scope": scope, "doc_type": doc_type,
             "status": status, "published": status in PUBLISHABLE,

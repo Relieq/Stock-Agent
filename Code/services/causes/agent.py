@@ -341,9 +341,10 @@ class CauseAgent:
         return explanation(self.conn, self.ticker, self.year, self.period, self.scope) is not None
 
     def _gathered_text(self) -> str:
-        if not self.gathered:
+        tried = [f"- đã chọn dòng {s['line']}: {s['result']}" for s in getattr(self, "steps", []) if s.get("result")]
+        if not self.gathered and not tried:
             return "(chưa có)"
-        out = []
+        out = tried
         for g in self.gathered:
             if g["tool"] == "note":
                 part = f" (thuộc dòng {g['for']})" if g.get("for") and g["for"] != g["line"] else ""
@@ -381,10 +382,13 @@ class CauseAgent:
             if step["action"] == "done" or key in done:
                 break
             done.add(key)
-            if step["action"] == "note" and self.notes is not None and self.note_codes(step["line"]):
+            if step["action"] != "note" or self.notes is None:
+                break
+            if self.note_codes(step["line"]):
                 self.gathered += self.read_note(step["line"])
             else:
-                break
+                # Dòng không có thuyết minh (STB quý 3/2026 chọn dự phòng rồi dừng): ghi lại để lượt sau chọn dòng khác
+                step["result"] = "dòng này không có thuyết minh"
 
     # ---------- bảng số và lời ----------
 

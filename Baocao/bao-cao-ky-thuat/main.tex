@@ -1160,6 +1160,15 @@ Khi KQKD thiếu dòng LNST, hệ thống tự chép thêm trang ngay sau trang 
 còn lại chỉ hiện cảnh báo \enquote{có thể thiếu dòng, cần xem lại}, không chặn BCTC, vì công ty cũng có thể tự đổi cách
 trình bày giữa hai kỳ.
 
+\subsection{Kiểm đúng kỳ}\label{sec:dungky}
+Phép cộng cũng không phân biệt được bảng của kỳ này với bảng của kỳ khác in trong cùng file. Có BCTC quý kẹp phụ lục trình
+bày lại số liệu năm trước (một BCĐKT và một KQKD đầy đủ, ba cột: số trình bày lại, số đã công bố, chênh lệch) ngay trước
+báo cáo quý; mỗi cột của phụ lục tự cộng khớp nên mọi ràng buộc đều đạt. Vì vậy khi chép mỗi báo cáo, mô hình ghi lại tiêu
+đề từng cột, và code kiểm: cột kỳ này phải có, tiêu đề có ghi năm thì phải đúng năm của BCTC, cột cuối kỳ của BCĐKT có ghi
+ngày thì phải đúng ngày cuối kỳ. Khối trang nào sai kỳ thì hệ thống chép khối trang cùng loại kế tiếp trong file; không khối
+nào đúng kỳ thì BCTC không được coi là đã kiểm chứng. Tiêu đề chỉ ghi \enquote{Kỳ này}, \enquote{Kỳ trước} không có năm thì
+không bị coi là sai kỳ.
+
 \section{Công nghệ lõi: tự định vị và tự sửa ô đọc sai}\label{sec:loi}
 \subsection{Ý tưởng}
 Khi một phép cộng lệch, cách đơn giản là đọc lại \emph{tất cả} các ô trong phép cộng đó. Cách này tốn tiền, và lần đọc

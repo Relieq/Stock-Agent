@@ -30,8 +30,10 @@ HEAD_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["he
                                             "properties": {"number": {"type": "string"}, "title": {"type": "string"}}}}}}
 HEAD_PROMPT = """Ảnh là một trang báo cáo tài chính của doanh nghiệp Việt Nam, thường thuộc phần thuyết minh. Liệt kê các tiêu đề
 MỤC thuyết minh BẮT ĐẦU trên trang này: dòng tiêu đề có số thứ tự mục ở đầu (ví dụ "27. DOANH THU THUẦN", "5. TIỀN",
-"VI.25 Chi phí tài chính"). Chép nguyên văn số thứ tự và tên mục. Chỉ lấy mục cấp lớn nhất; bỏ mục con kiểu a), b), (i),
-5.1 và bỏ tên dòng trong bảng. Trang không có tiêu đề mục nào thì trả danh sách rỗng."""
+"VI.25 Chi phí tài chính"). Chép nguyên văn số thứ tự và tên mục. Nếu trang có tiêu đề PHẦN đánh số La Mã (ví dụ
+"VI. THÔNG TIN BỔ SUNG CHO CÁC KHOẢN MỤC TRÌNH BÀY TRONG BÁO CÁO KẾT QUẢ HOẠT ĐỘNG", "IV- Thông tin bổ sung...") thì
+liệt kê cả tiêu đề phần đó (number là số La Mã) VÀ mọi mục đánh số 1., 2., 3. ... bên dưới nó, theo thứ tự trên trang.
+Bỏ mục con kiểu a), b), (i), 5.1 và bỏ tên dòng trong bảng. Trang không có tiêu đề nào thì trả danh sách rỗng."""
 
 _STR = {"type": ["string", "null"]}
 TABLE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["unit", "columns", "rows"], "properties": {
@@ -75,7 +77,7 @@ ROMAN = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
 
 def roman_value(text: str | None) -> int | None:
     """"VI." -> 6; chuỗi không phải số La Mã -> None."""
-    m = re.fullmatch(r"\s*([IVXLC]+)\s*\.?\s*", text or "")
+    m = re.fullmatch(r"\s*([IVXLC]+)\s*[.\-–):]?\s*", text or "")
     if not m:
         return None
     vals = [ROMAN[c] for c in m.group(1)]
@@ -156,14 +158,23 @@ class Notes:
         cached = self.cache.setdefault("sections", {}).get(key)
         if cached is not None:
             return tuple(cached) if cached else None
-        hi, found = self.last_page, None
+        hi, found, nxt = self.last_page, None, None
         for page in range(self.last_page, max(self.first_page, self.last_page - MAX_SECTION_SCAN) - 1, -1):
             rs = self.romans(page)
             if any(r > section for r in rs):
                 hi = page - 1 if not any(r == section for r in rs) else page
+            if section + 1 in rs:
+                nxt = page
             if any(r <= section for r in rs):
                 found = (page, hi)
                 break
+        if found is None and nxt is not None:
+            # Mô hình bỏ sót tiêu đề phần (MBB quý 3/2026: "IV-" ở đầu trang 46): phần này bắt đầu ở trang gần nhất trước
+            # phần kế tiếp có mục đánh lại số 1
+            for page in range(nxt - 1, max(self.first_page, nxt - MAX_SECTION_SCAN) - 1, -1):
+                if any(n == 1 for n, _ in self.headings(page)):
+                    found = (page, nxt - 1)
+                    break
         self.cache["sections"][key] = list(found) if found else []
         self._save()
         return found

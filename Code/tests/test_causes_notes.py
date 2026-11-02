@@ -74,3 +74,22 @@ def test_nested_table_subset_matches_both_columns_or_nothing():
     nt = match_note(raw, 14, {"ytd": (D(90_411) * M, D(70_760) * M)}, M * 5)
     assert nt.verified and len(nt.items) == 4          # tập nhiều dòng nhất: hai dòng con thay cho dòng cha
     assert "Lãi chứng khoán nợ" not in [lab for lab, *_ in nt.items]
+
+
+def test_section_found_by_numbering_restart_when_heading_missed():
+    """MBB quý 3/2026: mô hình bỏ sót tiêu đề "IV-" ở trang 46; phần IV phải là đoạn từ trang mục đánh lại số 1 tới trước
+    trang có phần V. "IV-" (gạch ngang) cũng là số La Mã."""
+    from services.causes.notes import Notes, roman_value
+    assert roman_value("IV-") == 4 and roman_value("V)") == 5 and roman_value("VII") == 7
+
+    class Pdf:
+        page_count = 12
+    pages = {5: [["1.", "Tiền"], ["2.", "Cho vay"]], 6: [["3.", "Chứng khoán"]], 8: [["1.", "Thu nhập lãi"]],
+             9: [["2.", "Dịch vụ"], ["3.", "Ngoại hối"]], 10: [["4.", "Chi phí hoạt động"]],
+             11: [["V", "THÔNG TIN KHÁC"], ["1", "Cam kết"]]}
+    n = Notes.__new__(Notes)
+    n.document_id, n.pdf, n.first_page, n.client = 0, Pdf(), 5, None
+    n.cache = {"headings": {str(p): pages.get(p, []) for p in range(1, 13)}, "tables": {}}
+    n._save = lambda: None
+    assert n.section_range(4) == (8, 10)
+    assert n.find(2, 4) == (9, "Dịch vụ")

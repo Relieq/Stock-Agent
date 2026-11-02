@@ -26,6 +26,7 @@ import psycopg
 
 from services.extraction import prompts
 from services.extraction.bank import canonicalize
+from services.extraction.periods import period_problem
 from services.extraction.numbers import normalize_code, parse_amount
 from services.extraction.sources import (
     candidates, is_low_dpi, open_pdf, render_page, render_sharp, render_strips, text_orientation,
@@ -80,17 +81,24 @@ def _locate(client: VisionClient, doc, max_pages: int) -> list[dict]:
     return sorted(pages, key=lambda x: x["page"])
 
 
-def _statement_pages(pages: list[dict]) -> dict[str, list[int]]:
-    """Gom các trang tiếng Việt theo loại báo cáo. Chỉ lấy khối trang liên tiếp đầu tiên của mỗi loại."""
-    out: dict[str, list[int]] = {}
+def _statement_blocks(pages: list[dict]) -> dict[str, list[list[int]]]:
+    """Gom các trang tiếng Việt theo loại báo cáo thành các khối trang liên tiếp, theo thứ tự trong file."""
+    out: dict[str, list[list[int]]] = {}
     for p in pages:
         st = prompts.STATEMENT_OF_KIND.get(p["kind"])
         if st is None or p["language"] != "vi":
             continue
-        block = out.setdefault(st, [])
-        if not block or p["page"] == block[-1] + 1:
-            block.append(p["page"])
+        blocks = out.setdefault(st, [])
+        if blocks and p["page"] == blocks[-1][-1] + 1:
+            blocks[-1].append(p["page"])
+        else:
+            blocks.append([p["page"]])
     return out
+
+
+def _statement_pages(pages: list[dict]) -> dict[str, list[int]]:
+    """Khối trang liên tiếp đầu tiên của mỗi loại báo cáo (khối sau chỉ dùng khi khối đầu sai kỳ, xem bước 2)."""
+    return {st: blocks[0] for st, blocks in _statement_blocks(pages).items()}
 
 
 def fix_row_pages(raw: dict, pages: list[int]) -> dict:
@@ -136,7 +144,8 @@ def _json_default(o):
 def extract_document(conn: psycopg.Connection, document_id: int, client: VisionClient) -> dict:
     row = conn.execute(
         """
-        SELECT d.ticker, d.title_raw, c.template, f.id, f.sha256, f.storage_key, d.doc_type
+        SELECT d.ticker, d.title_raw, c.template, f.id, f.sha256, f.storage_key, d.doc_type, d.fiscal_year,
+               d.fiscal_period
         FROM documents d JOIN companies c ON c.ticker = d.ticker
         JOIN document_files f ON f.document_id = d.id
         WHERE d.id = %s ORDER BY f.downloaded_at DESC LIMIT 1
@@ -145,7 +154,7 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
     ).fetchone()
     if row is None:
         raise RuntimeError(f"Tài liệu {document_id} chưa có file đã tải")
-    ticker, title, company_template, file_id, sha256, storage_key, doc_type = row
+    ticker, title, company_template, file_id, sha256, storage_key, doc_type, fiscal_year, fiscal_period = row
     path = raw_data_dir() / storage_key
 
     usage_before = asdict(client.usage)   # client dùng chung cho nhiều tài liệu: chỉ tính phần của tài liệu này
@@ -175,16 +184,26 @@ def extract_document(conn: psycopg.Connection, document_id: int, client: VisionC
     record["chosen"] = cand.name
     check_landscape_rotations(record, client, doc)
 
-    # 2. Chép bảng từng báo cáo
+    # 2. Chép bảng từng báo cáo. Khối trang đầu mà tiêu đề cột sai kỳ (VCB quý 3/2026 kẹp phụ lục trình bày lại số
+    #    năm 2025 trước BCTC quý) thì chép khối cùng loại kế tiếp; không khối nào đúng kỳ thì giữ khối đầu.
     record["raw"] = {}
+    chosen = next(c for c in record["candidates"] if c["name"] == cand.name)
+    blocks = _statement_blocks(chosen["pages"])
     for st in ("BS", "IS", "CF"):
-        pages = st_pages.get(st)
-        if not pages:
-            continue
-        images = [(f"Trang {p}", _extract_image(doc, p, _rotation(record, p))) for p in pages]
-        raw = fix_row_pages(client.json_from_images(prompts.extract_prompt(st), images, prompts.extract_schema(st),
-                                                    f"statement_{st}", detail=_extract_detail(doc, pages)), pages)
-        record["raw"][st] = raw
+        first = None
+        for pages in blocks.get(st, [])[:MAX_BLOCKS]:
+            images = [(f"Trang {p}", _extract_image(doc, p, _rotation(record, p))) for p in pages]
+            raw = fix_row_pages(client.json_from_images(prompts.extract_prompt(st), images, prompts.extract_schema(st),
+                                                        f"statement_{st}", detail=_extract_detail(doc, pages)), pages)
+            problem = period_problem(st, raw, fiscal_year, fiscal_period)
+            first = first or (pages, raw)
+            if problem is None:
+                first = (pages, raw)
+                break
+            record.setdefault("period_skips", []).append({"statement": st, "pages": pages, "problem": problem})
+        if first is not None:
+            st_pages[st], record["raw"][st] = first
+            chosen["statement_pages"][st] = first[0]
     record["company_template"] = company_template
 
     _escalate(record, client, doc, conn)
@@ -1228,6 +1247,7 @@ def recheck_document(conn: psycopg.Connection, document_id: int) -> dict:
     return _finalize(conn, _load_record(conn, document_id))
 
 
+MAX_BLOCKS = 3      # số khối trang cùng loại thử chép khi khối trước sai kỳ
 BALANCE_RULE = re.compile(r"_eq_440$|_ta_eq_tle$")   # tổng tài sản = tổng nguồn vốn, theo từng mẫu
 
 
@@ -1253,8 +1273,14 @@ def _finalize(conn: psycopg.Connection, record: dict) -> dict:
     balanced = any(c.gate and BALANCE_RULE.search(c.rule_id) for c in checks)
     summary["gate_statements"] = sorted(covered)
     summary["balance_checked"] = balanced
+    # Mọi cột tự cộng khớp vẫn có thể là bảng của kỳ khác (VCB quý 3/2026 chép nhầm phụ lục số năm 2025)
+    period = conn.execute("SELECT fiscal_year, fiscal_period FROM documents WHERE id = %s", (document_id,)).fetchone()
+    wrong = {st: pr for st in ("BS", "IS", "CF")
+             if period and (pr := period_problem(st, record.get("raw", {}).get(st), period[0], period[1]))}
+    if wrong:
+        summary["period_problems"] = wrong
     if (template and summary["gate_checks"] and summary["gate_failed"] == 0 and {"BS", "IS"} <= covered
-            and balanced):
+            and balanced and not wrong):
         status = "verified"
     elif record.get("approval"):
         status = "approved"     # người duyệt đã đối chiếu ảnh gốc và cho xuất bản (verify.approve_document)

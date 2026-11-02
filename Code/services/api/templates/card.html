@@ -120,6 +120,16 @@
     <ul class="reasons">{% for s in info.causes.sentences %}
       <li>{{ s.text }}{% if s.sources %} <span class="small muted">· nguồn: {% for x in s.sources %}<button class="src link" data-doc="{{ x.document_id }}" data-page="{{ x.page }}">{{ x.label | trim }} (trang {{ x.page }})</button>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</li>{% endfor %}</ul>
   </section>{% endif %}
+  {% if info.hypotheses and admin %}
+  <section class="hypotheses panel">
+    <h2>Giả thuyết <span class="badge warn">thử nghiệm, chỉ quản trị thấy</span> <span class="muted small">(code chọn theo ngưỡng số trên BCTC đã kiểm chứng, không dùng AI; giả thuyết chưa phải kết luận)</span></h2>
+    <ul class="reasons">{% for h in info.hypotheses %}
+      <li><strong>{{ h.title }}</strong> <span class="badge {{ 'muted' if h.kind == 'gross' else 'warn' }}">{{ h.label }}</span>
+        {% if h.company %}<span class="badge {{ 'ok' if h.company_text else 'muted' }}">{{ h.company }}</span>{% endif %}<br>
+        {{ h.text }}
+        {% if h.company_text %}<br><span class="small muted">Công văn: “{{ h.company_text }}”</span>{% endif %}
+        <br><span class="small muted">{{ h.check }}{% if h.sources %} · nguồn: {% for x in h.sources %}{% if x.page %}<button class="src link" data-doc="{{ x.document_id }}" data-page="{{ x.page }}">{{ x.label | trim }} (trang {{ x.page }})</button>{% if not loop.last %}, {% endif %}{% endif %}{% endfor %}{% endif %}</span></li>{% endfor %}</ul>
+  </section>{% endif %}
   {% if info.explanation %}{% set lv = info.explanation.view %}
   <section class="letter panel">
     <h2>Công ty giải thích <span class="muted small">(công văn giải trình; hệ thống đối chiếu từng con số với BCTC đã kiểm chứng)</span></h2>

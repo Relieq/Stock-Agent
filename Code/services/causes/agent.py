@@ -504,8 +504,24 @@ def view(document_id: int) -> dict | None:
                 key = (src.get("document_id"), src.get("page"), src.get("label"))
                 if src.get("page") and key not in [(x["document_id"], x["page"], x["label"]) for x in sources]:
                     sources.append({"document_id": src["document_id"], "page": src["page"], "label": src.get("label", "")})
-        out.append({"text": s["text"], "sources": sources})
+        out.append({"text": s["text"], "sources": sources,
+                    "kinds": sorted({facts.get(u, {}).get("kind", "") for u in s.get("uses", [])})})
     return {"sentences": out}
+
+
+def email_sentences(causes: dict | None, limit: int = 2) -> list[str]:
+    """Câu đưa vào email theo dõi: bỏ câu chỉ nhắc lại LNST (email đã có), ưu tiên câu có lý do của công ty, giữ thứ tự
+    trong đoạn."""
+    if not causes:
+        return []
+    body = [s for s in causes.get("sentences", []) if set(s.get("kinds", [])) - {"metric"}]
+    pick = [s for s in body if "reason" in s.get("kinds", [])][:1]
+    for s in body:
+        if len(pick) >= limit:
+            break
+        if s not in pick:
+            pick.append(s)
+    return [s["text"] for s in body if s in pick]
 
 
 def after_extraction(conn, document_id: int, client) -> str | None:

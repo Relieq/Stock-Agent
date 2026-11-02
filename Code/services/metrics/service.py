@@ -82,7 +82,18 @@ def card_for(conn: psycopg.Connection, document_id: int) -> tuple[Card, dict] | 
             "gate": (s.get("gate_checks", 0) - s.get("gate_failed", 0), s.get("gate_checks", 0)),
             "manual_fixes": len(rec.get("manual_fixes", [])),
             "explanation": explanation(conn, ticker, year, period, scope), "causes": _causes(document_id)}
+    info["hypotheses"] = _hypotheses(conn, document_id, rec, info) if doc_type == "fs_quarter" and info["published"]         else []
     return card, info
+
+
+def _hypotheses(conn, document_id: int, rec: dict, info: dict) -> list:
+    """Giả thuyết do code chọn theo ngưỡng số (services/causes/hypotheses.py); lỗi không làm hỏng thẻ."""
+    from services.causes.hypotheses import for_document
+    try:
+        return for_document(conn, document_id, rec, info["explanation"])
+    except Exception as e:  # noqa: BLE001
+        print(f"giả thuyết tài liệu {document_id}: LỖI {e}")
+        return []
 
 
 def _causes(document_id: int) -> dict | None:

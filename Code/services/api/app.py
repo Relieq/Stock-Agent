@@ -311,7 +311,7 @@ def card_api(ticker: str, ky: str | None = None):
                 "status": info["status"]}
     # Đoạn "vì sao lợi nhuận thay đổi" đang thử nghiệm: chỉ quản trị xem trên trang, không đưa ra API công khai
     return {"published": True, "info": {k: (str(v) if v is not None and k.endswith("_at") else v)
-                                        for k, v in info.items() if k != "causes"}, "card": card_dict(card)}
+                                        for k, v in info.items() if k not in ("causes", "hypotheses")}, "card": card_dict(card)}
 
 
 @app.get("/noi-bo")

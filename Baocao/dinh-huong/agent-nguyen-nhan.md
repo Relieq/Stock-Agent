@@ -110,7 +110,7 @@ phủ (mục "Thuyết minh làm nguồn ràng buộc thứ hai" trong hướng 
 khoảng 0,003 USD. Khoảng 0,01-0,03 USD mỗi BCTC, dưới 1 USD mỗi mùa VN30. Thử trên 4 BCTC quý 3 đã về (MCH, MSN, TCB,
 VPB): dưới 0,2 USD.
 
-## 8. Giả thuyết (bản thiết kế 02/11/2026, chờ duyệt)
+## 8. Giả thuyết (duyệt và làm 02/11/2026)
 
 **Vì sao cần.** Đoạn nguyên nhân quý 3/2026 (22 BCTC) đúng số nhưng chỉ kể từng dòng KQKD. Câu chuyện chính thường nằm
 ở chỗ nhiều dòng cùng đổi một lúc, và đoạn hiện tại không nối các dòng đó lại:
@@ -135,6 +135,25 @@ VPB): dưới 0,2 USD.
 | Khoản một lần | thu nhập khác, doanh thu tài chính hoặc chi phí tài chính đổi một lượng bằng ít nhất 1/3 mức thay đổi LNTT và ít nhất 10% LNTT, theo cả hai chiều (cờ hiện tại chỉ xét lợi nhuận khác tăng) | "Phần lớn mức thay đổi đến từ … — khoản ngoài hoạt động chính, thường không lặp lại" (kèm khoản con thuyết minh nếu đã đọc, ví dụ tiền bồi thường) |
 | Lãi gộp: quy mô hay biên | lợi nhuận gộp là dòng đóng góp lớn nhất. Code tách mức đổi thành phần do doanh thu đổi (theo biên cùng kỳ) và phần do biên lãi gộp đổi; hai phần cộng đúng bằng mức đổi | "Lợi nhuận gộp tăng X: Y do doanh thu tăng, Z do biên lãi gộp tăng từ a% lên b%" (đây là số tính được, không phải giả thuyết, nhưng đặt cùng chỗ) |
 | Ngân hàng: dòng tăng/giảm khác thường | thu dịch vụ, dự phòng hoặc lãi thuần hoạt động khác của quý cao hơn gấp đôi trung bình 4 quý trước của chính ngân hàng đó | "Khác hẳn các quý trước (trung bình …); có thể có khoản một lần" |
+
+**Khác với bản thiết kế (quyết khi làm).**
+- Không ghi "công ty xác nhận" hay "công ty giải thích khác": code chỉ so từ khóa trên lời công ty, nên chỉ biết công văn
+  có nhắc tới ý đó hay không. Nhãn là "công văn có nhắc tới" (kèm lời công ty), "công văn không nhắc tới", "chưa có
+  công văn".
+- Đổi phạm vi hợp nhất: lãi công ty liên kết đổi một mình không đủ (VIC quý 4/2025 bật nhầm: phần không kiểm soát lỗ
+  sâu hơn vì công ty con lỗ). Cần dòng LCTT về công ty con hoặc doanh thu và chi phí bán hàng cùng giảm; thêm điều kiện
+  phần không kiểm soát đổi từ 10% mức thay đổi LNST công ty mẹ.
+- Khoản một lần: phải cùng chiều với LNTT và LNTT phải đổi từ 10% so với cùng kỳ. Hai lỗi thấy ở nửa test (ghi rõ vì
+  đã sửa sau khi xem nửa test): công ty chứng khoán (SSI: chi phí lãi vay là hoạt động chính) bị loại khỏi loại này;
+  chi phí tài chính đổi mà một nửa trở lên là lãi vay thì không xét. Doanh thu/chi phí tài chính ghi "có thể có khoản
+  một lần" thay vì "thường không lặp lại".
+- Ngân hàng: phần vượt trung bình phải từ 10% LNTT quý; cần ít nhất 3 trong 4 quý trước.
+
+**Lần đo đầu (02/11/2026, 120 BCTC quý đã kiểm chứng Q4/2025–Q3/2026, `eval/hypotheses.py`).** 68 BCTC có ít nhất một
+giả thuyết: tách lợi nhuận gộp 43, ngân hàng 17, khoản một lần 16, đổi phạm vi hợp nhất 3 (FPT quý 1–3/2026). Có công
+văn: nhắc tới 20 lần, không nhắc tới 6. Nửa dev (mã chẵn) 71 BCTC, nửa test 49 BCTC. Chưa chấm đúng/sai từng giả
+thuyết: "khoản một lần" chỉ kiểm được khi có số các quý sau hoặc thuyết minh, nên chấm cùng lần đo agent nguyên nhân
+sau 08/11.
 
 **Đo trước khi mở cho mọi người.**
 1. Chạy trên mọi BCTC quý đã kiểm chứng (Q4/2025 đến Q3/2026), đếm số lần mỗi loại bật.

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import psycopg
 
+from services.causes.agent import email_sentences
 from services.metrics.card import ty
 from services.metrics.service import card_for
 from services.notify import send_email
@@ -29,6 +30,10 @@ def card_email(card, info) -> tuple[str, str]:
         lines.append(f"- {x.name} quý: " + (x.q_change or ('−' if x.q_cur.value < 0 else '') + ty(x.q_cur.value)))
     if card.plan:
         lines.append(f"- Lũy kế {card.plan['name']} đạt {card.plan['pct_text']} kế hoạch năm ({ty(card.plan['plan'])})")
+    if causes := email_sentences(info.get("causes")):
+        lines += ["", "Vì sao lợi nhuận thay đổi (AI viết từ số đã kiểm chứng; mỗi con số được kiểm lại, câu vẫn có thể "
+                      "gây hiểu nhầm):"]
+        lines += [f"- {t}" for t in causes]
     if card.flags:
         lines += ["", "Cần xem kỹ:"]
         lines += [f"- {f.title}: {f.detail}" for f in card.flags]

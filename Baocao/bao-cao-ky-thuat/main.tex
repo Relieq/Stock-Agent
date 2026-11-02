@@ -1365,17 +1365,39 @@ cho tới khi đo xong trên cả mùa BCTC quý 3/2026. Các bước:
         không kiểm soát\ldots), ra phần đóng góp của từng dòng. Vì các ràng buộc đó đã đạt, tổng các phần đóng góp phải
         bằng đúng mức thay đổi LNST; không bằng thì BCTC đó không được giải thích. Nhiều BCTC năm 2026 vẫn in mã dòng
         theo mẫu cũ dù đã sang mẫu mới, nên khi không khớp hệ thống thử mã dòng của mẫu còn lại.
-  \item \textbf{Agent chọn việc.} Mỗi lượt, mô hình xem bảng phần đóng góp và những gì đã thu thập rồi chọn một việc:
-        đọc thuyết minh của một dòng, lấy nguyên nhân trong công văn giải trình (mục~\ref{sec:congvan}), hoặc dừng; tối đa
-        4 lượt và 0,03 USD mỗi BCTC.
+  \item \textbf{Agent chọn việc.} Nếu đã có công văn giải trình cùng kỳ (mục~\ref{sec:congvan}), code luôn lấy các
+        nguyên nhân trong đó, không để mô hình chọn. Sau đó mỗi lượt mô hình xem bảng phần đóng góp và những gì đã thu
+        thập rồi chọn đọc thuyết minh của một dòng hoặc dừng; tối đa 4 lượt và 0,03 USD mỗi BCTC. Bộ canh đọc công văn
+        trước BCTC trong mỗi lượt; công văn đăng sau khi đoạn đã viết thì đoạn được viết lại.
   \item \textbf{Đọc thuyết minh.} Số thuyết minh của dòng có sẵn trong KQKD đã đọc. Hệ thống tìm trang bằng cách cho mô
         hình đọc tiêu đề mục trên vài trang và chia đôi khoảng trang theo số mục; BCTC đánh số lại từ đầu trong mỗi
         phần (ví dụ \enquote{VI.14}) thì tìm đầu phần trước. Mô hình chép bảng của mục; code chỉ dùng các khoản con khi
         chúng cộng đúng bằng dòng KQKD ở cả kỳ này và cùng kỳ, kể cả khi bảng gồm nhiều dòng KQKD (tìm khối có dòng
         bằng dòng KQKD và các dòng kề cộng ra nó). Thuyết minh quý có thể chỉ in số lũy kế, nên mỗi dòng ghi rõ kỳ của số.
   \item \textbf{Viết và kiểm.} Code dựng bảng số (mỗi dòng có nguồn tới trang BCTC hoặc trang thuyết minh); mô hình viết
-        2--5 câu; bộ kiểm tra số của agent báo cáo kiểm từng câu, câu sai được viết lại tối đa 2 lần rồi bỏ.
+        2--5 câu; bộ kiểm tra số của agent báo cáo kiểm từng câu, câu sai được viết lại tối đa 2 lần rồi bỏ. Email gửi
+        người theo dõi mã có thêm 1--2 câu của đoạn này (bỏ câu chỉ nhắc lại LNST, ưu tiên câu có lý do của công ty).
 \end{enumerate}
+
+Đoạn trên kể từng dòng KQKD nhưng không nối các dòng cùng đổi một lúc thành một câu chuyện. Phần \enquote{Giả thuyết}
+của thẻ làm việc đó bằng code, không gọi mô hình. Danh sách giả thuyết cố định; mỗi loại bật khi số vượt ngưỡng:
+\begin{itemize}
+  \item \textbf{Có thể đổi phần sở hữu ở công ty con:} phần lợi nhuận của cổ đông không kiểm soát đổi ít nhất gấp 3 lần
+        (và từ 10\% mức thay đổi LNST công ty mẹ), kèm dòng LCTT về mua, bán, mất hoặc giành quyền kiểm soát công ty con,
+        hoặc doanh thu và chi phí bán hàng cùng giảm trên 20\%;
+  \item \textbf{Có thể có khoản một lần:} lợi nhuận khác, doanh thu tài chính hoặc chi phí tài chính đổi một lượng bằng
+        ít nhất 1/3 mức thay đổi LNTT và 10\% LNTT, cùng chiều với LNTT; không xét khi chi phí tài chính đổi chủ yếu do lãi
+        vay, và không xét công ty chứng khoán (lãi vay, lãi tài sản tài chính là hoạt động chính);
+  \item \textbf{Lợi nhuận gộp đổi do quy mô hay do biên:} khi lợi nhuận gộp là dòng đóng góp lớn nhất, code tách mức đổi
+        thành phần do doanh thu đổi (giữ biên cùng kỳ) và phần do biên lãi gộp đổi; hai phần cộng đúng bằng mức đổi nên
+        đây là số tính được, không phải giả thuyết;
+  \item \textbf{Ngân hàng, dòng khác hẳn các quý trước:} thu dịch vụ, dự phòng hoặc lãi thuần hoạt động khác của quý cao
+        hơn gấp đôi trung bình 4 quý trước của chính ngân hàng đó (cần ít nhất 3 quý).
+\end{itemize}
+Mỗi giả thuyết mang nhãn \enquote{giả thuyết, chưa kiểm chứng}, nói điều gì sẽ kiểm được nó (thuyết minh về công ty
+con, thuyết minh của dòng, số các quý sau) và ghi công văn giải trình có nhắc tới ý đó hay không, kèm lời công ty nếu
+có. Ngưỡng được chỉnh trên một nửa số BCTC quý (mã tài liệu chẵn), nửa còn lại chỉ dùng để đo; phần này cũng chỉ quản
+trị viên thấy cho tới khi đo xong.
 
 \subsection{Nguyên nhân từ công văn giải trình}\label{sec:congvan}
 Khi lợi nhuận biến động mạnh, công ty gửi công văn giải trình nêu nguyên nhân, thường kèm con số: doanh thu tăng bao
@@ -2242,6 +2264,7 @@ Các mục dưới đây đã có trong kế hoạch nhưng chưa thực hiện.
 \subsection{Đo độ đúng trên cả mùa BCTC quý 3/2026}\chualam
 \subsection{Đo thời gian từ lúc công bố tới lúc có thẻ trong mùa quý 3/2026}\chualam
 \subsection{Đo agent tìm nguyên nhân trên cả mùa quý 3/2026, lấy công văn giải trình làm đáp án}\chualam
+\subsection{Đo phần giả thuyết: tỷ lệ giả thuyết đúng trên nửa BCTC giữ riêng để đo}\chualam
 \subsection{Chỉ số tài chính trên thẻ KQKD: biên lợi nhuận gộp, ROE, NIM}\chualam
 \subsection{Mở rộng lên VN100}\chualam
 \subsection{Thuyết minh làm nguồn ràng buộc thứ hai cho dòng không có phép cộng (lãi trên cổ phiếu, chi phí lãi vay, mục ngoài bảng)}\chualam

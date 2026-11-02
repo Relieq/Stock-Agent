@@ -190,14 +190,16 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             conn.commit()
             s = rec["summary"]
             lag = datetime.now(timezone.utc) - listed_at if listed_at else None
+            # Vì sao lợi nhuận thay đổi: tách theo dòng KQKD, đọc thuyết minh, viết vài câu có kiểm số (hiện trên thẻ,
+            # 1-2 câu vào email nên chạy trước khi báo người theo dõi; khoảng 0,005 USD, dưới một phút)
+            causes = causes_after_extraction(conn, doc_id, vision)
+            conn.commit()
             sent = notify_watchers(conn, doc_id)
             conn.commit()
             # Sau khi đã báo người theo dõi: ô không phép kiểm nào phủ được nhà cung cấp còn lại đọc lần hai
             second = after_extraction(conn, doc_id, vision)
             # Ô lệch với BCTC kỳ khác: đọc lại ngay ở ảnh nét hơn trên cả hai bản
             rechecked = verify_after_extraction(conn, doc_id, vision)
-            # Vì sao lợi nhuận thay đổi: tách theo dòng KQKD, đọc thuyết minh, viết vài câu có kiểm số (hiện trên thẻ)
-            causes = causes_after_extraction(conn, doc_id, vision)
             conn.commit()
             second = "; ".join(x for x in (second, rechecked, causes) if x) or None
             lines.append(

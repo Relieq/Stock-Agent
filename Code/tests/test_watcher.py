@@ -46,3 +46,23 @@ def test_stuck_download_is_reported_once():
     body, ids = stuck_notice(rows, set(), now)
     assert ids == [22191] and "TCX" in body and "7 giờ" in body
     assert stuck_notice(rows, {22191}, now) == (None, [])
+
+
+def test_wait_for_db_retries_until_database_accepts(monkeypatch):
+    calls = []
+
+    class Conn:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_connect():
+        calls.append(1)
+        if len(calls) < 3:
+            raise RuntimeError("the database system is starting up")
+        return Conn()
+
+    monkeypatch.setattr(watcher, "connect", fake_connect)
+    assert watcher.wait_for_db(tries=5, delay=0) and len(calls) == 3
+    calls.clear()
+    monkeypatch.setattr(watcher, "connect", lambda: (_ for _ in ()).throw(RuntimeError("down")))
+    assert not watcher.wait_for_db(tries=2, delay=0)

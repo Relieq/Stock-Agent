@@ -228,6 +228,21 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
         notify_admin("[Soi] " + ", ".join(parts), body)
 
 
+def wait_for_db(tries: int = 36, delay: float = 5) -> bool:
+    """Chờ CSDL nhận kết nối (tối đa 3 phút). Docker bật lại sau khi máy tắt đột ngột thì mọi container chạy cùng lúc,
+    điều kiện chờ CSDL của compose chỉ áp dụng khi `up`: sáng 31/10/2026 lượt đầu gặp "the database system is starting
+    up" lúc CSDL đang tự phục hồi, mất một lượt và gửi một thư báo lỗi."""
+    for i in range(tries):
+        try:
+            with connect():
+                return True
+        except Exception:
+            if i == tries - 1:
+                return False
+            time.sleep(delay)
+    return False
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
@@ -239,6 +254,7 @@ def main() -> None:
     p.add_argument("--once", action="store_true")
     args = p.parse_args()
 
+    wait_for_db()
     notice = downtime_notice(last_heartbeat(), datetime.now(timezone.utc), args.interval)
     if notice:
         print(notice)

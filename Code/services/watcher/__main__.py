@@ -29,7 +29,7 @@ from services.db import connect
 from services.extraction.pipeline import extract_document
 from services.extraction.second_read import after_extraction
 from services.extraction.verify import after_extraction as verify_after_extraction
-from services.causes.agent import after_extraction as causes_after_extraction
+from services.causes.agent import after_extraction as causes_after_extraction, refresh_with_letters as causes_refresh
 from services.ingestion.hose import HoseClient
 from services.ingestion.registry import discover, discover_hose, download_pending, raw_data_dir
 from services.ingestion.vietstock import VietstockClient
@@ -163,9 +163,14 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             download_pending(conn, vs, year=year, period=period, doc_type=None, tickers=None)
         conn.commit()
         _check_stuck(conn)
+        lines = []
+        # Công văn giải trình vừa tải: đọc trước khi đọc BCTC để đoạn "vì sao lợi nhuận thay đổi" có lý do của công ty
+        # (bản đọc chỉ là lời chép, phép đối chiếu với BCTC chạy lại mỗi lần hiện thẻ)
+        if vision is not None:
+            lines += read_pending(conn, vision)
+            conn.commit()
         # Chỉ tự đọc BCTC của năm đang canh; dữ liệu năm trước chạy bù bằng services.extraction run
         pending = _pending_extraction(conn, since, year)
-        lines = []
         for doc_id, ticker, title, listed_at, discovered_at in pending:
             if vision is None:
                 lines.append(f"{ticker}: {title} (chưa đọc vì chưa cấu hình mô hình)")
@@ -210,9 +215,12 @@ def one_pass(year: int, since: date, vision: VisionClient | None) -> None:
             lines += resume_waiting(conn)
         except Exception as e:      # noqa: BLE001 - lỗi chạy tiếp báo cáo không làm hỏng lượt canh
             lines.append(f"LỖI chạy tiếp báo cáo: {e}")
-        # Công văn giải trình vừa tải: đọc một lần để thẻ hiện nguyên nhân kèm kết quả đối chiếu với BCTC
+        # Công văn đọc xong sau khi đoạn nguyên nhân đã viết (công văn đăng muộn hơn BCTC): viết lại đoạn đó
         if vision is not None:
-            lines += read_pending(conn, vision)
+            try:
+                lines += causes_refresh(conn, vision)
+            except Exception as e:      # noqa: BLE001
+                lines.append(f"LỖI viết lại nguyên nhân: {e}")
         conn.commit()
         lines += new_explanations
     stamp = datetime.now(VN_TZ).strftime("%d/%m %H:%M")

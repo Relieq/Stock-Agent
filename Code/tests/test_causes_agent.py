@@ -39,11 +39,11 @@ def test_guard_reason_label_only_flags_matched_numbers_called_unchecked():
 
 def test_expense_reversal_and_tax_benefit_directions():
     gas = Part("26", "Chi phí quản lý", D("-7.9") * B, D("-1282.8") * B, D("-1274.9") * B, expense=True)
-    assert "âm 7,9 tỷ (hoàn nhập hoặc lợi ích), cùng kỳ âm 1.283 tỷ (hoàn nhập hoặc lợi ích) (tăng 1.275 tỷ)" in         part_text(gas, "quý 2/2026", "GAS")
+    assert "hoàn nhập 7,9 tỷ, cùng kỳ hoàn nhập 1.283 tỷ (tăng 1.275 tỷ)" in         part_text(gas, "quý 2/2026", "GAS")
     sab = Part("52", "Thuế hoãn lại", D("-21.7") * B, D("21.2") * B, D("42.9") * B, expense=True)
     assert "(giảm 42,9 tỷ), làm LNST tăng 42,9 tỷ" in part_text(sab, "quý 2/2026", "SAB")
     vre = Part("52", "Thuế hoãn lại", D("-33.6") * B, D("15.3") * B, D("-48.9") * B, expense=True)   # in chi phí số âm
-    assert "33,6 tỷ, cùng kỳ âm 15,3 tỷ (hoàn nhập hoặc lợi ích) (tăng 48,9 tỷ), làm LNST giảm 48,9 tỷ" in         part_text(vre, "quý 2/2026", "VRE", flip=True)
+    assert "33,6 tỷ, cùng kỳ lợi ích thuế 15,3 tỷ (tăng 48,9 tỷ), làm LNST giảm 48,9 tỷ" in         part_text(vre, "quý 2/2026", "VRE", flip=True)
 
 
 def test_note_items_and_parts_selection():
@@ -52,7 +52,7 @@ def test_note_items_and_parts_selection():
     from services.causes.agent import orient_items
     # GAS: hoàn nhập dự phòng (in âm) trong thuyết minh chi phí quản lý nhỏ đi -> chi phí tăng, LNST giảm
     gas = item_text("Các khoản dự phòng", -D(492) * B, -D(1634) * B, expense=True)
-    assert "âm 492 tỷ, cùng kỳ âm 1.634 tỷ (độ lớn giảm 1.142 tỷ), làm LNST giảm 1.142 tỷ" in gas
+    assert "Các khoản dự phòng (khoản giảm trừ) 492 tỷ, cùng kỳ 1.634 tỷ (giảm 1.142 tỷ), làm LNST giảm 1.142 tỷ" in gas
     # VRE: cả khối doanh thu in âm -> xoay chiều, doanh thu tăng làm LNST tăng
     (lab, a, b), = orient_items([("Doanh thu cho thuê", -D(120) * B, -D(100) * B)], natural=D(120) * B)
     assert item_text(lab, a, b, expense=False).endswith("(tăng 20,0 tỷ), làm LNST tăng 20,0 tỷ")
@@ -92,3 +92,33 @@ def test_guard_accepts_profit_loss_label_with_loss_value():
     r = check_sentence("Lãi/(lỗ) thuần từ mua bán chứng khoán đầu tư quý 2/2026 là lỗ 21,3 tỷ đồng, so với lãi 446 tỷ đồng "
                        "cùng kỳ, giảm 467 tỷ đồng.", ["S1", "S2"], sh, {"ACB"}, {"ACB"})
     assert not [v for v in r.violations if v.kind == "direction"]
+
+
+def test_no_negative_word_in_sheet_lines():
+    from services.causes.agent import item_text
+    # VIB quý 3: trả lãi tiền gửi in âm hai kỳ; VPL: lỗ tỷ giá đổi dấu
+    vib = item_text("Trả lãi tiền gửi", -D(17169) * B, -D(12126) * B, expense=False)
+    assert "âm" not in vib and "Trả lãi tiền gửi (khoản giảm trừ) 17.169 tỷ, cùng kỳ 12.126 tỷ (tăng 5.043 tỷ), làm LNST giảm 5.043 tỷ" in vib
+    vpl = item_text("Lỗ chênh lệch tỷ giá", -D("9.5") * B, D("52.1") * B, expense=True)
+    assert "âm" not in vpl and "9,5 tỷ (khoản giảm trừ), cùng kỳ 52,1 tỷ" in vpl
+
+
+def test_letter_refresh_only_when_paragraph_lacks_company_reasons():
+    from services.causes.agent import needs_letter_refresh
+    done = {"status": "done", "gathered": [{"tool": "note", "items": []}]}
+    assert needs_letter_refresh(done, 3)
+    assert not needs_letter_refresh(done, 0)                          # công văn không có lý do dùng được
+    assert not needs_letter_refresh({**done, "status": "failed"}, 3)
+    assert not needs_letter_refresh(None, 3)
+    with_letter = {"status": "done", "gathered": [{"tool": "letter", "reasons": [["x", "khớp", ""]]}]}
+    assert not needs_letter_refresh(with_letter, 3)                  # đã viết lại một lần: không lặp
+
+
+def test_line_code_strips_brackets_and_labels():
+    from services.causes.agent import line_code
+    codes = {"20": {}, "b.nii": {}, "60": {}}
+    assert line_code("[20]", codes) == "20"
+    assert line_code("[20] Lợi nhuận gộp", codes) == "20"
+    assert line_code("b.nii", codes) == "b.nii"
+    assert line_code("[b.nii]", codes) == "b.nii"
+    assert line_code("99", codes) == "99"

@@ -110,7 +110,39 @@ phủ (mục "Thuyết minh làm nguồn ràng buộc thứ hai" trong hướng 
 khoảng 0,003 USD. Khoảng 0,01-0,03 USD mỗi BCTC, dưới 1 USD mỗi mùa VN30. Thử trên 4 BCTC quý 3 đã về (MCH, MSN, TCB,
 VPB): dưới 0,2 USD.
 
-## 8. Thứ tự làm
+## 8. Giả thuyết (bản thiết kế 02/11/2026, chờ duyệt)
+
+**Vì sao cần.** Đoạn nguyên nhân quý 3/2026 (22 BCTC) đúng số nhưng chỉ kể từng dòng KQKD. Câu chuyện chính thường nằm
+ở chỗ nhiều dòng cùng đổi một lúc, và đoạn hiện tại không nối các dòng đó lại:
+- FPT: lợi nhuận gộp −2.255 tỷ, phần của cổ đông không kiểm soát 467 → 6,2 tỷ, lãi công ty liên kết +666 tỷ;
+- MWG: phần của cổ đông không kiểm soát 12,8 → 427 tỷ;
+- GVR: tiền bồi thường 1.779 tỷ; VIC: doanh thu tài chính −27.594 tỷ;
+- STB: thu dịch vụ 673 → 4.255 tỷ cùng lúc dự phòng 1.044 → 5.729 tỷ.
+
+**Nguyên tắc.**
+- Danh sách giả thuyết cố định. Code quyết định giả thuyết nào hiện, theo ngưỡng số; mô hình không tự nghĩ giả thuyết.
+- Câu do code điền theo mẫu, không gọi mô hình (0 USD). Mỗi số bấm ra trang BCTC như các số khác.
+- Mỗi giả thuyết có nhãn "giả thuyết, chưa kiểm chứng". Nếu có lý do của công ty thì đặt ngay cạnh: công văn nói cùng
+  ý thì ghi "công ty xác nhận"; nói khác thì ghi "công ty giải thích khác"; không có công văn thì ghi "công ty chưa nêu".
+- Mỗi giả thuyết nói rõ điều gì sẽ xác nhận hoặc bác bỏ nó (ví dụ "thuyết minh về công ty con cuối kỳ").
+- Không nhận định tốt/xấu, không nói về giá cổ phiếu.
+
+**Bốn loại.**
+
+| Loại | Code bật khi | Câu mẫu (rút gọn) |
+|---|---|---|
+| Đổi phạm vi hợp nhất | phần của cổ đông không kiểm soát đổi ít nhất gấp 3 lần (hoặc giảm còn dưới 1/3), cộng thêm ít nhất một dấu hiệu: lãi công ty liên kết đổi ít nhất gấp 3 lần, có dòng LCTT về mua/bán công ty con, hoặc doanh thu và chi phí bán hàng cùng giảm trên 20% | "Nhiều dòng cùng đổi một lúc (…), giống trường hợp công ty thay đổi phần sở hữu ở công ty con" |
+| Khoản một lần | thu nhập khác, doanh thu tài chính hoặc chi phí tài chính đổi một lượng bằng ít nhất 1/3 mức thay đổi LNTT và ít nhất 10% LNTT, theo cả hai chiều (cờ hiện tại chỉ xét lợi nhuận khác tăng) | "Phần lớn mức thay đổi đến từ … — khoản ngoài hoạt động chính, thường không lặp lại" (kèm khoản con thuyết minh nếu đã đọc, ví dụ tiền bồi thường) |
+| Lãi gộp: quy mô hay biên | lợi nhuận gộp là dòng đóng góp lớn nhất. Code tách mức đổi thành phần do doanh thu đổi (theo biên cùng kỳ) và phần do biên lãi gộp đổi; hai phần cộng đúng bằng mức đổi | "Lợi nhuận gộp tăng X: Y do doanh thu tăng, Z do biên lãi gộp tăng từ a% lên b%" (đây là số tính được, không phải giả thuyết, nhưng đặt cùng chỗ) |
+| Ngân hàng: dòng tăng/giảm khác thường | thu dịch vụ, dự phòng hoặc lãi thuần hoạt động khác của quý cao hơn gấp đôi trung bình 4 quý trước của chính ngân hàng đó | "Khác hẳn các quý trước (trung bình …); có thể có khoản một lần" |
+
+**Đo trước khi mở cho mọi người.**
+1. Chạy trên mọi BCTC quý đã kiểm chứng (Q4/2025 đến Q3/2026), đếm số lần mỗi loại bật.
+2. Đọc từng ca và ghi đúng/sai. Với các BCTC có công văn, đếm số ca công văn xác nhận và số ca công văn nói khác.
+3. Chỉnh ngưỡng trên nửa số ca, đo lại trên nửa còn lại (cách đã làm với bộ kiểm tra của agent báo cáo).
+4. Chỉ quản trị thấy cho đến khi người dùng duyệt kết quả đo; sau đó mới hiện cho mọi người, có nhãn rõ ràng.
+
+## 9. Thứ tự làm
 
 1. Phân rã bằng code cho ba mẫu, có test (không tốn tiền).
 2. Định vị và chép thuyết minh, kiểm tổng; thử trên 4 BCTC quý 3.

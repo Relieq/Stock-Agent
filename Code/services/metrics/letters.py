@@ -49,10 +49,12 @@ def _cached(doc_id: int) -> dict | None:
 def _section(sections: list[dict], scope: str) -> dict | None:
     """Phần dùng cho thẻ quý: cùng phạm vi BCTC (hợp nhất hoặc riêng duy nhất), ưu tiên phần nói về riêng quý."""
     same = [s for s in sections if s["scope"] != "separate" or scope == "separate"]
-    for kind in ("quarter", "ytd", "half_year", "year"):
-        for s in same:
-            if s["period_kind"] == kind:
-                return s
+    # Phần có nêu lý do trước: MWG quý 3/2026 phần riêng quý chỉ có số, lý do nằm ở phần lũy kế 9 tháng
+    for want_reasons in (True, False):
+        for kind in ("quarter", "ytd", "half_year", "year"):
+            for s in same:
+                if s["period_kind"] == kind and (bool(s.get("reasons")) or not want_reasons):
+                    return s
     return None
 
 

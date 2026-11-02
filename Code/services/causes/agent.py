@@ -31,7 +31,7 @@ PERIOD_WORDS = {"quarter": "quý {q}/{y}", "ytd": "lũy kế {m} tháng năm {y}
 MONTHS = {"Q1": 3, "Q2": 6, "Q3": 9, "Q4": 12}
 
 STEP_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["action", "line", "why"], "properties": {
-    "action": {"type": "string", "enum": ["note", "letter", "done"]},
+    "action": {"type": "string", "enum": ["note", "done"]},
     "line": {"type": "string"}, "why": {"type": "string"}}}
 STEP_PROMPT = """Bạn giúp tìm nguyên nhân LNST của {ticker} {period} thay đổi so với cùng kỳ. Code đã tách mức thay đổi theo
 từng dòng của KQKD (số đã kiểm chứng, đơn vị tỷ đồng; đóng góp dương là làm LNST tăng):
@@ -43,7 +43,6 @@ từng dòng của KQKD (số đã kiểm chứng, đơn vị tỷ đồng; đó
 Chọn MỘT việc tiếp theo để giải thích các dòng đóng góp lớn nhất:
 - "note": đọc thuyết minh của một dòng (line = mã dòng trong bảng trên, chỉ dòng có ghi "có thuyết minh"); thuyết minh
   tách dòng đó thành các khoản con (ví dụ thu nhập lãi từ cho vay, từ tiền gửi).
-- "letter": lấy nguyên nhân công ty nêu trong công văn giải trình (chỉ khi bảng ghi "có công văn"; line để trống).
 - "done": đã đủ để giải thích, hoặc không còn việc gì đáng làm.
 Không chọn lại việc đã làm. why: một câu ngắn vì sao."""
 
@@ -63,14 +62,26 @@ Cách viết:
 - Khoản con thuyết minh chỉ giải thích dòng của nó (dòng bảng số ghi nó làm dòng nào tăng/giảm); không so khoản con với
   các dòng KQKD bằng "lớn nhất", và số lũy kế không so với số quý.
 - Chỉ nói "công ty không nêu nguyên nhân" khi bảng số có dòng nguyên nhân từ công văn.
-- Số ghi "âm ... (hoàn nhập hoặc lợi ích)" là khoản làm giảm chi phí; số ghi "lỗ" là lỗ: giữ đúng như vậy trong câu.
+- Số ghi "hoàn nhập", "lợi ích thuế" là khoản làm giảm chi phí; "khoản giảm trừ" là khoản trừ trong dòng của nó; số ghi
+  "lỗ" là lỗ: giữ đúng các chữ đó trong câu, không viết "âm".
 - Mỗi dòng bảng số đã ghi rõ kỳ (riêng quý hay lũy kế). Viết đúng kỳ của dòng đó; không gán số lũy kế cho riêng quý,
-  không rào đón về kỳ khi dòng đã ghi rõ.
+  không rào đón về kỳ khi dòng đã ghi rõ. Câu dùng số lũy kế đặt sau các câu riêng quý và mở đầu bằng "Lũy kế ... tháng".
+- Nguyên nhân công ty nêu trong công văn (nếu bảng có) phải có trong đoạn, đặt cạnh dòng số mà nó giải thích.
 - Mỗi câu ghi trong "uses" mã các dòng bảng số câu dùng. Chỉ dùng con số có trong các dòng đã ghi, chép đúng như bảng
   (được làm tròn bớt). Không tự tính số mới. Từ tăng/giảm phải đúng như bảng.
 - Nguyên nhân ghi "theo công ty" thì viết rõ là theo công ty. Không khuyến nghị mua bán, không nói về giá cổ phiếu.
 - Không nhắc mã dòng (S1...) hay mã chỉ tiêu trong câu.
 {feedback}"""
+
+
+def line_code(line: str, codes) -> str:
+    """Mã dòng mô hình chọn, bỏ ngoặc và tên dòng chép theo bảng ("[20]", "[20] Lợi nhuận gộp" -> "20"). Quý 3/2026:
+    6/22 BCTC không đọc được thuyết minh nào vì mô hình chép cả ngoặc vuông."""
+    s = line.strip()
+    if s in codes:
+        return s
+    m = re.match(r"\[?\s*([\w.()]+?)\s*\]", s) or re.match(r"([\w.]+)", s)
+    return m.group(1) if m and m.group(1) in codes else s
 
 
 def _signed_ty(v: Decimal) -> str:
@@ -101,7 +112,9 @@ def part_text(p, label: str, ticker: str, flip: bool = False) -> str:
     else:
         sign = -1 if flip and not p.code.startswith("(") else 1      # phần cổ đông không kiểm soát do code tính
         cur, prev = sign * p.cur, sign * p.prev
-        show = lambda v: ty(v) if v >= 0 else f"âm {ty(v)} (hoàn nhập hoặc lợi ích)"     # noqa: E731
+        # Chi phí âm gọi đúng tên thay cho "âm ... tỷ" (người đọc quý 3 thấy khó hiểu): lợi ích thuế hoặc hoàn nhập
+        neg = "lợi ích thuế" if "thuế" in p.label.lower() else "hoàn nhập"
+        show = lambda v: ty(v) if v >= 0 else f"{neg} {ty(v)}"     # noqa: E731
         if "hoàn nhập" in p.label.lower():
             # SHB: dòng "Hoàn nhập/(Chi phí) dự phòng" in (3.825) là khoản chi, từng bị viết là hoàn nhập
             p = type(p)(**{**p.__dict__, "label": f"{p.label} (số dương là khoản chi, âm là hoàn nhập)"})
@@ -114,19 +127,21 @@ def item_text(lab: str, a: Decimal, b: Decimal, expense: bool, target: tuple[str
     """Khoản con trong thuyết minh của một dòng KQKD, đã xoay chiều theo bảng (orient_items). `expense`: dòng đó là khoản
     trừ trong công thức LNST. Khoản âm là khoản đi ngược dòng của nó (hoàn nhập trong dòng chi phí, khoản trừ trong dòng
     thu nhập). Ghi luôn tác động lên LNST để câu không phải tự suy (GAS quý 2: "các khoản dự phòng" (492) so với (1.634)
-    tỷ là hoàn nhập ít đi, tức chi phí tăng và LNST giảm, từng bị viết là "làm tăng lợi nhuận")."""
-    show = lambda v: ty(v) if v >= 0 else f"âm {ty(v)}"     # noqa: E731
+    tỷ là hoàn nhập ít đi, tức chi phí tăng và LNST giảm, từng bị viết là "làm tăng lợi nhuận").
+    Khoản âm ghi là "khoản giảm trừ" thay cho "âm ... tỷ" (VIB quý 3: "trả lãi tiền gửi âm 17.169 tỷ" khó hiểu)."""
+    show = lambda v: ty(v) if v >= 0 else f"{ty(v)} (khoản giảm trừ)"     # noqa: E731
     name, sign = target
     effect = (b - a) if expense else (a - b)
     if a <= 0 and b <= 0 and (a, b) != (0, 0):
-        change = f"độ lớn {'tăng' if -a >= -b else 'giảm'} {ty(a - b)}"     # khoản trừ: nói theo độ lớn (VPB quý 3)
+        # khoản trừ cả hai kỳ: nói theo độ lớn (VPB quý 3), chỉ ghi "khoản giảm trừ" một lần
+        shown = f"{lab} (khoản giảm trừ) {ty(a)}, cùng kỳ {ty(b)} ({'tăng' if -a >= -b else 'giảm'} {ty(a - b)})"
     else:
-        change = f"{'tăng' if a >= b else 'giảm'} {ty(a - b)}"
+        shown = f"{lab} {show(a)}, cùng kỳ {show(b)} ({'tăng' if a >= b else 'giảm'} {ty(a - b)})"
     if sign != 0:
         # Dòng là một phần của dòng lớn hơn (doanh thu trong lợi nhuận gộp): không gán cả mức thay đổi cho dòng lớn vì
         # phần còn lại có thể đi ngược (MSN quý 3: doanh thu tăng 30.723 tỷ, lợi nhuận gộp chỉ tăng 8.912 tỷ)
-        return f"{lab} {show(a)}, cùng kỳ {show(b)} ({change}); thuộc dòng {name}"
-    return (f"{lab} {show(a)}, cùng kỳ {show(b)} ({change}), "
+        return f"{shown}; thuộc dòng {name}"
+    return (f"{shown}, "
             f"làm LNST {'tăng' if effect >= 0 else 'giảm'} {ty(effect)}")
 
 
@@ -142,6 +157,7 @@ def orient_items(items: list[tuple[str, Decimal, Decimal]], natural: Decimal | N
 
 MAX_PARTS = 6
 MIN_PART_SHARE = Decimal("0.1")     # dòng nhỏ hơn 10% dòng đóng góp lớn nhất thì không đưa vào bảng số
+NOTE_MIN_SHARE = Decimal("0.05")    # khoản con thuyết minh đổi ít hơn 5% mức thay đổi LNST cùng loại kỳ thì bỏ
 
 
 def sheet_parts(bd):
@@ -318,8 +334,6 @@ class CauseAgent:
             for p in bd.parts[:8]:
                 has = "có thuyết minh" if self.note_codes(p.code) else "không có thuyết minh"
                 lines.append(f"  [{p.code}] {p.label}: đóng góp {_signed_ty(p.effect)} ({has})")
-        if self.letter_available():
-            lines.append("Có công văn giải trình của công ty cho kỳ này.")
         return "\n".join(lines)
 
     def letter_available(self) -> bool:
@@ -348,6 +362,10 @@ class CauseAgent:
         bd = self.bd["quarter"]
         if bd is None or not bd.ok:
             return
+        # Công văn giải trình: code luôn lấy, không để mô hình chọn (quý 3/2026: 4 mã có công văn đã đọc nhưng mô hình
+        # chọn đọc thuyết minh, không đoạn nào có lý do của công ty)
+        if self.letter_available():
+            self.gathered += self.read_letter()
         done: set[tuple[str, str]] = set()
         for _ in range(MAX_STEPS):
             if self.spent() >= MAX_USD:
@@ -357,6 +375,7 @@ class CauseAgent:
                 STEP_PROMPT.format(ticker=self.ticker, period=_period_label(self.period, self.year, "quarter"),
                                    breakdown=self._breakdown_text(), gathered=self._gathered_text()),
                 [], STEP_SCHEMA, "cause_step")
+            step["line"] = line_code(step.get("line", ""), self.st.values)
             self.steps.append(step)
             key = (step["action"], step["line"] if step["action"] == "note" else "")
             if step["action"] == "done" or key in done:
@@ -364,8 +383,6 @@ class CauseAgent:
             done.add(key)
             if step["action"] == "note" and self.notes is not None and self.note_codes(step["line"]):
                 self.gathered += self.read_note(step["line"])
-            elif step["action"] == "letter":
-                self.gathered += self.read_letter()
             else:
                 break
 
@@ -398,7 +415,11 @@ class CauseAgent:
                 target = self.effect_target(g["line"])
                 qv = self.st.values.get(g["line"], {})
                 q_change = abs((qv.get("q_cur") or 0) - (qv.get("q_prev_year") or 0))
+                same_kind = self.bd.get(g["period"])
+                floor = abs(same_kind.change) * NOTE_MIN_SHARE if same_kind is not None and same_kind.ok else 0
                 for lab, a, b in items:
+                    if abs(a - b) < floor:
+                        continue    # khoản quá nhỏ so với mức thay đổi LNST cùng kỳ (MSN quý 3: hàng bán bị trả lại 33 tỷ)
                     if g["period"] == "ytd" and q_change < abs(a - b) * MIN_PART_SHARE:
                         continue    # số lũy kế đổi nhiều mà dòng trong quý gần như không đổi: không giải thích được quý này
                                     # (SSB: bán công ty con ở quý 1/2025 từng được dùng để giải thích quý 2)
@@ -409,9 +430,13 @@ class CauseAgent:
                            sources=[{"document_id": self.doc_id, "page": g["pages"][0] if g["pages"] else None,
                                      "label": f"Thuyết minh {g['number']}", "column": g["period"]}])
             elif g["tool"] == "letter":
-                for text, verdict, detail in g["reasons"][:4]:
-                    from services.analyst.tools import words_only
+                from services.analyst.tools import words_only
+                used = 0
+                for text, verdict, detail in g["reasons"]:
                     shown = text if verdict == "số khớp BCTC" else words_only(text)
+                    if "…" in shown or used == 4:
+                        continue    # lý do chủ yếu là số chưa kiểm: bỏ số đi chỉ còn "dư nợ tăng … đồng" (STB quý 3)
+                    used += 1
                     sh.add("reason", f"Nguyên nhân {self.ticker} nêu trong công văn giải trình ({verdict}): {shown}",
                            ticker=self.ticker, sources=[{"document_id": g["letter_id"], "page": None,
                                                          "label": "Công văn giải trình"}])
@@ -498,3 +523,42 @@ def after_extraction(conn, document_id: int, client) -> str | None:
     if r["status"] != "done":
         return f"nguyên nhân biến động: không viết được ({r.get('note') or r['status']})"
     return f"nguyên nhân biến động: {len(r['sentences'])} câu ({r['usd']:.4f} USD)"
+
+
+def has_letter_reasons(data: dict) -> bool:
+    return any(g["tool"] == "letter" and g.get("reasons") for g in data.get("gathered", []))
+
+
+def needs_letter_refresh(data: dict | None, letter_reasons: int) -> bool:
+    """Đoạn đã viết mà chưa có lý do của công ty, trong khi công văn cùng kỳ nay đã đọc và có lý do dùng được."""
+    return data is not None and data.get("status") == "done" and letter_reasons > 0 and not has_letter_reasons(data)
+
+
+def refresh_with_letters(conn, client, days: int = 45) -> list[str]:
+    """Viết lại đoạn nguyên nhân khi công văn giải trình đọc xong sau đoạn đó (quý 3/2026: 5/9 mã có công văn bị lỡ vì
+    đoạn viết ngay khi đọc xong BCTC, công văn đọc chậm hơn 1-16 phút hoặc đăng sau). Bộ canh gọi cuối mỗi lượt."""
+    from services.metrics.service import explanation
+    if client is None:
+        return []
+    rows = conn.execute(
+        """SELECT id, ticker, fiscal_year, fiscal_period, scope FROM documents
+           WHERE doc_type = 'fs_quarter' AND content_kind = 'full' AND status IN ('verified', 'approved')
+             AND owner_user_id IS NULL AND duplicate_of IS NULL AND processed_at > now() - make_interval(days => %s)""",
+        (days,)).fetchall()
+    out = []
+    for doc_id, ticker, year, period, scope in rows:
+        path = raw_data_dir() / "causes" / f"{doc_id}.json"
+        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+        if data is None or data.get("status") != "done" or has_letter_reasons(data):
+            continue
+        e = explanation(conn, ticker, year, period, scope)
+        usable = [r for r in e["view"].reasons if r.css != "bad"] if e is not None and e["view"].read else []
+        if not needs_letter_refresh(data, len(usable)):
+            continue
+        try:
+            r = CauseAgent(conn, doc_id, client).run()
+            out.append(f"{ticker} {period}/{year}: viết lại nguyên nhân kèm công văn, {len(r.get('sentences', []))} câu "
+                       f"({r['usd']:.4f} USD)")
+        except Exception as e2:      # noqa: BLE001
+            out.append(f"{ticker} {period}/{year}: viết lại nguyên nhân LỖI {e2}")
+    return out

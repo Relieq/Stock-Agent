@@ -89,3 +89,12 @@ def test_company_own_grouping_is_not_checkable():
     r = {"text": "Chi từ các hoạt động còn lại tăng 1.054 tỷ đồng", "about": "company", "line_item": "provision",
          "direction": "up", "number_kind": "change", "pct": None, "amount": "1.054 tỷ đồng", "amount_unit": "tỷ đồng"}
     assert check_reason(r, facts, "quarter").verdict == "không kiểm được"
+
+
+def test_card_section_prefers_part_with_reasons():
+    from services.metrics.letters import _section
+    secs = [{"scope": "consolidated", "period_kind": "quarter", "reasons": []},
+            {"scope": "consolidated", "period_kind": "ytd", "reasons": [{"text": "x"}]},
+            {"scope": "separate", "period_kind": "quarter", "reasons": [{"text": "y"}]}]
+    assert _section(secs, "consolidated")["period_kind"] == "ytd"          # MWG quý 3/2026
+    assert _section(secs[:1], "consolidated")["period_kind"] == "quarter"  # không phần nào có lý do: như cũ
